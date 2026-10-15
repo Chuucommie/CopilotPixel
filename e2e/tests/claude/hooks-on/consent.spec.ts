@@ -129,7 +129,7 @@ test.describe('Hooks consent gate', () => {
 
     narrator.step('waiting for the first-run Intro');
     const dialog = await openConsentDialog(frame);
-    await expect(dialog).toContainText('Welcome to Pixel Agents!');
+    await expect(dialog).toContainText('Welcome to CopilotPixel!');
 
     // Diegetic: the tour is a greeter character's speech bubble, and the camera
     // shifts so character + bubble are centered — the bubble ends up FULLY on
@@ -162,9 +162,9 @@ test.describe('Hooks consent gate', () => {
     // The disclosure is the point: what is written, what data moves, how to undo.
     const text = (await dialog.textContent()) ?? '';
     expect(text).toContain('One more thing: hooks!');
-    expect(text).toMatch(/adds hooks for 12 Claude Code events/);
-    expect(text).toContain('~/.claude/settings.json');
-    expect(text).toContain('.pixel-agents.backup');
+    expect(text).toContain('dedicated hook file');
+    expect(text).toContain('~/.copilot/hooks/');
+    expect(text).toContain('copilot-hook.js');
     expect(text).toMatch(/tool inputs/);
     expect(text).toContain('127.0.0.1');
     // The LAST sentence of the disclosure — asserted at the tail so a clipped

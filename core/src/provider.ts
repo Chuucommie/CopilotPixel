@@ -1,10 +1,9 @@
 /**
  * Provider abstraction for AI agent tools.
  *
- * Only HookProvider ships today (Claude Code). Transcript-polling and push-based
- * provider types will be added when a real second provider (Codex, Goose,
- * Discord, etc.) actually lands, derived from that provider's needs rather than
- * speculation.
+ * The active shipped HookProvider is GitHub Copilot CLI. The legacy Claude
+ * implementation remains available for compatibility but is not registered
+ * by the product. Other provider types should be derived from real integrations.
  */
 
 import type { TeamProvider } from './teamProvider.js';

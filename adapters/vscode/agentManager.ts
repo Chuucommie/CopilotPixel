@@ -30,7 +30,7 @@ export function getProjectDirPath(cwd?: string): string {
     return workspacePath;
   }
   const projectDir = dirs[0];
-  console.log(`[Pixel Agents] Terminal: Project dir: ${workspacePath} → ${projectDir}`);
+  console.log(`[CopilotPixel] Terminal: Project dir: ${workspacePath} → ${projectDir}`);
   return projectDir;
 }
 
@@ -63,7 +63,7 @@ export async function launchNewTerminal(
     cwd,
   });
   // When suppressShow is set (auto-spawn + autoShowPanel), keep the panel view
-  // on Pixel Agents instead of switching to Terminal. Claude Code still runs
+  // on CopilotPixel instead of switching to Terminal. Claude Code still runs
   // via sendText below; user can click the character to focus the terminal via
   // the existing focusAgent message handler.
   if (!suppressShow) {
@@ -125,7 +125,7 @@ export async function launchNewTerminal(
   agents.set(id, agent);
   activeAgentIdRef.current = id;
   persistAgents();
-  console.log(`[Pixel Agents] Terminal: Agent ${id} - created for terminal ${terminal.name}`);
+  console.log(`[CopilotPixel] Terminal: Agent ${id} - created for terminal ${terminal.name}`);
 
   ensureProjectScan(
     projectDir,
@@ -144,13 +144,13 @@ export async function launchNewTerminal(
   // Poll for the specific JSONL file to appear
   const createdAt = Date.now();
   let pollCount = 0;
-  console.log(`[Pixel Agents] Terminal: Agent ${id} - waiting for JSONL at ${agent.jsonlFile}`);
+  console.log(`[CopilotPixel] Terminal: Agent ${id} - waiting for JSONL at ${agent.jsonlFile}`);
   const pollTimer = setInterval(() => {
     pollCount++;
     try {
       if (fs.existsSync(agent.jsonlFile)) {
         console.log(
-          `[Pixel Agents] Terminal: Agent ${id} - found JSONL file ${path.basename(agent.jsonlFile)} (after ${pollCount}s)`,
+          `[CopilotPixel] Terminal: Agent ${id} - found JSONL file ${path.basename(agent.jsonlFile)} (after ${pollCount}s)`,
         );
         clearInterval(pollTimer);
         jsonlPollTimers.delete(id);
@@ -182,7 +182,7 @@ export async function launchNewTerminal(
           dirContents = 'Dir does not exist';
         }
         console.warn(
-          `[Pixel Agents] Terminal: Agent ${id} - JSONL file not found after 10s. ` +
+          `[CopilotPixel] Terminal: Agent ${id} - JSONL file not found after 10s. ` +
             `Expected: ${agent.jsonlFile}. ${dirContents}`,
         );
       } else if (pollCount > 10) {
@@ -202,7 +202,7 @@ export async function launchNewTerminal(
 
           if (candidates.length > 0) {
             console.log(
-              `[Pixel Agents] Terminal: Agent ${id} - /resume detected, reassigning to ${path.basename(candidates[0].file)}`,
+              `[CopilotPixel] Terminal: Agent ${id} - /resume detected, reassigning to ${path.basename(candidates[0].file)}`,
             );
             clearInterval(pollTimer);
             jsonlPollTimers.delete(id);
@@ -400,11 +400,11 @@ export function restoreAgents(
     knownJsonlFiles.add(p.jsonlFile);
     if (isExternal) {
       console.log(
-        `[Pixel Agents] Terminal: Agent ${p.id} - restored external → ${path.basename(p.jsonlFile)}`,
+        `[CopilotPixel] Terminal: Agent ${p.id} - restored external → ${path.basename(p.jsonlFile)}`,
       );
     } else {
       console.log(
-        `[Pixel Agents] Terminal: Agent ${p.id} - restored → terminal "${p.terminalName}"`,
+        `[CopilotPixel] Terminal: Agent ${p.id} - restored → terminal "${p.terminalName}"`,
       );
       justRestoredTerminalIds.push(p.id);
     }
@@ -438,7 +438,7 @@ export function restoreAgents(
         const pollTimer = setInterval(() => {
           try {
             if (fs.existsSync(agent.jsonlFile)) {
-              console.log(`[Pixel Agents] Terminal: Agent ${p.id} - found JSONL file`);
+              console.log(`[CopilotPixel] Terminal: Agent ${p.id} - found JSONL file`);
               clearInterval(pollTimer);
               jsonlPollTimers.delete(p.id);
               const stat = fs.statSync(agent.jsonlFile);
@@ -476,7 +476,7 @@ export function restoreAgents(
         const agent = store.get(id);
         if (agent && !agent.isExternal && agent.linesProcessed === 0) {
           console.log(
-            `[Pixel Agents] Terminal: Agent ${id} - removing restored agent, no data received`,
+            `[CopilotPixel] Terminal: Agent ${id} - removing restored agent, no data received`,
           );
           agent.terminalRef?.dispose();
           removeAgent(
@@ -549,7 +549,7 @@ export function sendExistingAgents(
     }
   }
   console.log(
-    `[Pixel Agents] sendExistingAgents: agents=${JSON.stringify(agentIds)}, meta=${JSON.stringify(agentMeta)}`,
+    `[CopilotPixel] sendExistingAgents: agents=${JSON.stringify(agentIds)}, meta=${JSON.stringify(agentMeta)}`,
   );
 
   webview.postMessage({

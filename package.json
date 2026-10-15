@@ -1,12 +1,12 @@
 {
-  "name": "pixel-agents",
-  "displayName": "Pixel Agents",
+  "name": "copilot-pixe",
+  "displayName": "CopilotPixel",
   "description": "GitHub Copilot CLI session monitor for VS Code",
   "version": "1.4.1",
-  "publisher": "pablodelucca",
+  "publisher": "chuucommie",
   "repository": {
     "type": "git",
-    "url": "https://github.com/pixel-agents-hq/pixel-agents"
+    "url": "https://github.com/Chuucommie/CopilotPixel"
   },
   "workspaces": [
     "server",
@@ -29,7 +29,7 @@
   ],
   "main": "./dist/extension.js",
   "bin": {
-    "pixel-agents": "./dist/cli.js"
+    "copilot-pixe": "./dist/cli.js"
   },
   "files": [
     "CHANGELOG.md",
@@ -46,18 +46,18 @@
     "commands": [
       {
         "command": "pixel-agents.showPanel",
-        "title": "Pixel Agents: Show Panel"
+        "title": "CopilotPixel: Show Panel"
       },
       {
         "command": "pixel-agents.exportDefaultLayout",
-        "title": "Pixel Agents: Export Layout as Default"
+        "title": "CopilotPixel: Export Layout as Default"
       }
     ],
     "viewsContainers": {
       "panel": [
         {
           "id": "pixel-agents-panel",
-          "title": "Pixel Agents",
+          "title": "CopilotPixel",
           "icon": "$(window)"
         }
       ]
@@ -67,17 +67,17 @@
         {
           "type": "webview",
           "id": "pixel-agents.panelView",
-          "name": "Pixel Agents"
+          "name": "CopilotPixel"
         }
       ]
     },
     "configuration": {
-      "title": "Pixel Agents",
+      "title": "CopilotPixel",
       "properties": {
         "pixel-agents.autoShowPanel": {
           "type": "boolean",
           "default": false,
-          "description": "Automatically open and focus the Pixel Agents panel when VS Code starts."
+          "description": "Automatically open and focus the CopilotPixel panel when VS Code starts."
         },
         "pixel-agents.autoSpawnAgent": {
           "type": "boolean",

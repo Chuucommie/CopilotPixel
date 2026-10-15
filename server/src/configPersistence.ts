@@ -45,8 +45,8 @@ export interface PixelAgentsConfig {
   vscode: AdapterSettings;
   standalone: AdapterSettings;
   externalAssetDirectories: string[];
-  /** Per-provider consent to modify that provider's settings file (Claude:
-   *  ~/.claude/settings.json). Shared across surfaces — consent is per-human
+  /** Per-provider consent to modify that provider's hook configuration.
+   *  Shared across surfaces — consent is per-human
    *  per-provider, not per-adapter. A provider absent from the map has never
    *  been answered. */
   hooksConsent: Record<string, HooksConsentState>;
@@ -172,7 +172,7 @@ export function readConfig(): PixelAgentsConfig {
       hooksEnabled: parseHooksEnabled(parsed.hooksEnabled),
     };
   } catch (err) {
-    console.error('[Pixel Agents] Failed to read config file:', err);
+    console.error('[CopilotPixel] Failed to read config file:', err);
     return {
       vscode: { ...DEFAULT_ADAPTER_SETTINGS },
       standalone: { ...DEFAULT_ADAPTER_SETTINGS },
@@ -184,7 +184,7 @@ export function readConfig(): PixelAgentsConfig {
 }
 
 // ── Per-provider hooks consent + preference ─────────────────
-// The provider id keys these maps (HookProvider.id — 'claude' today). All
+// The provider id keys these maps (HookProvider.id — 'copilot' in the active app). All
 // writers go through readConfig→writeConfig, so a hand-edited or older file
 // degrades to "unanswered"/default rather than crashing.
 
@@ -294,6 +294,6 @@ export function writeConfig(config: PixelAgentsConfig): void {
     fs.writeFileSync(tmpPath, json, 'utf-8');
     fs.renameSync(tmpPath, filePath);
   } catch (err) {
-    console.error('[Pixel Agents] Failed to write config file:', err);
+    console.error('[CopilotPixel] Failed to write config file:', err);
   }
 }

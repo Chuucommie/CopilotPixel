@@ -95,7 +95,7 @@ async function stopChild(child) {
 }
 
 async function verifyInstalledTarball(tarballPath) {
-  const smokeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pixel-agents-npm-smoke-'));
+  const smokeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-pixe-npm-smoke-'));
   const smokeHome = path.join(smokeRoot, 'home');
   const smokeProject = path.join(smokeRoot, 'project');
   fs.mkdirSync(smokeHome, { recursive: true });
@@ -108,14 +108,14 @@ async function verifyInstalledTarball(tarballPath) {
   // gate's own behavior is pinned by server/__tests__/cli.test.ts,
   // consentFlow.test.ts, and the consent e2e specs). Same shape as
   // server/__tests__/cli.test.ts.
-  fs.mkdirSync(path.join(smokeHome, '.pixel-agents'), { recursive: true });
+  fs.mkdirSync(path.join(smokeHome, '.copilotpixel'), { recursive: true });
   fs.writeFileSync(
-    path.join(smokeHome, '.pixel-agents', 'config.json'),
-    JSON.stringify({ hooksConsent: { claude: 'granted' } }),
+    path.join(smokeHome, '.copilotpixel', 'config.json'),
+    JSON.stringify({ hooksConsent: { copilot: 'granted' } }),
   );
   fs.writeFileSync(
     path.join(smokeProject, 'package.json'),
-    JSON.stringify({ name: 'pixel-agents-package-smoke', private: true }, null, 2),
+    JSON.stringify({ name: 'copilot-pixe-package-smoke', private: true }, null, 2),
   );
 
   let child = null;
@@ -125,12 +125,12 @@ async function verifyInstalledTarball(tarballPath) {
       cwd: smokeProject,
     });
 
-    const installedRoot = path.join(smokeProject, 'node_modules', 'pixel-agents');
+    const installedRoot = path.join(smokeProject, 'node_modules', 'copilot-pixe');
     const installedManifest = JSON.parse(
       fs.readFileSync(path.join(installedRoot, 'package.json'), 'utf-8'),
     );
-    if (installedManifest.bin?.['pixel-agents'] !== './dist/cli.js') {
-      throw new Error('Installed package has an unexpected pixel-agents bin entry');
+    if (installedManifest.bin?.['copilot-pixe'] !== './dist/cli.js') {
+      throw new Error('Installed package has an unexpected copilot-pixe bin entry');
     }
 
     const installedCli = path.join(installedRoot, 'dist', 'cli.js');
@@ -143,15 +143,15 @@ async function verifyInstalledTarball(tarballPath) {
       smokeProject,
       'node_modules',
       '.bin',
-      process.platform === 'win32' ? 'pixel-agents.cmd' : 'pixel-agents',
+      process.platform === 'win32' ? 'copilot-pixe.cmd' : 'copilot-pixe',
     );
     const help = await execFileAsync(installedBin, ['--help'], {
       cwd: smokeProject,
       env: { ...process.env, HOME: smokeHome, USERPROFILE: smokeHome },
       shell: process.platform === 'win32',
     });
-    if (!help.stdout.includes('Usage: pixel-agents')) {
-      throw new Error('Installed pixel-agents bin did not print CLI help');
+    if (!help.stdout.includes('Usage: copilot-pixe')) {
+      throw new Error('Installed copilot-pixe bin did not print CLI help');
     }
 
     const port = await getFreePort();
@@ -201,20 +201,20 @@ async function verifyInstalledTarball(tarballPath) {
       throw new Error(`Installed package did not load non-empty bundled assets:\n${output}`);
     }
 
-    const installedHook = path.join(smokeHome, '.pixel-agents', 'hooks', 'claude-hook.js');
-    const settingsPath = path.join(smokeHome, '.claude', 'settings.json');
+    const installedHook = path.join(smokeHome, '.pixel-agents', 'hooks', 'copilot-hook.js');
+    const settingsPath = path.join(smokeHome, '.copilot', 'hooks', 'copilotpixel.json');
     await waitFor(
       () => fs.existsSync(installedHook) && fs.existsSync(settingsPath),
-      'default Hook ON installation',
+      'consented Copilot hook installation',
     );
     if (process.platform !== 'win32' && (fs.statSync(installedHook).mode & 0o100) === 0) {
-      throw new Error('Installed Claude hook script is not owner-executable');
+      throw new Error('Installed Copilot hook script is not owner-executable');
     }
     const settingsText = fs.readFileSync(settingsPath, 'utf-8');
     const normalizedSettings = settingsText.replaceAll('\\\\', '/');
     const normalizedHookPath = installedHook.replaceAll(path.sep, '/');
     if (!normalizedSettings.includes(normalizedHookPath)) {
-      throw new Error('Claude hook settings do not reference the installed hook script');
+      throw new Error('Copilot hook settings do not reference the installed hook script');
     }
 
     return { assetCounts: counts.slice(1).map(Number), port };
@@ -229,7 +229,7 @@ async function main() {
   const ownsOutputDir = args.outputDir === null;
   const outputDir = args.outputDir
     ? path.resolve(args.outputDir)
-    : fs.mkdtempSync(path.join(os.tmpdir(), 'pixel-agents-npm-pack-'));
+    : fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-pixe-npm-pack-'));
 
   if (!ownsOutputDir) {
     fs.mkdirSync(outputDir, { recursive: true });

@@ -123,11 +123,11 @@ export function migrateVsCodeState(context: vscode.ExtensionContext, adapter: St
 
   if (pending.length > 0) {
     console.warn(
-      `[Pixel Agents] Migration incomplete -- ${pending.length} legacy VS Code ` +
+      `[CopilotPixel] Migration incomplete -- ${pending.length} legacy VS Code ` +
         `key(s) still present. Will retry next activate. Keys: ${pending.join(', ')}`,
     );
     void vscode.window.showWarningMessage(
-      `Pixel Agents: ${pending.length} legacy setting(s) could not be migrated to ` +
+      `CopilotPixel: ${pending.length} legacy setting(s) could not be migrated to ` +
         `~/.pixel-agents/config.json. Check ~/.pixel-agents/ is writable.`,
     );
   }

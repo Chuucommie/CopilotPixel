@@ -86,7 +86,7 @@ const ANSI_YELLOW = '\u001b[33m';
 const ANSI_MAGENTA = '\u001b[35m';
 const ANSI_RESET = '\u001b[0m';
 
-// External sessions (spawned detached by the e2e harness so Pixel Agents
+// External sessions (spawned detached by the e2e harness so CopilotPixel
 // ADOPTS them instead of launching them) narrate into a shared per-test log
 // that a monitor terminal tails. The magenta prefix keeps their lines
 // visually distinct from internal-terminal narration, and the short
@@ -106,7 +106,7 @@ function shortId(value) {
 }
 
 /**
- * Human-readable narration to stdout. Pixel Agents never reads the terminal
+ * Human-readable narration to stdout. CopilotPixel never reads the terminal
  * (its inputs are JSONL transcripts and hook POSTs), so this changes nothing
  * about what tests exercise — it exists purely so run recordings show WHAT
  * the mock is simulating and WHEN, where real claude would render its TUI.
@@ -508,7 +508,7 @@ async function main() {
   if (IS_EXTERNAL) {
     externalTag = tinySessionTag(sessionId);
     process.stdout.write(
-      `${ANSI_MAGENTA}══ EXTERNAL session ·${externalTag} — adopted by Pixel Agents, not launched ══${ANSI_RESET}\n`,
+      `${ANSI_MAGENTA}══ EXTERNAL session ·${externalTag} — adopted by CopilotPixel, not launched ══${ANSI_RESET}\n`,
     );
   }
   echo(

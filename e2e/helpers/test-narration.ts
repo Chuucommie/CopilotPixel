@@ -23,7 +23,7 @@ import { getExternalNarrationLogPath } from './external-monitor';
  *     universal moments (e.g. spawning an agent) without threading the handle
  *     through 60+ call sites. It no-ops until the fixture sets a context.
  *
- * STRICTLY COSMETIC. Pixel Agents never reads terminal output (its inputs are
+ * STRICTLY COSMETIC. CopilotPixel never reads terminal output (its inputs are
  * JSONL transcripts and hook POSTs), so no assertion may depend on narration —
  * deleting every step()/check() call must leave all tests passing. Every
  * failure here is swallowed. The suite runs with workers:1, so the single

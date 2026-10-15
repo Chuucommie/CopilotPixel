@@ -156,7 +156,7 @@ async function mutateClaudeSettings(
   throw lastError ?? new Error(SETTINGS_UNPARSEABLE_MESSAGE);
 }
 
-/** One-time safety net: before Pixel Agents' first-ever modification of
+/** One-time safety net: before CopilotPixel' first-ever modification of
  *  settings.json, copy it aside. Never overwritten after that, so even a future
  *  installer bug leaves the user a recoverable copy of their pre-Pixel-Agents
  *  file.
@@ -182,7 +182,7 @@ function backupClaudeSettingsOnce(settingsPath: string): void {
   const backupPath = settingsPath + SETTINGS_BACKUP_SUFFIX;
   try {
     fs.copyFileSync(settingsPath, backupPath, fs.constants.COPYFILE_EXCL);
-    console.log(`[Pixel Agents] Backed up Claude settings to ${backupPath}`);
+    console.log(`[CopilotPixel] Backed up Claude settings to ${backupPath}`);
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
     if (!isRegularFile(backupPath)) {
@@ -491,7 +491,7 @@ function settingsHoldOnlyOurHooks(settings: ClaudeSettings): boolean {
  *  A unique symbol, never `null`: `null` is a value a user's settings.json can
  *  legitimately contain inside a hooks array, and using it as the sentinel made
  *  us DELETE it. Observed: `{"hooks":{"Stop":[null,"third-party-junk"]}}` — a
- *  file with no Pixel Agents command anywhere — came back rewritten as
+ *  file with no CopilotPixel command anywhere — came back rewritten as
  *  `{"hooks":{"Stop":["third-party-junk"]}}` and logged "Hooks removed". A
  *  sentinel that can collide with user data is a sentinel that eats user data;
  *  a symbol cannot appear in parsed JSON. */
@@ -547,7 +547,7 @@ function makeHookEntry(): ClaudeHookEntry {
 }
 
 /**
- * Whether ANY Pixel Agents hook command is present in ~/.claude/settings.json.
+ * Whether ANY CopilotPixel hook command is present in ~/.claude/settings.json.
  *
  * "Any", not "all 12", and the difference is the whole point. Every caller asks
  * this question for one of two reasons — "are our hooks firing right now?"
@@ -586,9 +586,9 @@ export function areHooksInstalled(): boolean {
 }
 
 /**
- * Install Pixel Agents hook entries into ~/.claude/settings.json for
+ * Install CopilotPixel hook entries into ~/.claude/settings.json for
  * Notification, Stop, and PermissionRequest events. Idempotent: removes
- * any existing Pixel Agents entries before adding fresh ones.
+ * any existing CopilotPixel entries before adding fresh ones.
  *
  * Rejects (before any write) when settings.json exists but cannot be parsed or
  * keeps changing concurrently — callers surface the error to the user instead
@@ -604,7 +604,7 @@ export async function installHooks(): Promise<void> {
     });
   }
   if (wrote) {
-    console.log('[Pixel Agents] Hooks installed in ~/.claude/settings.json');
+    console.log('[CopilotPixel] Hooks installed in ~/.claude/settings.json');
   }
 }
 
@@ -665,7 +665,7 @@ function installEntries(): Promise<boolean> {
         throw new Error(settingsNonArrayEventMessage(event));
       }
       const entries = hooks[event];
-      // Remove any existing Pixel Agents commands (in case the script path changed)
+      // Remove any existing CopilotPixel commands (in case the script path changed)
       const filtered = (withoutOurEntries(entries) ?? entries).concat(makeHookEntry());
       if (JSON.stringify(filtered) !== JSON.stringify(entries)) {
         hooks[event] = filtered;
@@ -676,7 +676,7 @@ function installEntries(): Promise<boolean> {
   });
 }
 
-/** Remove all Pixel Agents hook entries from ~/.claude/settings.json. Cleans up empty objects.
+/** Remove all CopilotPixel hook entries from ~/.claude/settings.json. Cleans up empty objects.
  *  Rejects (before any write) when the file cannot be parsed — same protection
  *  as install: never rewrite a file we could not read. Callers surface the
  *  error; claiming success after an aborted uninstall is how a "removed"
@@ -717,7 +717,7 @@ export async function uninstallHooks(): Promise<void> {
     });
   }
   if (wrote) {
-    console.log('[Pixel Agents] Hooks removed from ~/.claude/settings.json');
+    console.log('[CopilotPixel] Hooks removed from ~/.claude/settings.json');
   }
 }
 
@@ -735,15 +735,15 @@ export function copyHookScript(extensionPath: string): boolean {
       fs.mkdirSync(dstDir, { recursive: true, mode: 0o700 });
     }
     if (!fs.existsSync(src)) {
-      console.warn(`[Pixel Agents] Hook script not found at ${src}`);
+      console.warn(`[CopilotPixel] Hook script not found at ${src}`);
       return false;
     }
     fs.copyFileSync(src, dst);
     fs.chmodSync(dst, 0o700);
-    console.log(`[Pixel Agents] Hook script installed at ${dst}`);
+    console.log(`[CopilotPixel] Hook script installed at ${dst}`);
     return true;
   } catch (e) {
-    console.error(`[Pixel Agents] Failed to copy hook script: ${e}`);
+    console.error(`[CopilotPixel] Failed to copy hook script: ${e}`);
     return false;
   }
 }

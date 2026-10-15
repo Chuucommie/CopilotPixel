@@ -103,7 +103,7 @@ async function ensurePanelIsLarge(window: Page): Promise<void> {
 
   await expect
     .poll(() => getPanelHeight(window), {
-      message: 'Expected the bottom panel to be resized for the Pixel Agents webview',
+      message: 'Expected the bottom panel to be resized for the CopilotPixel webview',
       timeout: PANEL_OPEN_TIMEOUT_MS,
       intervals: [250, 500, 1000],
     })
@@ -111,8 +111,8 @@ async function ensurePanelIsLarge(window: Page): Promise<void> {
 }
 
 /**
- * Open the Pixel Agents panel via the Command Palette and wait for the
- * "Pixel Agents: Show Panel" command to execute.
+ * Open the CopilotPixel panel via the Command Palette and wait for the
+ * "CopilotPixel: Show Panel" command to execute.
  */
 /**
  * Close the bottom panel. Triggers onDidChangeVisibility(false) on every
@@ -141,7 +141,7 @@ export async function closeBottomPanel(window: Page): Promise<void> {
     await window.mouse.click(statusBox.x + statusBox.width / 2, statusBox.y + statusBox.height / 2);
   }
   await window.keyboard.press(process.platform === 'darwin' ? 'Meta+J' : 'Control+J');
-  // Wait until the Pixel Agents webview is actually DESTROYED, not merely
+  // Wait until the CopilotPixel webview is actually DESTROYED, not merely
   // hidden. VS Code disposes a hidden WebviewView lazily; returning on a
   // fixed sleep lets a quick reopen re-show the SAME webview context, which
   // breaks tests whose premise is a fresh webview (e.g. restored-agents reads
@@ -161,7 +161,7 @@ export async function closeBottomPanel(window: Page): Promise<void> {
         return false;
       },
       {
-        message: 'Expected the Pixel Agents webview to be disposed after closing the panel',
+        message: 'Expected the CopilotPixel webview to be disposed after closing the panel',
         timeout: 15_000,
       },
     )
@@ -188,7 +188,7 @@ export async function reopenBottomPanel(window: Page): Promise<void> {
 }
 
 /**
- * Single-shot (non-waiting) check for the Pixel Agents webview frame.
+ * Single-shot (non-waiting) check for the CopilotPixel webview frame.
  *
  * The iframe must be VISIBLE, not merely attached: after the panel is hidden
  * (View: Toggle Panel), VS Code keeps the dying webview's iframe in the DOM
@@ -201,7 +201,7 @@ async function findPixelAgentsFrameOnce(window: Page): Promise<Frame | null> {
     if (!frame.url().startsWith('vscode-webview://')) continue;
     try {
       // count() resolves immediately (no waiting); a non-zero count means
-      // this is the Pixel Agents frame.
+      // this is the CopilotPixel frame.
       const buttonCount = await frame.locator('button', { hasText: '+ Agent' }).count();
       if (buttonCount === 0) continue;
       const frameElement = await frame.frameElement();
@@ -248,7 +248,7 @@ export async function openPixelAgentsPanel(
     }
   }
   if (!shown) {
-    await runCommand(window, 'Pixel Agents: Show Panel');
+    await runCommand(window, 'CopilotPixel: Show Panel');
   }
 
   // Wait for the panel container to appear
@@ -286,7 +286,7 @@ async function getPanelRect(window: Page): Promise<PanelRect | null> {
 }
 
 /**
- * Arrange the workbench into the run-video layout: Pixel Agents panel (docked
+ * Arrange the workbench into the run-video layout: CopilotPixel panel (docked
  * left via workbench.panel.defaultLocation, see launch.ts) at ~2/3 window
  * width, editor area (terminal tabs) in the remaining third, primary and
  * secondary side bars hidden. Called once per test by the pixelAgents fixture
@@ -355,7 +355,7 @@ export async function arrangeReviewLayout(window: Page): Promise<void> {
     let touched = false;
     // The hide chords need workbench (not webview) focus: webviews forward
     // only a whitelist of keybindings, and autoShowPanel leaves focus inside
-    // the Pixel Agents webview. Clicking the empty middle of the status bar
+    // the CopilotPixel webview. Clicking the empty middle of the status bar
     // moves focus to workbench chrome without triggering any action.
     const statusBox = await window
       .locator('.part.statusbar')
@@ -385,7 +385,7 @@ export async function arrangeReviewLayout(window: Page): Promise<void> {
 }
 
 /**
- * Find and return the Pixel Agents webview frame.
+ * Find and return the CopilotPixel webview frame.
  *
  * VS Code renders WebviewViewProvider content in an <iframe> whose URL
  * starts with "vscode-webview://". Because VS Code can have multiple
@@ -402,7 +402,7 @@ export async function getPixelAgentsFrame(window: Page): Promise<Frame> {
         return foundFrame !== null;
       },
       {
-        message: 'Pixel Agents webview frame with "+ Agent" button not found',
+        message: 'CopilotPixel webview frame with "+ Agent" button not found',
         timeout: WEBVIEW_TIMEOUT_MS,
         intervals: [250, 500, 1000],
       },

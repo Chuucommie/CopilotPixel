@@ -27,7 +27,7 @@ export type { ServerConfig } from './serverConfig.js';
 type HookEventCallback = (providerId: string, event: Record<string, unknown>) => void;
 
 /**
- * Pixel Agents server: receives hook events, broadcasts state via WebSocket,
+ * CopilotPixel server: receives hook events, broadcasts state via WebSocket,
  * and optionally serves the SPA in standalone mode.
  *
  * Routes (via Fastify in httpServer.ts):
@@ -41,7 +41,7 @@ type HookEventCallback = (providerId: string, event: Record<string, unknown>) =>
  * Multi-window / multi-surface: a second instance detects running servers via
  * the registry and reuses one only when it offers the same capability
  * (embedded reuses embedded, standalone reuses standalone) -- an embedded
- * VS Code server and a standalone `npx pixel-agents` server can run at once,
+ * VS Code server and a standalone `npx copilot-pixe` server can run at once,
  * each owning its own registry entry, both reachable by hook fan-out.
  */
 export class PixelAgentsServer {
@@ -85,7 +85,7 @@ export class PixelAgentsServer {
       this.config = candidate;
       this.ownsServer = false;
       console.log(
-        `[Pixel Agents] Reusing existing ${wantsSpa ? 'standalone' : 'embedded'} server on port ${candidate.port} (PID ${candidate.pid})`,
+        `[CopilotPixel] Reusing existing ${wantsSpa ? 'standalone' : 'embedded'} server on port ${candidate.port} (PID ${candidate.pid})`,
       );
       return candidate;
     }
@@ -127,7 +127,7 @@ export class PixelAgentsServer {
     // entry (new hook scripts fan out to every entry here).
     this.writeServerJson(this.config);
     this.writeRegistryEntry(this.config);
-    console.log(`[Pixel Agents] Server: listening on 127.0.0.1:${port}`);
+    console.log(`[CopilotPixel] Server: listening on 127.0.0.1:${port}`);
 
     return this.config;
   }
@@ -168,7 +168,7 @@ export class PixelAgentsServer {
       fs.writeFileSync(tmpPath, JSON.stringify(config, null, 2), { mode: 0o600 });
       fs.renameSync(tmpPath, filePath);
     } catch (e) {
-      console.error(`[Pixel Agents] Failed to write server.json: ${e}`);
+      console.error(`[CopilotPixel] Failed to write server.json: ${e}`);
     }
   }
 
@@ -263,7 +263,7 @@ export class PixelAgentsServer {
       fs.writeFileSync(tmpPath, JSON.stringify(config, null, 2), { mode: 0o600 });
       fs.renameSync(tmpPath, filePath);
     } catch (e) {
-      console.error(`[Pixel Agents] Failed to write registry entry: ${e}`);
+      console.error(`[CopilotPixel] Failed to write registry entry: ${e}`);
     }
   }
 

@@ -90,7 +90,24 @@ export async function createHttpServer(options: HttpServerOptions): Promise<Http
 
   // ── Listen ──────────────────────────────────────────────────
 
-  await app.listen({ host: options.host ?? '127.0.0.1', port: options.port ?? 0 });
+  let portCandidate = options.port ?? 0;
+  const requestedPort = options.port ?? undefined;
+  for (let attempt = 0; attempt < 8; attempt++) {
+    try {
+      await app.listen({ host: options.host ?? '127.0.0.1', port: portCandidate });
+      break;
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException;
+      if (err.code !== 'EADDRINUSE' || !requestedPort || requestedPort === 0) {
+        throw error;
+      }
+      console.warn(
+        `[CopilotPixel] Port ${requestedPort} is busy; retrying with an available ephemeral port.`,
+      );
+      portCandidate = 0;
+    }
+  }
+
   const address = app.server.address();
   const port = typeof address === 'object' ? (address?.port ?? 0) : 0;
 
@@ -202,7 +219,7 @@ function registerWebSocketRoute(app: FastifyInstance, options: HttpServerOptions
       try {
         const msg = JSON.parse(data.toString()) as Record<string, unknown>;
         if (!options.embedded && msg.type) {
-          console.log('[Pixel Agents] WS client message:', msg.type);
+          console.log('[CopilotPixel] WS client message:', msg.type);
         }
         handleClientMessage(msg, (m) => safeSend(socket, m), {
           store,
@@ -280,7 +297,7 @@ export function isAllowedWebSocketOrigin(
  * gate must ride something the channel never carries — an out-of-band secret
  * the operator's own URL delivers and the forwarded attacker never sees.
  *
- * A tokenless client is not locked out of Pixel Agents — it connects and
+ * A tokenless client is not locked out of CopilotPixel — it connects and
  * watches the office exactly as before (the connection gate,
  * isAllowedWebSocketOrigin, is separate and unchanged). It simply cannot
  * approve a change to a file in someone's home directory.

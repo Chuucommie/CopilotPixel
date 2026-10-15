@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { DISCORD_INVITE_URL } from '../changelogData.js';
 import {
-  CLAUDE_CODE_INSTALL_COMMAND,
-  CLAUDE_CODE_URL,
+  COPILOT_CLI_URL,
   INTRO_BUBBLE_EDGE_MARGIN_PX,
   INTRO_BUBBLE_MAX_WIDTH_PX,
   INTRO_BUBBLE_Z_INDEX,
@@ -56,7 +55,7 @@ interface IntroBubbleProps {
 
 const STEP_COUNT = 4;
 const WELCOME_STEP = 0;
-const CLAUDE_CODE_STEP = 1;
+const COPILOT_CLI_STEP = 1;
 const CONSENT_STEP = 2;
 const CLOSING_STEP = 3;
 
@@ -65,7 +64,7 @@ const CLOSING_STEP = 3;
  * shared by both surfaces (the VS Code webview and the standalone browser
  * render this same component off the same server message).
  *
- * Steps: welcome → Claude Code → hooks consent → all set. The consent step is
+ * Steps: welcome → Copilot CLI → hooks consent → all set. The consent step is
  * the same first-run ask as before, now wrapped in a tour; its copy still
  * arrives from the server and its buttons still send `hooksConsentResponse`
  * the moment they are clicked. Back from the closing step re-opens the consent
@@ -217,8 +216,8 @@ export function IntroBubble({
   };
 
   const titles = [
-    'Welcome to Pixel Agents!',
-    'Powered by Claude Code',
+    'Welcome to CopilotPixel!',
+    'Powered by GitHub Copilot CLI',
     headline,
     installFailed ? "Hooks couldn't be installed" : "You're all set!",
   ];
@@ -288,24 +287,21 @@ export function IntroBubble({
           </p>
         )}
 
-        {step === CLAUDE_CODE_STEP && (
+        {step === COPILOT_CLI_STEP && (
           <>
             <p className="text-sm m-0 mb-8">
-              The office watches your Claude Code sessions and brings them to life in here. New to
-              Claude Code? Download it first:
+              The office watches your GitHub Copilot CLI sessions and brings them to life in here.
+              New to Copilot CLI? Follow the installation guide:
             </p>
-            <div className="text-sm bg-btn-bg border-2 border-border py-4 px-8 mb-8 select-all">
-              {CLAUDE_CODE_INSTALL_COMMAND}
-            </div>
             <p className="text-sm m-0 mb-8">
-              For more info, visit{' '}
+              Install instructions:{' '}
               <a
-                href={CLAUDE_CODE_URL}
+                href={COPILOT_CLI_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-accent-bright hover:text-accent no-underline"
               >
-                claude.com/claude-code
+                GitHub Copilot CLI
               </a>
             </p>
           </>
@@ -322,9 +318,8 @@ export function IntroBubble({
           <>
             {installFailed ? (
               <p className="text-sm m-0 mb-8">
-                Something went wrong writing to your Claude Code settings, so the office will watch
-                your sessions the slower way instead. No worries, everything still works and you can
-                retry activating them any time from Settings.
+                Something went wrong writing the Copilot CLI hook config, so the office will watch
+                your sessions the slower way instead. You can retry from Settings.
               </p>
             ) : null}
             <p className="text-sm m-0 mb-8">

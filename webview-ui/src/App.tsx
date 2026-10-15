@@ -157,9 +157,8 @@ function App() {
     onClose: handleIntroClose,
   } = useIntroTour({ consentRequest, hooksInstalled, hooksStatusSeq, dismissConsentRequest });
 
-  // The Settings surface renders one provider today; its checkbox binds to
-  // the Claude row of the per-provider install-state map.
-  const claudeHooksInstalled = hooksInstalled['claude'] === true;
+  // The Settings surface renders the active GitHub Copilot CLI provider.
+  const copilotHooksInstalled = hooksInstalled['copilot'] === true;
 
   // Mutate folder→Area mappings locally + send to server. Updates OfficeState in
   // the same tick so a follow-up agentCreated picks up the new mapping.
@@ -454,7 +453,7 @@ function App() {
           message), NOT the hooksEnabled preference: hooksEnabled defaults true
           while first-run consent is still pending, and announcing "Instant
           Detection Active" before anything is installed would be a lie. */}
-      {hooksEnabled && claudeHooksInstalled && !hooksInfoShown && !hooksTooltipDismissed && (
+      {hooksEnabled && copilotHooksInstalled && !hooksInfoShown && !hooksTooltipDismissed && (
         <Tooltip
           title="Instant Detection Active"
           position="top-right"
@@ -487,15 +486,15 @@ function App() {
         zIndex={52}
       >
         <div className="text-base text-text px-10" style={{ lineHeight: 1.4 }}>
-          <p className="mb-8">Your Pixel Agents office now reacts in real-time:</p>
+          <p className="mb-8">Your CopilotPixel office now reacts in real-time:</p>
           <ul className="mb-8 pl-18 list-disc m-0">
             <li className="text-sm mb-2">Permission prompts appear instantly</li>
             <li className="text-sm mb-2">Turn completions detected the moment they happen</li>
             <li className="text-sm mb-2">Sound notifications play immediately</li>
           </ul>
           <p className="mb-12 text-text-muted">
-            This works through Claude Code Hooks, small event listeners that notify Pixel Agents
-            whenever something happens in your Claude sessions.
+            This works through GitHub Copilot CLI hooks, which notify CopilotPixel when your
+            sessions start, use tools, or request permission.
           </p>
           <div className="text-center">
             <button
@@ -513,7 +512,7 @@ function App() {
 
       <BottomToolbar
         isEditMode={editor.isEditMode}
-        onOpenClaude={editor.handleOpenClaude}
+        onLaunchAgent={editor.handleLaunchAgent}
         onToggleEditMode={editor.handleToggleEditMode}
         isSettingsOpen={isSettingsOpen}
         onToggleSettings={() => setIsSettingsOpen((v) => !v)}
@@ -551,7 +550,7 @@ function App() {
           setWatchAllSessions(newVal);
           transport.send({ type: 'setWatchAllSessions', enabled: newVal });
         }}
-        hooksInstalled={claudeHooksInstalled}
+        hooksInstalled={copilotHooksInstalled}
         onToggleHooksEnabled={() => {
           // Toggle the DISPLAYED state (actual install), not the preference: when the two disagree — preference on,
           // nothing installed while consent is pending — toggling the preference would turn hooks OFF for a user
@@ -559,12 +558,12 @@ function App() {
           // checkbox renders, so it lands correct instead of flickering when an install fails. The providerId is
           // ECHOED from that row (never originated here), so nothing sends until the row has arrived.
           const [rowProviderId] =
-            Object.entries(hooksInstalled).find(([id]) => id === 'claude') ?? [];
+            Object.entries(hooksInstalled).find(([id]) => id === 'copilot') ?? [];
           if (rowProviderId !== undefined) {
             transport.send({
               type: 'setHooksEnabled',
               providerId: rowProviderId,
-              enabled: !claudeHooksInstalled,
+              enabled: !copilotHooksInstalled,
             });
           }
         }}

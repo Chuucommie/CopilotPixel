@@ -345,7 +345,7 @@ export async function spawnExternalClaudeScenario(options: {
   sessionId: string;
 }): Promise<ExternalClaudeSpawn> {
   // Universal narration moment (cosmetic): every external spawn is a detached
-  // session Pixel Agents adopts rather than launches. Its own magenta stdout
+  // session CopilotPixel adopts rather than launches. Its own magenta stdout
   // narrates the per-hook timeline in the monitor tab.
   narrate.step('spawning a detached external mock session (adopted, not launched)');
   await arrangeNextClaudeInvocation(options.tmpHome, options.scenario);

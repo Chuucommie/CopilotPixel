@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const resultsRootDir = path.join(repoRoot, 'allure-results');
 const reportDir = path.join(repoRoot, 'allure-report', 'allure');
-const reportName = 'Pixel Agents Cross-Platform Test Report';
+const reportName = 'CopilotPixel Cross-Platform Test Report';
 const metadataFileNames = new Set([
   'categories.json',
   'environment.json',
@@ -120,7 +120,7 @@ function writePlaceholderReport() {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Pixel Agents Linux Test Report Unavailable</title>
+    <title>CopilotPixel Linux Test Report Unavailable</title>
     <style>
       :root {
         color-scheme: light;

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Standalone CLI entry point: `npx pixel-agents`
+ * Standalone CLI entry point: `npx copilot-pixe`
  *
  * Starts the Fastify server in standalone mode with SPA serving and WebSocket.
  * Loads all assets (PNGs -> SpriteData) on startup and caches in memory.
@@ -66,7 +66,7 @@ export function parseArgs(argv: string[]): CliArgs {
       args.host = argv[i + 1];
       i++;
     } else if (argv[i] === '--help') {
-      console.log(`Usage: pixel-agents [options]
+      console.log(`Usage: copilot-pixe [options]
 
 Options:
   --port, -p <number>   Port to listen on (default: OS-assigned ephemeral port)
@@ -92,12 +92,12 @@ Options:
  *
  * Callers run this BEFORE installing the settings.json entries and abort when
  * it returns false: an entry whose command points at a missing script makes
- * Claude Code spawn a dead `node` process for every event, which is strictly
+ * Copilot CLI spawn a dead `node` process for every event, which is strictly
  * worse than no hooks at all.
  */
 function copyHookScriptOrReport(packageRoot: string, context = ''): boolean {
   if (copyHookScript(packageRoot)) return true;
-  console.error(`[Pixel Agents] Hooks NOT installed${context}: hook script missing.`);
+  console.error(`[CopilotPixel] Hooks NOT installed${context}: hook script missing.`);
   return false;
 }
 
@@ -108,7 +108,7 @@ async function main(): Promise<void> {
   try {
     args = parseArgs(process.argv.slice(2));
   } catch (err) {
-    console.error(`[Pixel Agents] ${err instanceof Error ? err.message : String(err)}`);
+    console.error(`[CopilotPixel] ${err instanceof Error ? err.message : String(err)}`);
     process.exit(1);
   }
 
@@ -121,7 +121,7 @@ async function main(): Promise<void> {
   // External asset directories are merged at startup too, so directories added
   // in a previous session survive a restart. buildAssetCache is the shared
   // loader used by both the standalone server and the VS Code adapter.
-  console.log('[Pixel Agents] Loading assets...');
+  console.log('[CopilotPixel] Loading assets...');
   const assetCache: AssetCache = await buildAssetCache(
     distRoot,
     readConfig().externalAssetDirectories,
@@ -130,7 +130,7 @@ async function main(): Promise<void> {
   const petCount = assetCache.pets?.pets.length ?? 0;
   const furnitureCount = assetCache.furniture?.catalog.length ?? 0;
   console.log(
-    `[Pixel Agents] Assets loaded: ${charCount} characters, ${petCount} pets, ${furnitureCount} furniture items`,
+    `[CopilotPixel] Assets loaded: ${charCount} characters, ${petCount} pets, ${furnitureCount} furniture items`,
   );
 
   // ── Store + adapter (shared settings + standalone-scoped agents/seats) ──
@@ -171,16 +171,16 @@ async function main(): Promise<void> {
             currentConfig.token,
           );
         } catch (err) {
-          console.error(`[Pixel Agents] ${err instanceof Error ? err.message : String(err)}`);
+          console.error(`[CopilotPixel] ${err instanceof Error ? err.message : String(err)}`);
           return;
         }
-        console.log('[Pixel Agents] Hooks installed (user toggle)');
+        console.log('[CopilotPixel] Hooks installed (user toggle)');
       } else {
         try {
           await provider.uninstallHooks();
-          console.log('[Pixel Agents] Hooks uninstalled (user toggle)');
+          console.log('[CopilotPixel] Hooks uninstalled (user toggle)');
         } catch (err) {
-          console.error(`[Pixel Agents] ${err instanceof Error ? err.message : String(err)}`);
+          console.error(`[CopilotPixel] ${err instanceof Error ? err.message : String(err)}`);
         }
       }
     };
@@ -219,7 +219,7 @@ async function main(): Promise<void> {
           sprites: Object.fromEntries(furniture.sprites),
         });
       }
-      console.log('[Pixel Agents] Assets reloaded (external directory change)');
+      console.log('[CopilotPixel] Assets reloaded (external directory change)');
     };
 
     const config = await server.start({
@@ -244,34 +244,29 @@ async function main(): Promise<void> {
     if (runtime.hooksEnabled.current) {
       let consent = getHooksConsent(copilotProvider.id) === 'granted';
       if (!consent && (await copilotProvider.areHooksInstalled())) {
-        // Our hooks are already installed and already firing — a pre-consent
-        // version put them there. Grant and continue with NO prompt: the
-        // install below is the 14 -> 12 migration, and it only ever REDUCES
-        // scope (it drops UserPromptSubmit and TaskCreated, the two events that
-        // forwarded prompt text and were consumed by nothing). Asking would buy
-        // this user no protection they do not already have, so they are not
-        // asked. A fresh install still is, in full — in the browser UI, when a
-        // tokened client connects (clientMessageHandler's webviewReady).
+        // Hooks already present in the provider config represent an existing
+        // installation. Preserve its no-prompt upgrade path; fresh installs
+        // still require approval in the tokened browser UI.
         grantHooksConsent(copilotProvider.id);
         consent = true;
       }
       if (!consent) {
         console.log(
-          '[Pixel Agents] Hooks not installed: modifying the Copilot hook config needs one-time approval — open the URL below to review and approve it.',
+          '[CopilotPixel] Hooks not installed: modifying the Copilot hook config needs one-time approval — open the URL below to review and approve it.',
         );
       } else if (copyHookScriptOrReport(packageRoot)) {
         try {
           await copilotProvider.installHooks(`http://127.0.0.1:${config.port}`, config.token);
-          console.log('[Pixel Agents] Hooks installed');
+          console.log('[CopilotPixel] Hooks installed');
         } catch (err) {
-          console.error(`[Pixel Agents] ${err instanceof Error ? err.message : String(err)}`);
+          console.error(`[CopilotPixel] ${err instanceof Error ? err.message : String(err)}`);
         }
       }
     } else {
       // Without this line, a persisted hooks-off makes startup skip the entire
       // consent/install flow with zero output — indistinguishable from a bug.
       console.log(
-        '[Pixel Agents] Hooks disabled — enable "Instant Detection (Hooks)" in the UI settings to install them.',
+        '[CopilotPixel] Hooks disabled — enable "Instant Detection (Hooks)" in the UI settings to install them.',
       );
     }
 
@@ -280,7 +275,7 @@ async function main(): Promise<void> {
     const dirs = copilotProvider.getSessionDirs?.(cwd);
     if (dirs && dirs[0]) {
       const projectDir = dirs[0];
-      console.log(`[Pixel Agents] Scanning project dir: ${projectDir}`);
+      console.log(`[CopilotPixel] Scanning project dir: ${projectDir}`);
       runtime.startProjectScan(projectDir);
       runtime.startExternalScanning(projectDir);
       runtime.startStaleCheck();
@@ -296,7 +291,7 @@ async function main(): Promise<void> {
     const displayHost =
       args.host === '0.0.0.0' || args.host === '::' || args.host === '' ? '127.0.0.1' : args.host;
     console.log(
-      `\n  Pixel Agents server running at http://${displayHost}:${config.port}/?token=${config.token}\n`,
+      `\n  CopilotPixel server running at http://${displayHost}:${config.port}/?token=${config.token}\n`,
     );
 
     // ── Graceful shutdown ──
@@ -317,8 +312,8 @@ async function main(): Promise<void> {
 
 // Only auto-run when this file is executed directly (`node dist/cli.js`), not
 // when it's imported for its exports (e.g. `parseArgs` in tests) -- importing
-// it unconditionally used to start a real server and install real Claude
-// hooks as a side effect of module load.
+// it unconditionally used to start a real server and install provider hooks as
+// a side effect of module load.
 if (require.main === module) {
   main().catch((err) => {
     console.error(err);

@@ -55,7 +55,7 @@ export interface LaunchOptions {
 }
 
 /**
- * Launch VS Code with the Pixel Agents extension loaded in development mode.
+ * Launch VS Code with the CopilotPixel extension loaded in development mode.
  *
  * Uses an isolated temp HOME and injects the mock `claude` binary at the
  * front of PATH so no real Claude CLI is needed.
@@ -225,16 +225,16 @@ export async function launchVSCode(
 
   // VS Code user settings for the isolated profile. Together with
   // arrangeReviewLayout() (e2e/helpers/webview.ts) they produce the run-video
-  // layout: Pixel Agents panel docked LEFT at ~2/3 width, terminals opening
+  // layout: CopilotPixel panel docked LEFT at ~2/3 width, terminals opening
   // as editor tabs in the remaining right third, all other chrome hidden.
   //
   // - workbench.panel.defaultLocation "left": the panel (which hosts the
-  //   Pixel Agents webview) docks left at full height, so ensurePanelIsLarge()
+  //   CopilotPixel webview) docks left at full height, so ensurePanelIsLarge()
   //   no-ops instead of driving the flaky "View: Toggle Maximized Panel"
   //   command-palette interaction at the start of every test.
-  // - pixel-agents.autoShowPanel: the extension focuses the Pixel Agents view
+  // - pixel-agents.autoShowPanel: the extension focuses the CopilotPixel view
   //   on activation (onStartupFinished), so openPixelAgentsPanel({ autoShown })
-  //   skips the "Pixel Agents: Show Panel" palette interaction at setup.
+  //   skips the "CopilotPixel: Show Panel" palette interaction at setup.
   // - terminal.integrated.defaultLocation "editor": mock-claude terminals open
   //   as editor tabs beside the office instead of stealing the panel (the
   //   webview has no retainContextWhenHidden, so a panel-hosted terminal.show()
@@ -428,7 +428,7 @@ export async function launchVSCode(
 
     const window = await app.firstWindow();
 
-    // Mark this as the e2e harness BEFORE the Pixel Agents webview iframe loads.
+    // Mark this as the e2e harness BEFORE the CopilotPixel webview iframe loads.
     // addInitScript runs in every frame on attach/navigate (including that
     // iframe, which opens later when the panel is shown), so the webview reads
     // __PIXEL_AGENTS_E2E === true and installs its test-only observability hooks

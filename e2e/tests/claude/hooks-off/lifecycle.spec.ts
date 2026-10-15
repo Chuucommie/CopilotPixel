@@ -127,7 +127,7 @@ test.describe('Hooks OFF / lifecycle', () => {
   // reassigns the agent to the newest candidate — hence the replacement landing
   // at t+11s, just past the >10-poll threshold. Note this is a STARTUP fallback:
   // there is no grace window in heuristic mode (that's hooks-mode vocabulary),
-  // and no conversation-content continuity is asserted — Pixel Agents tracks
+  // and no conversation-content continuity is asserted — CopilotPixel tracks
   // session files, not transcript content.
   //
   // Coexists with the /clear content-disambiguation heuristic in
@@ -788,7 +788,7 @@ test.describe('Hooks OFF / lifecycle', () => {
   // notificationSound.ts instrumentation records in
   // window.__pixelAgentsTestHooks.playedSounds.
   //
-  // Uses EXTERNAL agent (no VS Code terminal) so the Pixel Agents panel
+  // Uses EXTERNAL agent (no VS Code terminal) so the CopilotPixel panel
   // stays at full size, dodging the layout race that breaks
   // closeAgentFromOverlay after an internal spawn (same close-via-overlay
   // pattern used by the dismissal-cooldown lifecycle test in this file).

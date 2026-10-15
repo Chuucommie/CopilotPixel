@@ -7,7 +7,7 @@ import { WebSocket } from 'ws';
 import { WS_CLOSE_FORBIDDEN_ORIGIN, WS_CLOSE_UNAUTHORIZED } from '../src/constants.js';
 
 // Isolated temp HOME: the server writes ~/.pixel-agents/{server.json,servers/}
-// and the consent assertions below read ~/.pixel-agents/config.json.
+// and the consent assertions below read ~/.copilotpixel/config.json.
 let tmpBase: string;
 
 vi.mock('os', async () => {
@@ -91,9 +91,9 @@ function waitForMessage(socket: WebSocket, type: string, ms = 2_000): Promise<un
 
 function readHooksConsent(): boolean {
   try {
-    const raw = fs.readFileSync(path.join(tmpBase, '.pixel-agents', 'config.json'), 'utf-8');
+    const raw = fs.readFileSync(path.join(tmpBase, '.copilotpixel', 'config.json'), 'utf-8');
     const consent = (JSON.parse(raw) as { hooksConsent?: Record<string, string> }).hooksConsent;
-    return consent?.claude === 'granted';
+    return consent?.copilot === 'granted';
   } catch {
     return false;
   }
@@ -150,7 +150,7 @@ describe('/ws connection gate', () => {
     // Even if the attacker keeps writing, nothing is processed.
     try {
       result.socket.send(
-        JSON.stringify({ type: 'setHooksEnabled', providerId: 'claude', enabled: true }),
+        JSON.stringify({ type: 'setHooksEnabled', providerId: 'copilot', enabled: true }),
       );
     } catch {
       /* socket already closed — that IS the point */
@@ -289,7 +289,7 @@ describe('/ws privileged-message gate', () => {
 
   /** Send setHooksEnabled over an accepted socket and let it settle. */
   async function sendToggle(socket: WebSocket, enabled: boolean): Promise<void> {
-    socket.send(JSON.stringify({ type: 'setHooksEnabled', providerId: 'claude', enabled }));
+    socket.send(JSON.stringify({ type: 'setHooksEnabled', providerId: 'copilot', enabled }));
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
 
@@ -439,7 +439,7 @@ describe('/ws privileged-message gate', () => {
     expect(await request).toBeNull();
 
     result.socket.send(
-      JSON.stringify({ type: 'hooksConsentResponse', providerId: 'claude', choice: 'install' }),
+      JSON.stringify({ type: 'hooksConsentResponse', providerId: 'copilot', choice: 'install' }),
     );
     await new Promise((resolve) => setTimeout(resolve, 500));
     expect(sideEffects).toEqual([]);
@@ -458,7 +458,7 @@ describe('/ws privileged-message gate', () => {
     sockets.push(result.socket);
 
     result.socket.send(
-      JSON.stringify({ type: 'hooksConsentResponse', providerId: 'claude', choice: 'install' }),
+      JSON.stringify({ type: 'hooksConsentResponse', providerId: 'copilot', choice: 'install' }),
     );
     await new Promise((resolve) => setTimeout(resolve, 500));
     expect(sideEffects).toEqual([true]);

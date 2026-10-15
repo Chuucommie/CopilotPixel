@@ -11,7 +11,7 @@ import {
 } from '../src/clientMessageHandler.js';
 import { getHooksEnabled, readConfig, setHooksEnabled } from '../src/configPersistence.js';
 import { FileStateAdapter } from '../src/fileStateAdapter.js';
-import { CLAUDE_HOOK_EVENTS } from '../src/providers/hook/claude/constants.js';
+import { COPILOT_HOOK_EVENTS } from '../src/providers/hook/copilot/constants.js';
 import type { AgentState } from '../src/types.js';
 
 /** Let the setHooksEnabled dispatch's async chain (side effect →
@@ -155,7 +155,7 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
       await new Promise((r) => setTimeout(r, 0));
 
       const status = sent.find((m) => m.type === 'hooksStatus');
-      expect(status).toEqual({ type: 'hooksStatus', providerId: 'claude', installed: false });
+      expect(status).toEqual({ type: 'hooksStatus', providerId: 'copilot', installed: false });
     });
 
     it('setHooksEnabled reports the actual outcome after the side effect settles', async () => {
@@ -165,7 +165,7 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
         sideEffectRan = true;
       };
       handleClientMessage(
-        { type: 'setHooksEnabled', providerId: 'claude', enabled: true },
+        { type: 'setHooksEnabled', providerId: 'copilot', enabled: true },
         (m) => sent.push(m),
         ctx,
       );
@@ -175,7 +175,7 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
       // The side effect installed nothing (stub), so the truthful answer is false
       // even though the user just toggled the setting ON.
       const status = sent.find((m) => m.type === 'hooksStatus');
-      expect(status).toEqual({ type: 'hooksStatus', providerId: 'claude', installed: false });
+      expect(status).toEqual({ type: 'hooksStatus', providerId: 'copilot', installed: false });
     });
   });
 
@@ -184,13 +184,15 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
   describe('setHooksEnabled persistence', () => {
     /** Put our command on every installed event, as a real install would. */
     function seedInstalledHooks(): void {
-      const command = `node "${path.join(tempHome, '.pixel-agents', 'hooks', 'claude-hook.js')}"`;
-      const entry = { matcher: '', hooks: [{ type: 'command', command, timeout: 5 }] };
-      fs.mkdirSync(path.join(tempHome, '.claude'), { recursive: true });
+      const hookPath = path.join(tempHome, '.pixel-agents', 'hooks', 'copilot-hook.js');
+      const entry = { type: 'command', exec: 'node', args: [hookPath], timeoutSec: 5 };
+      const configPath = path.join(tempHome, '.copilot', 'hooks', 'copilotpixel.json');
+      fs.mkdirSync(path.dirname(configPath), { recursive: true });
       fs.writeFileSync(
-        path.join(tempHome, '.claude', 'settings.json'),
+        configPath,
         JSON.stringify({
-          hooks: Object.fromEntries(CLAUDE_HOOK_EVENTS.map((e) => [e, [entry]])),
+          version: 1,
+          hooks: Object.fromEntries(COPILOT_HOOK_EVENTS.map((event) => [event, [entry]])),
         }),
       );
     }
@@ -207,7 +209,7 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
       };
 
       handleClientMessage(
-        { type: 'setHooksEnabled', providerId: 'claude', enabled: false },
+        { type: 'setHooksEnabled', providerId: 'copilot', enabled: false },
         (m) => sent.push(m),
         ctx,
       );
@@ -215,31 +217,31 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
 
       // The preference still says ON, so the next startup re-runs the install
       // path and the user keeps a way to turn hooks off.
-      expect(getHooksEnabled('claude')).toBe(true);
+      expect(getHooksEnabled('copilot')).toBe(true);
       // ...and the checkbox is told the truth: they are still installed.
       expect(sent.find((m) => m.type === 'hooksStatus')).toEqual({
         type: 'hooksStatus',
-        providerId: 'claude',
+        providerId: 'copilot',
         installed: true,
       });
     });
 
     // The mirror case: an install that did not happen must not persist ON.
     it('does not persist hooks-on when the install failed', async () => {
-      setHooksEnabled('claude', false);
+      setHooksEnabled('copilot', false);
       ctx.privileged = true;
       ctx.onSetHooksEnabled = () => {
         /* the install failed: settings.json stays empty */
       };
 
       handleClientMessage(
-        { type: 'setHooksEnabled', providerId: 'claude', enabled: true },
+        { type: 'setHooksEnabled', providerId: 'copilot', enabled: true },
         (m) => sent.push(m),
         ctx,
       );
       await settle();
 
-      expect(getHooksEnabled('claude')).toBe(false);
+      expect(getHooksEnabled('copilot')).toBe(false);
     });
 
     // The happy path still persists, or the toggle would do nothing at all.
@@ -248,16 +250,16 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
       ctx.onSetHooksEnabled = () => seedInstalledHooks();
 
       handleClientMessage(
-        { type: 'setHooksEnabled', providerId: 'claude', enabled: true },
+        { type: 'setHooksEnabled', providerId: 'copilot', enabled: true },
         (m) => sent.push(m),
         ctx,
       );
       await settle();
 
-      expect(getHooksEnabled('claude')).toBe(true);
+      expect(getHooksEnabled('copilot')).toBe(true);
       expect(sent.find((m) => m.type === 'hooksStatus')).toEqual({
         type: 'hooksStatus',
-        providerId: 'claude',
+        providerId: 'copilot',
         installed: true,
       });
     });
@@ -273,19 +275,19 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
       };
 
       handleClientMessage(
-        { type: 'setHooksEnabled', providerId: 'claude', enabled: true },
+        { type: 'setHooksEnabled', providerId: 'copilot', enabled: true },
         (m) => sent.push(m),
         ctx,
       );
       await settle();
 
       expect(sideEffectRan).toBe(false);
-      expect(getHooksEnabled('claude')).toBe(true);
+      expect(getHooksEnabled('copilot')).toBe(true);
       // It still hears the truth, so a LAN viewer's checkbox shows reality
       // rather than appearing to have worked.
       expect(sent.find((m) => m.type === 'hooksStatus')).toEqual({
         type: 'hooksStatus',
-        providerId: 'claude',
+        providerId: 'copilot',
         installed: false,
       });
     });

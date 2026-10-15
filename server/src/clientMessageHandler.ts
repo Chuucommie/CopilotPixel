@@ -16,7 +16,7 @@ import { readLayoutFromFile, writeLayoutToFile } from './layoutPersistence.js';
 import type { ConsentEffects } from './providers/hook/consentExecutor.js';
 import { applyConsentChoice } from './providers/hook/consentExecutor.js';
 import { hooksConsentRequest } from './providers/hook/consentGate.js';
-import { claudeProvider, hookProviderById, hookProviders } from './providers/index.js';
+import { copilotProvider, hookProviderById, hookProviders } from './providers/index.js';
 
 type WsSend = (message: Record<string, unknown>) => void;
 
@@ -192,7 +192,7 @@ export function handleClientMessage(
         // Answer with the truth so the checkbox still shows reality instead of
         // silently appearing to have worked.
         console.warn(
-          '[Pixel Agents] Ignoring setHooksEnabled from an untokened client — installing hooks needs approval from this machine (open the tokened URL the CLI printed).',
+          '[CopilotPixel] Ignoring setHooksEnabled from an untokened client — installing hooks needs approval from this machine (open the tokened URL the CLI printed).',
         );
         void provider
           .areHooksInstalled()
@@ -209,7 +209,7 @@ export function handleClientMessage(
       // reasoning as setHooksEnabled above.
       if (!ctx.privileged) {
         console.warn(
-          '[Pixel Agents] Ignoring hooksConsentResponse from an untokened client — installing hooks needs approval from this machine (open the tokened URL the CLI printed).',
+          '[CopilotPixel] Ignoring hooksConsentResponse from an untokened client — installing hooks needs approval from this machine (open the tokened URL the CLI printed).',
         );
         break;
       }
@@ -298,7 +298,7 @@ async function applyHooksPreference(
       // The runtime's single hooksEnabled ref gates the CLAUDE scanners; it
       // follows only the Claude provider until the scanners grow per-provider
       // awareness alongside the Settings UI.
-      if (ctx.runtime && provider.id === claudeProvider.id) {
+      if (ctx.runtime && provider.id === copilotProvider.id) {
         ctx.runtime.hooksEnabled.current = enabled;
       }
     }
@@ -306,7 +306,7 @@ async function applyHooksPreference(
     // not outcome (the installer refuses to touch an unparseable file).
     send({ type: 'hooksStatus', providerId: provider.id, installed });
   } catch (err) {
-    console.error('[Pixel Agents] Applying the hooks preference failed:', err);
+    console.error('[CopilotPixel] Applying the hooks preference failed:', err);
   }
 }
 
@@ -329,7 +329,7 @@ function standaloneConsentEffects(
       try {
         await ctx.onSetHooksEnabled?.(provider.id, false);
       } catch (err) {
-        console.error('[Pixel Agents] Hook uninstall failed:', err);
+        console.error('[CopilotPixel] Hook uninstall failed:', err);
       }
     },
     areHooksInstalled: () => provider.areHooksInstalled(),
@@ -337,7 +337,7 @@ function standaloneConsentEffects(
       // Durable writes are the executor's own atomic recordHooksDecline; this
       // only mirrors the live runtime ref the CLAUDE scanners read, so another
       // provider's answer can never flip Claude's fallback behavior.
-      if (ctx.runtime && provider.id === claudeProvider.id) {
+      if (ctx.runtime && provider.id === copilotProvider.id) {
         ctx.runtime.hooksEnabled.current = false;
       }
     },
@@ -362,8 +362,8 @@ function handleWebviewReady(send: WsSend, ctx: ClientMessageContext): void {
   // 1. Provider capabilities (must arrive before any agent messages)
   send({
     type: 'providerCapabilities',
-    readingTools: [...claudeProvider.readingTools],
-    subagentToolNames: [...claudeProvider.subagentToolNames],
+    readingTools: [...copilotProvider.readingTools],
+    subagentToolNames: [...copilotProvider.subagentToolNames],
   });
 
   // 2. Assets (from server cache, loaded at startup via pngjs)
@@ -405,10 +405,10 @@ function handleWebviewReady(send: WsSend, ctx: ClientMessageContext): void {
   // 4. Settings (from adapter, with sensible defaults when adapter is absent)
   const cfg = readConfig();
   const watchAllSessions = adapter?.getSetting(KEY_WATCH_ALL_SESSIONS, false) ?? false;
-  // settingsLoaded.hooksEnabled stays a single boolean carrying the CLAUDE
+  // settingsLoaded.hooksEnabled stays a single boolean carrying the active
   // provider's preference until the Settings UI grows a per-provider list —
   // its sole webview reader is the hooks tooltip gate.
-  const hooksEnabled = getHooksEnabled(claudeProvider.id);
+  const hooksEnabled = getHooksEnabled(copilotProvider.id);
   const showAreas = adapter?.getSetting(KEY_SHOW_AREAS, false) ?? false;
   send({
     type: 'settingsLoaded',
@@ -438,7 +438,7 @@ function handleWebviewReady(send: WsSend, ctx: ClientMessageContext): void {
     void provider
       .areHooksInstalled()
       .catch((err: unknown) => {
-        console.error(`[Pixel Agents] hooks status check failed for provider ${provider.id}:`, err);
+        console.error(`[CopilotPixel] hooks status check failed for provider ${provider.id}:`, err);
         return false;
       })
       .then((installed) => {
