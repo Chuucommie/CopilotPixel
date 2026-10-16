@@ -65,7 +65,7 @@ jobs:
         id: package-vsix
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          VSIX_NAME="copilot-agents-${VERSION}.vsix"
+          VSIX_NAME="copilot-pixel-${VERSION}.vsix"
           npx @vscode/vsce package --no-dependencies -o "$VSIX_NAME"
           echo "vsixPath=$(pwd)/$VSIX_NAME" >> "$GITHUB_OUTPUT"
           echo "vsixName=$VSIX_NAME" >> "$GITHUB_OUTPUT"

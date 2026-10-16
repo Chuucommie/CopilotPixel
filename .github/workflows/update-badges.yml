@@ -20,7 +20,7 @@ jobs:
             -H 'Accept: application/json;api-version=7.2-preview.1' \
             -d '{
               "filters": [{
-                "criteria": [{"filterType": 7, "value": "chuucommie.copilot-agents"}]
+                "criteria": [{"filterType": 7, "value": "chuucommie.copilot-pixel"}]
               }],
               "flags": 914
             }')
@@ -34,7 +34,7 @@ jobs:
       - name: Fetch Open VSX stats
         id: openvsx
         run: |
-          DOWNLOADS=$(curl -s 'https://open-vsx.org/api/chuucommie/copilot-agents' | jq '.downloadCount // 0')
+          DOWNLOADS=$(curl -s 'https://open-vsx.org/api/chuucommie/copilot-pixel' | jq '.downloadCount // 0')
           echo "downloads=$DOWNLOADS" >> "$GITHUB_OUTPUT"
 
       - name: Fetch GitHub Releases downloads
@@ -49,8 +49,8 @@ jobs:
         id: npm
         shell: bash
         run: |
-          START_DATE=$(curl --fail --silent --show-error 'https://registry.npmjs.org/copilot-agents' | jq -er '.time.created[0:10]')
-          END_DATE=$(curl --fail --silent --show-error 'https://api.npmjs.org/downloads/point/last-day/copilot-agents' | jq -er '.end')
+          START_DATE=$(curl --fail --silent --show-error 'https://registry.npmjs.org/copilot-pixel' | jq -er '.time.created[0:10]')
+          END_DATE=$(curl --fail --silent --show-error 'https://api.npmjs.org/downloads/point/last-day/copilot-pixel' | jq -er '.end')
           TOTAL=0
           CURSOR="$START_DATE"
 
@@ -61,7 +61,7 @@ jobs:
             fi
 
             DOWNLOADS=$(curl --fail --silent --show-error \
-              "https://api.npmjs.org/downloads/point/$CURSOR:$CHUNK_END/copilot-agents" \
+              "https://api.npmjs.org/downloads/point/$CURSOR:$CHUNK_END/copilot-pixel" \
               | jq -er '.downloads')
             TOTAL=$((TOTAL + DOWNLOADS))
             CURSOR=$(date -u -d "$CHUNK_END + 1 day" +%F)

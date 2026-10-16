@@ -1,4 +1,4 @@
-# CI workflow for copilot-agents
+# CI workflow for copilot-pixel
 
 name: CI
 
@@ -158,21 +158,21 @@ jobs:
       - name: Package VSIX
         id: package_vsix
         if: always() && steps.build.outcome == 'success' && steps.install_dependencies.outcome == 'success'
-        run: npx @vscode/vsce package --no-dependencies -o copilot-agents-ci.vsix
+        run: npx @vscode/vsce package --no-dependencies -o copilot-pixel-ci.vsix
         continue-on-error: true
 
       - name: Verify VSIX Package and Extension Host
         id: verify_vsix
         if: always() && steps.package_vsix.outcome == 'success'
-        run: xvfb-run -a node scripts/verify-vsix-package.mjs copilot-agents-ci.vsix
+        run: xvfb-run -a node scripts/verify-vsix-package.mjs copilot-pixel-ci.vsix
         continue-on-error: true
 
       - name: Upload CI VSIX Artifact
         if: always() && steps.package_vsix.outcome == 'success'
         uses: actions/upload-artifact@v7
         with:
-          name: copilot-agents-ci-vsix
-          path: copilot-agents-ci.vsix
+          name: copilot-pixel-ci-vsix
+          path: copilot-pixel-ci.vsix
           if-no-files-found: warn
 
       # --- Audit Checks (blocking) ---
