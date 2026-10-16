@@ -1,3 +1,5 @@
+import * as path from 'path';
+
 import { formatAntigravityToolStatus } from './providers/hook/antigravity/antigravity.js';
 import {
   copilotProvider,
@@ -972,6 +974,54 @@ export function processCopilotChatRecord(
   } | null => {
     if (!item || typeof item !== 'object') return null;
     const obj = item as Record<string, unknown>;
+
+    // Handle references / context reading in Copilot
+    if (
+      obj.kind === 'references' ||
+      obj.kind === 'reference' ||
+      obj.kind === 'inlineReference' ||
+      obj.kind === 'codeCitations'
+    ) {
+      let filePath = '';
+      if (Array.isArray(obj.references) && obj.references.length > 0) {
+        const ref = obj.references[0] as Record<string, unknown>;
+        const uri = (ref.uri || ref.resource || ref) as Record<string, unknown>;
+        filePath = (uri.path || uri.fsPath || uri.value || '') as string;
+      } else if (obj.reference && typeof obj.reference === 'object') {
+        const ref = obj.reference as Record<string, unknown>;
+        const uri = (ref.uri || ref) as Record<string, unknown>;
+        filePath = (uri.path || uri.fsPath || uri.value || '') as string;
+      } else if (Array.isArray(obj.citations) && obj.citations.length > 0) {
+        const cit = obj.citations[0] as Record<string, unknown>;
+        const val = (cit.value || cit) as Record<string, unknown>;
+        filePath = (val.path || val.fsPath || '') as string;
+      }
+      const fileName = filePath ? path.basename(filePath) : 'file';
+      const status = `Reading ${fileName}`;
+      return {
+        toolName: 'readFile',
+        input: { filePath },
+        status,
+        isComplete: false,
+      };
+    }
+
+    // Handle textEditGroup / file edits in Copilot
+    if (obj.kind === 'textEditGroup' || obj.kind === 'undoStop') {
+      if (obj.kind === 'textEditGroup') {
+        const uri = (obj.uri || obj.resource) as Record<string, unknown> | string;
+        const filePath =
+          typeof uri === 'string' ? uri : ((uri?.path || uri?.fsPath || '') as string);
+        const fileName = filePath ? path.basename(filePath) : 'file';
+        const status = `Editing ${fileName}`;
+        return {
+          toolName: 'editFiles',
+          input: { filePath },
+          status,
+          isComplete: false,
+        };
+      }
+    }
     if (
       obj.type === 'toolInvocation' ||
       obj.kind === 'toolInvocation' ||
@@ -1003,8 +1053,6 @@ export function processCopilotChatRecord(
         }
       }
 
-      const cleanName =
-        rawName.replace(/^(copilot_|vscode_|tools_)/, '').replace(/^.*[./]/, '') || 'tool';
       const isComplete =
         obj.isComplete === true ||
         obj.status === 'completed' ||
@@ -1014,6 +1062,18 @@ export function processCopilotChatRecord(
       const invocationMsg = extractMessage(obj.invocationMessage || obj.message || obj.content);
       const pastTenseMsg = extractMessage(obj.pastTenseMessage);
       let status = isComplete && pastTenseMsg ? pastTenseMsg : invocationMsg;
+
+      // Fallback inference from status if rawName is generic/missing
+      if ((!rawName || rawName === 'tool' || rawName === 'progressTask') && status) {
+        if (/^reading/i.test(status)) rawName = 'readFile';
+        else if (/^editing/i.test(status)) rawName = 'editFiles';
+        else if (/^searching/i.test(status)) rawName = 'searchCode';
+        else if (/^running/i.test(status)) rawName = 'runInTerminal';
+      }
+
+      const cleanName =
+        rawName.replace(/^(copilot_|vscode_|tools_)/, '').replace(/^.*[./]/, '') || 'tool';
+
       if (!status) {
         status = formatCopilotToolStatus(cleanName, input);
       }

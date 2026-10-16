@@ -247,6 +247,18 @@ export interface Character {
   /** True when lead spawns teammates via tmux (run_in_background Agent calls) */
   teamUsesTmux?: boolean;
 
+  // -- Custom Name, Role & Orders --
+  /** Custom user-editable English name (from 50 names pool) */
+  customName?: string;
+  /** Role assigned to the agent (e.g. Lead, Architect, Coder, Researcher, Reviewer, Tester, DevOps, Generalist) */
+  role?: string;
+  /** Active directive/order assigned to this agent */
+  currentOrder?: string | null;
+  /** History of directives/orders given to this agent */
+  orderHistory?: string[];
+  /** Name of agent who delegated the current order */
+  delegatedFrom?: string | null;
+
   // -- Context gauge --
   /** Tokens in the agent's context as of its newest turn; 0 until reported.
    *  Sub-agents have no session of their own and stay at 0. */

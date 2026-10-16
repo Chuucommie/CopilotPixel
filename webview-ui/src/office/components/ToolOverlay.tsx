@@ -14,10 +14,10 @@ import {
   CONTEXT_GAUGE_WIDTH_PX,
   CONTEXT_WARN_THRESHOLD,
   TEAM_LEAD_COLOR,
-  TEAM_ROLE_COLOR,
   TOOL_OVERLAY_VERTICAL_OFFSET,
 } from '../../constants.js';
 import type { SubagentCharacter } from '../../hooks/useExtensionMessages.js';
+import { getRoleDefinition } from '../agentRoles.js';
 import type { OfficeState } from '../engine/officeState.js';
 import { overlayProjection } from '../projection.js';
 import type { ToolActivity } from '../types.js';
@@ -234,30 +234,55 @@ export function ToolOverlay({
                   style={{ background: dotColor }}
                 />
               )}
-              <div className="flex flex-col gap-0 overflow-hidden">
-                {teamRoleLabel && (
+              <div className="flex flex-col gap-1 overflow-hidden">
+                <div className="flex items-center gap-2 overflow-hidden">
                   <span
-                    className="overflow-hidden text-ellipsis block leading-none"
+                    className="overflow-hidden text-ellipsis block font-bold leading-none"
                     style={{
-                      fontSize: '18px',
-                      color: ch.isTeamLead ? TEAM_LEAD_COLOR : TEAM_ROLE_COLOR,
-                      fontWeight: ch.isTeamLead ? 'bold' : undefined,
+                      fontSize: '16px',
+                      color: ch.isTeamLead ? TEAM_LEAD_COLOR : 'inherit',
                     }}
                   >
-                    {teamRoleLabel}
+                    {ch.customName || teamRoleLabel || (isSub ? 'Subagent' : 'Agent')}
                   </span>
-                )}
+                  {(() => {
+                    const r = getRoleDefinition(ch.role);
+                    return (
+                      <span
+                        className="text-2xs px-2 py-0.5 rounded border leading-none shrink-0"
+                        style={{
+                          borderColor: r.badgeColor,
+                          backgroundColor: r.badgeColor + '22',
+                          color: r.badgeColor,
+                          fontSize: '11px',
+                        }}
+                        title={r.description}
+                      >
+                        {r.icon} {r.name}
+                      </span>
+                    );
+                  })()}
+                </div>
                 <span
-                  className="overflow-hidden text-ellipsis block leading-none"
+                  className="overflow-hidden text-ellipsis block leading-tight font-medium"
                   style={{
-                    fontSize: isSub ? '20px' : '22px',
+                    fontSize: isSub ? '15px' : '17px',
                     fontStyle: isSub ? 'italic' : undefined,
                   }}
                 >
                   {activityText}
                 </span>
+                {ch.currentOrder && (
+                  <span
+                    className="text-2xs leading-tight text-accent-bright overflow-hidden text-ellipsis block max-w-xs"
+                    title={'Active order: ' + ch.currentOrder}
+                  >
+                    📋 {ch.delegatedFrom ? `${ch.delegatedFrom} ➔ ` : ''}
+                    {ch.currentOrder}
+                  </span>
+                )}
                 {ch.folderName && (
-                  <span className="text-2xs leading-none overflow-hidden text-ellipsis block">
+                  <span className="text-2xs leading-none text-text-muted overflow-hidden text-ellipsis block">
                     {ch.folderName}
                   </span>
                 )}

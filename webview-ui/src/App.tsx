@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { toMajorMinor } from './changelogData.js';
+import { AgentRosterModal } from './components/AgentRosterModal.js';
 import { BottomToolbar } from './components/BottomToolbar.js';
 import { ChangelogModal } from './components/ChangelogModal.js';
 import { ConnectionIndicator } from './components/ConnectionIndicator.js';
@@ -24,6 +25,7 @@ import { EditorToolbar } from './office/editor/EditorToolbar.js';
 import { OfficeState } from './office/engine/officeState.js';
 import { exportLayoutToFile } from './office/layout/exportLayout.js';
 import { isRotatable } from './office/layout/furnitureCatalog.js';
+import type { LayoutPresetDefinition } from './office/layout/layoutPresets.js';
 import { migrateLayoutColors } from './office/layout/layoutSerializer.js';
 import { getPetCount } from './office/sprites/petSpriteData.js';
 import { EditTool, type OfficeLayout } from './office/types.js';
@@ -104,6 +106,7 @@ function App() {
 
   const [isChangelogOpen, setIsChangelogOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isRosterOpen, setIsRosterOpen] = useState(false);
   const [isHooksInfoOpen, setIsHooksInfoOpen] = useState(false);
   const [hooksTooltipDismissed, setHooksTooltipDismissed] = useState(false);
   const [isDebugMode, setIsDebugMode] = useState(false);
@@ -262,6 +265,28 @@ function App() {
   const handleExportLayout = useCallback(() => {
     exportLayoutToFile(getOfficeState().getLayout());
   }, []);
+
+  const handleApplyPreset = useCallback(
+    (preset: LayoutPresetDefinition) => {
+      if (
+        isEditDirty() &&
+        !window.confirm(
+          'Replace the current layout with ' + preset.name + '? Unsaved edits will be lost.',
+        )
+      ) {
+        return;
+      }
+      const migrated = migrateLayoutColors(preset.layout);
+      getOfficeState().rebuildFromLayout(migrated);
+      editor.setLastSavedLayout(migrated);
+      transport.send({
+        type: 'saveLayout',
+        layout: migrated as unknown as Record<string, unknown>,
+      });
+      editor.markClean();
+    },
+    [isEditDirty, editor],
+  );
 
   const handleImportLayout = useCallback(
     (file: File) => {
@@ -517,6 +542,9 @@ function App() {
         isSettingsOpen={isSettingsOpen}
         onToggleSettings={() => setIsSettingsOpen((v) => !v)}
         workspaceFolders={workspaceFolders}
+        isRosterOpen={isRosterOpen}
+        onToggleRoster={() => setIsRosterOpen((v) => !v)}
+        agentCount={agents.length + subagentCharacters.length}
       />
 
       <VersionIndicator
@@ -532,6 +560,17 @@ function App() {
         isOpen={isChangelogOpen}
         onClose={() => setIsChangelogOpen(false)}
         currentVersion={extensionVersion}
+      />
+
+      <AgentRosterModal
+        isOpen={isRosterOpen}
+        onClose={() => setIsRosterOpen(false)}
+        officeState={officeState}
+        agentTools={agentTools}
+        subagentTools={subagentTools}
+        onFocusAgent={(agentId) => {
+          handleSelectAgent(agentId);
+        }}
       />
 
       <SettingsModal
@@ -572,6 +611,7 @@ function App() {
         showAreasAvailable={areasAvailable}
         onExportLayout={handleExportLayout}
         onImportLayout={handleImportLayout}
+        onApplyPreset={handleApplyPreset}
       />
 
       {showMigrationNotice && (
@@ -592,6 +632,7 @@ function App() {
           onClose={handleIntroClose}
           escapeSuppressed={
             isSettingsOpen ||
+            isRosterOpen ||
             isChangelogOpen ||
             isHooksInfoOpen ||
             showMigrationNotice ||

@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.4.6
+
+### Agent Roles, 50 English Names, Team Directives & Office Layout Presets
+
+- **Precise Action & Reading Detection (Copilot & Antigravity)**: Fixed issue where Copilot was limited to "Thinking..." and never shown reading files. Parsed VS Code Copilot Chat `references`, `reference`, `inlineReference`, `codeCitations`, `textEditGroup`, and `progressTask` streaming records. Added keyword and case-insensitive taxonomy mapping so that inspecting files dynamically triggers the `Reading` sprite (`sprites.reading`) and descriptive status labels ("Reading <filename>", "Editing <filename>").
+- **Agent Roster & Directives Panel**: Introduced a dedicated Agent Roster modal (`AgentRosterModal`) accessible from the bottom toolbar (`Agents` button). Users can view all active agents and subagents, inspect live activity, change roles, rename agents, and issue direct directives.
+- **50 Random English Names Pool**: Added a pool of 50 distinctive English names (`ENGLISH_NAMES_50`) assigned randomly to new agents upon creation. Names can be edited inline or re-rolled with a one-click `🎲 Random` button. Custom names and roles are persisted in `localStorage`.
+- **Structured Agent Roles**: Introduced 8 specialized team roles with unique icons and color badges:
+  - `Lead` (👑 Project Lead, Gold)
+  - `Architect` (🏛️ System Architect, Purple)
+  - `Coder` (💻 Full-Stack Coder, Blue)
+  - `Researcher` (🔍 Researcher, Cyan)
+  - `Reviewer` (📝 Code Reviewer, Pink)
+  - `Tester` (🧪 QA & Tester, Green)
+  - `DevOps` (⚙️ DevOps & SRE, Orange)
+  - `Generalist` (🤖 Generalist Assistant, Slate)
+- **Direct Orders & Agent-to-Agent Delegation**: Users can give specific task directives to any agent. Agents can also delegate tasks to other teammates or spawn new helper subagents with a chosen role and task description right into the office.
+- **Office Layout Presets (2 Normal, 2 Medium, 2 Large + Default)**: Added an office layout preset picker in Settings with 7 complete, functional environments:
+  - `Default HQ` (Default classic 2-room layout, 21x22)
+  - `Cozy Startup` (Normal 1, 18x16 - 4 workstations, coffee table, plant, bookshelf)
+  - `Compact Studio` (Normal 2, 20x16 - 6 workstations in 2 pods, whiteboard, lounge)
+  - `Tech Branch` (Medium 1, 24x17 - 8 workstations in 2 pods, separate conference room)
+  - `Creative Agency` (Medium 2, 26x18 - 10 workstations with executive lead desk and 4-way sofa lounge)
+  - `Open Enterprise` (Large 1, 32x20 - 14 workstations in 3 wings, large boardroom)
+  - `Corporate Campus` (Large 2, 36x22 - 18+ workstations across 4 quadrants, boardroom, cafeteria)
+- **Enhanced ToolOverlay**: Live badges display custom names, role icons/colors, active task directives (`📋 ...`), and precise action descriptions above agent sprites.
+
 ## v1.4.5
 
 ### Subagent Spawning, Live Office Animations & Copilot Activity Fixes

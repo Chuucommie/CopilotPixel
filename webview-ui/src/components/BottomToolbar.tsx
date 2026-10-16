@@ -13,6 +13,9 @@ interface BottomToolbarProps {
   isSettingsOpen: boolean;
   onToggleSettings: () => void;
   workspaceFolders: WorkspaceFolder[];
+  isRosterOpen?: boolean;
+  onToggleRoster?: () => void;
+  agentCount?: number;
 }
 
 export function BottomToolbar({
@@ -22,6 +25,9 @@ export function BottomToolbar({
   isSettingsOpen,
   onToggleSettings,
   workspaceFolders,
+  isRosterOpen,
+  onToggleRoster,
+  agentCount,
 }: BottomToolbarProps) {
   const [isFolderPickerOpen, setIsFolderPickerOpen] = useState(false);
   const [isBypassMenuOpen, setIsBypassMenuOpen] = useState(false);
@@ -119,6 +125,15 @@ export function BottomToolbar({
             ))}
           </Dropdown>
         </div>
+      )}
+      {onToggleRoster && (
+        <Button
+          variant={isRosterOpen ? 'active' : 'default'}
+          onClick={onToggleRoster}
+          title="Agent Roster, Roles & Directives"
+        >
+          Agents {agentCount !== undefined && agentCount > 0 ? `(${agentCount})` : ''}
+        </Button>
       )}
       <Button
         variant={isEditMode ? 'active' : 'default'}

@@ -16,6 +16,7 @@ import {
   PET_HIT_HEIGHT,
   WAITING_BUBBLE_DURATION_SEC,
 } from '../../constants.js';
+import { getAgentProfile, updateAgentProfile } from '../agentRoles.js';
 import { getAnimationFrames, getCatalogEntry, getOnStateType } from '../layout/furnitureCatalog.js';
 import {
   createDefaultLayout,
@@ -488,6 +489,17 @@ export class OfficeState {
     if (folderName) {
       ch.folderName = folderName;
     }
+    const existingNames = Array.from(this.characters.values())
+      .map((c) => c.customName || '')
+      .filter(Boolean);
+    const isLeadOrFirst = this.characters.size === 0 || id === 0;
+    const profile = getAgentProfile(id, existingNames, isLeadOrFirst);
+    ch.customName = profile.customName;
+    ch.role = profile.role;
+    ch.currentOrder = profile.currentOrder;
+    ch.orderHistory = profile.orderHistory;
+    ch.delegatedFrom = profile.delegatedFrom;
+
     if (!skipSpawnEffect) {
       startMatrixEffect(ch, 'spawn');
     }
@@ -724,6 +736,16 @@ export class OfficeState {
     }
     ch.isSubagent = true;
     ch.parentAgentId = parentAgentId;
+    const existingSubNames = Array.from(this.characters.values())
+      .map((c) => c.customName || '')
+      .filter(Boolean);
+    const subProfile = getAgentProfile(id, existingSubNames, false);
+    ch.customName = subProfile.customName;
+    ch.role = subProfile.role || 'Coder';
+    ch.currentOrder = subProfile.currentOrder;
+    ch.orderHistory = subProfile.orderHistory;
+    ch.delegatedFrom = subProfile.delegatedFrom;
+
     startMatrixEffect(ch, 'spawn');
     this.characters.set(id, ch);
 
@@ -1182,6 +1204,82 @@ export class OfficeState {
   /** Get character at pixel position (for hit testing). Returns id or null.
    *  Agents only: clicks pass straight through the consent greeter, which is
    *  a prop, not something to select or follow. */
+  setAgentName(id: number, name: string): void {
+    const ch = this.characters.get(id);
+    if (ch) {
+      ch.customName = name;
+      updateAgentProfile(id, { customName: name });
+    }
+  }
+
+  setAgentRole(id: number, role: string): void {
+    const ch = this.characters.get(id);
+    if (ch) {
+      ch.role = role;
+      updateAgentProfile(id, { role });
+    }
+  }
+
+  setAgentOrder(id: number, order: string, fromAgentName?: string): void {
+    const ch = this.characters.get(id);
+    if (ch) {
+      ch.currentOrder = order;
+      ch.delegatedFrom = fromAgentName || null;
+      updateAgentProfile(id, {
+        currentOrder: order,
+        delegatedFrom: fromAgentName || null,
+      });
+    }
+  }
+
+  clearAgentOrder(id: number): void {
+    const ch = this.characters.get(id);
+    if (ch) {
+      ch.currentOrder = null;
+      ch.delegatedFrom = null;
+      updateAgentProfile(id, { currentOrder: null, delegatedFrom: null });
+    }
+  }
+
+  delegateOrder(fromAgentId: number, toAgentId: number, order: string): boolean {
+    const fromCh = this.characters.get(fromAgentId);
+    const toCh = this.characters.get(toAgentId);
+    if (!toCh) return false;
+    const fromName = fromCh?.customName || 'Agent #' + fromAgentId;
+    this.setAgentOrder(toAgentId, order, fromName);
+    return true;
+  }
+
+  spawnSubagentWithRole(
+    parentAgentId: number,
+    role = 'Coder',
+    name?: string,
+    initialTask?: string,
+  ): number {
+    const parentToolId =
+      'manual_spawn_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+    const subId = this.addSubagent(parentAgentId, parentToolId);
+    const subCh = this.characters.get(subId);
+    if (subCh) {
+      if (name) {
+        subCh.customName = name;
+      }
+      subCh.role = role;
+      if (initialTask) {
+        const parentCh = this.characters.get(parentAgentId);
+        subCh.currentOrder = initialTask;
+        subCh.delegatedFrom = parentCh?.customName || 'Lead #' + parentAgentId;
+      }
+      updateAgentProfile(subId, {
+        customName: subCh.customName,
+        role: subCh.role,
+        currentOrder: subCh.currentOrder,
+        delegatedFrom: subCh.delegatedFrom,
+      });
+    }
+    return subId;
+  }
+
   getCharacterAt(worldX: number, worldY: number): number | null {
     const chars = Array.from(this.characters.values()).sort((a, b) => b.y - a.y);
     for (const ch of chars) {

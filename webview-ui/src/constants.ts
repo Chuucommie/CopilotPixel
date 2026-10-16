@@ -271,6 +271,18 @@ export const CONTEXT_GAUGE_COLOR_DANGER = '#ff8800';
 export const CONTEXT_GAUGE_COLOR_CRITICAL = '#ff2222';
 export const CONTEXT_GAUGE_BG = '#222';
 
+// ── Agent Roles ─────────────────────────────────────────────
+export const ROLE_BADGE_LEAD_COLOR = '#eab308';
+export const ROLE_BADGE_ARCHITECT_COLOR = '#a855f7';
+export const ROLE_BADGE_CODER_COLOR = '#3b82f6';
+export const ROLE_BADGE_RESEARCHER_COLOR = '#06b6d4';
+export const ROLE_BADGE_REVIEWER_COLOR = '#ec4899';
+export const ROLE_BADGE_TESTER_COLOR = '#22c55e';
+export const ROLE_BADGE_DEVOPS_COLOR = '#f97316';
+export const ROLE_BADGE_GENERALIST_COLOR = '#94a3b8';
+export const AGENT_STATUS_IDLE_DOT_COLOR = '#64748b';
+export const AGENT_STATUS_ACTIVE_DOT_COLOR = '#22c55e';
+
 // ── Agent Teams ─────────────────────────────────────────────
 export const TEAM_LEAD_COLOR = '#ffd700';
 export const TEAM_ROLE_COLOR = '#66aaff';

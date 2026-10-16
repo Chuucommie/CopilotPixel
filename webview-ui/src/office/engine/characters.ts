@@ -84,6 +84,11 @@ export function createCharacter(
     matrixEffect: null,
     matrixEffectTimer: 0,
     matrixEffectSeeds: [],
+    customName: undefined,
+    role: undefined,
+    currentOrder: null,
+    orderHistory: [],
+    delegatedFrom: null,
     contextTokens: 0,
     maxContextTokens: DEFAULT_MAX_CONTEXT_TOKENS,
   };

@@ -436,4 +436,87 @@ describe('VS Code Copilot Chat Integration', () => {
 
     expect(agent.activeToolStatuses.get('chat_turn')).toBe('Responding...');
   });
+
+  it('parses references and textEditGroup as readFile and editFiles actions', () => {
+    const broadcastEvents: unknown[] = [];
+    agents.broadcast = (msg: unknown) => broadcastEvents.push(msg);
+
+    const agent: AgentState = {
+      id: 4,
+      sessionId: 'session-refs',
+      terminalRef: undefined,
+      isExternal: true,
+      projectDir: tmpDir,
+      jsonlFile: path.join(tmpDir, 'session-refs.jsonl'),
+      fileOffset: 0,
+      lineBuffer: '',
+      activeToolIds: new Set(),
+      activeToolStatuses: new Map(),
+      activeToolNames: new Map(),
+      activeSubagentToolIds: new Map(),
+      activeSubagentToolNames: new Map(),
+      backgroundAgentToolIds: new Set(),
+      isWaiting: false,
+      permissionSent: false,
+      hadToolsInTurn: false,
+      lastDataAt: 0,
+      linesProcessed: 0,
+      seenUnknownRecordTypes: new Set(),
+      hookDelivered: false,
+      contextTokens: 0,
+      maxContextTokens: 200_000,
+    };
+    agents.set(4, agent);
+
+    // References stream event (file read for context)
+    processCopilotChatRecord(
+      4,
+      agent,
+      {
+        kind: 2,
+        k: ['requests', 0, 'response', 0],
+        v: {
+          kind: 'references',
+          references: [{ uri: { path: '/workspace/src/app.controller.ts' } }],
+        },
+      },
+      agents,
+      waitingTimers,
+      permissionTimers,
+    );
+
+    expect(agent.activeToolNames.get('tool_requests_0_response_0_readFile')).toBe('readFile');
+    expect(agent.activeToolStatuses.get('tool_requests_0_response_0_readFile')).toBe(
+      'Reading app.controller.ts',
+    );
+
+    const readStart = broadcastEvents.find(
+      (e: any) => e.type === 'agentToolStart' && e.toolName === 'readFile',
+    ) as any;
+    expect(readStart).toBeDefined();
+    expect(readStart.status).toBe('Reading app.controller.ts');
+
+    // Text edit group event (file edit)
+    processCopilotChatRecord(
+      4,
+      agent,
+      {
+        kind: 2,
+        k: ['requests', 0, 'response', 1],
+        v: {
+          kind: 'textEditGroup',
+          uri: { path: '/workspace/src/app.service.ts' },
+          edits: [],
+        },
+      },
+      agents,
+      waitingTimers,
+      permissionTimers,
+    );
+
+    expect(agent.activeToolNames.get('tool_requests_0_response_1_editFiles')).toBe('editFiles');
+    expect(agent.activeToolStatuses.get('tool_requests_0_response_1_editFiles')).toBe(
+      'Editing app.service.ts',
+    );
+  });
 });

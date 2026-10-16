@@ -1,14 +1,18 @@
 /** Map status prefixes back to tool names for animation selection */
 const STATUS_TO_TOOL: Record<string, string> = {
   Reading: 'Read',
+  Viewing: 'view_file',
   Searching: 'Grep',
+  'Searching code': 'Grep',
+  'Searching web': 'WebSearch',
+  Listing: 'list_dir',
   Globbing: 'Glob',
   Fetching: 'WebFetch',
-  'Searching web': 'WebSearch',
   Writing: 'Write',
   Editing: 'Edit',
   Running: 'Bash',
   Task: 'Task',
+  Subtask: 'Task',
 };
 
 export function extractToolName(status: string): string | null {
@@ -40,8 +44,26 @@ export function setProviderCapabilities(caps: {
   providerCaps.subagentToolNames = new Set(caps.subagentToolNames);
 }
 
+const FALLBACK_READING_KEYWORDS = [
+  'read',
+  'view',
+  'grep',
+  'search',
+  'glob',
+  'fetch',
+  'find',
+  'list',
+  'cat',
+];
+
 export function isReadingToolName(name: string | null | undefined): boolean {
-  return typeof name === 'string' && providerCaps.readingTools.has(name);
+  if (typeof name !== 'string' || !name.trim()) return false;
+  if (providerCaps.readingTools.has(name)) return true;
+  const lower = name.toLowerCase();
+  for (const tool of providerCaps.readingTools) {
+    if (tool.toLowerCase() === lower) return true;
+  }
+  return FALLBACK_READING_KEYWORDS.some((kw) => lower.includes(kw));
 }
 
 export function isSubagentToolName(name: string | null | undefined): boolean {
