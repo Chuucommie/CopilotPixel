@@ -106,7 +106,7 @@ test.describe('Pets', () => {
     });
     narrator.check('petSpritesLoaded reached the client — pet assets delivered');
 
-    // The two bundled pets (buddy, gitcat) render as carousel thumbnails in
+    // The two bundled pets (buddy, pixelcat) render as carousel thumbnails in
     // alphabetical order, each titled with its manifest `name`. Asserting the
     // count + both names covers "loaded" and "manifest names" together.
     narrator.step('opening the layout editor → Pets tab');
@@ -114,9 +114,9 @@ test.describe('Pets', () => {
     await expect(carousel.locator('button')).toHaveCount(3);
     narrator.check('carousel has exactly 3 pet thumbnails');
     await expect(carousel.locator('button[title="Buddy"]')).toBeVisible();
-    await expect(carousel.locator('button[title="Gitcat"]')).toBeVisible();
+    await expect(carousel.locator('button[title="PixelCat"]')).toBeVisible();
     await expect(carousel.locator('button[title="Mimi"]')).toBeVisible();
-    narrator.check('thumbnails titled "Buddy", "Gitcat", and "Mimi" — manifest names surfaced');
+    narrator.check('thumbnails titled "Buddy", "PixelCat", and "Mimi" — manifest names surfaced');
   });
 
   test('placing a pet toggles it on/off and persists across a panel reload @area:pets', async ({
@@ -127,7 +127,7 @@ test.describe('Pets', () => {
     narrator.step('opening the layout editor → Pets tab');
     const carousel = await openPetsTab(frame);
     const buddy = carousel.locator('button[title="Buddy"]');
-    const gitcat = carousel.locator('button[title="Gitcat"]');
+    const pixelcat = carousel.locator('button[title="PixelCat"]');
 
     // Toggle ON: clicking the carousel button drives the real placement path.
     narrator.step('clicking Buddy — placing the pet');
@@ -147,14 +147,14 @@ test.describe('Pets', () => {
     narrator.check('canvas empty again (getPets → 0)');
 
     // Place both pets, then persist via the EditActionBar Save button.
-    narrator.step('placing both pets — Buddy, then Gitcat');
+    narrator.step('placing both pets — Buddy, then PixelCat');
     await buddy.click();
     await frame.waitForFunction(
       () =>
         ((globalThis as unknown as PetWindow).__copilotAgentsTestHooks?.getPets?.() ?? [])
           .length === 1,
     );
-    await gitcat.click();
+    await pixelcat.click();
     await frame.waitForFunction(
       () => ((window as PetWindow).__copilotAgentsTestHooks?.getPets?.() ?? []).length === 2,
     );

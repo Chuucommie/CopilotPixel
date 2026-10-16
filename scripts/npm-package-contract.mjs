@@ -3,8 +3,8 @@ import fs from 'node:fs';
 
 import semver from 'semver';
 
-export const EXPECTED_PACKAGE_NAME = 'copilot-agents';
-export const EXPECTED_REPOSITORY_URL = 'https://github.com/Chuucommie/CopilotPixel';
+export const EXPECTED_PACKAGE_NAME = 'copilot-pixel';
+export const EXPECTED_REPOSITORY_URL = 'https://github.com/Chuucommie/CopilotPixel.git';
 
 // fastify + @fastify/{cors,static,websocket} are root runtime `dependencies` even though
 // no root source file imports them: esbuild marks them `external` when bundling
@@ -123,7 +123,10 @@ export function validateReleaseIdentity({
       `Expected package name ${EXPECTED_PACKAGE_NAME}, received ${String(manifest.name)}`,
     );
   }
-  if (manifest.repository?.url !== EXPECTED_REPOSITORY_URL) {
+  if (
+    (manifest.repository?.url || '').replace(/\.git$/, '') !==
+    EXPECTED_REPOSITORY_URL.replace(/\.git$/, '')
+  ) {
     throw new Error(
       `Expected repository ${EXPECTED_REPOSITORY_URL}, received ${String(manifest.repository?.url)}`,
     );

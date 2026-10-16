@@ -261,7 +261,7 @@ export type PetState = (typeof PetState)[keyof typeof PetState];
 export interface Pet {
   /** Stable identifier; matches PlacedPet.id in the layout. */
   id: string;
-  /** Display name from sprite manifest (e.g. "Buddy", "Gitcat"). */
+  /** Display name from sprite manifest (e.g. "Buddy", "PixelCat"). */
   name: string;
   /** Index into the loaded PetSpriteFrames[] array. */
   petType: number;

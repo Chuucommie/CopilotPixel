@@ -579,5 +579,15 @@ export class AgentRuntime {
     for (const id of [...this.store.keys()]) {
       this.removeAgent(id);
     }
+
+    for (const timer of this.waitingTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.waitingTimers.clear();
+
+    for (const timer of this.permissionTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.permissionTimers.clear();
   }
 }

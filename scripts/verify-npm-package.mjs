@@ -95,6 +95,7 @@ async function stopChild(child) {
 }
 
 async function verifyInstalledTarball(tarballPath) {
+  const packageManifest = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
   const smokeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-agents-npm-smoke-'));
   const smokeHome = path.join(smokeRoot, 'home');
   const smokeProject = path.join(smokeRoot, 'project');
@@ -125,11 +126,11 @@ async function verifyInstalledTarball(tarballPath) {
       cwd: smokeProject,
     });
 
-    const installedRoot = path.join(smokeProject, 'node_modules', 'copilot-agents');
+    const installedRoot = path.join(smokeProject, 'node_modules', packageManifest.name);
     const installedManifest = JSON.parse(
       fs.readFileSync(path.join(installedRoot, 'package.json'), 'utf-8'),
     );
-    if (installedManifest.bin?.['copilot-agents'] !== './dist/cli.js') {
+    if (installedManifest.bin?.[packageManifest.name] !== './dist/cli.js') {
       throw new Error('Installed package has an unexpected copilot-agents bin entry');
     }
 
@@ -143,14 +144,17 @@ async function verifyInstalledTarball(tarballPath) {
       smokeProject,
       'node_modules',
       '.bin',
-      process.platform === 'win32' ? 'copilot-agents.cmd' : 'copilot-agents',
+      process.platform === 'win32' ? `${packageManifest.name}.cmd` : packageManifest.name,
     );
     const help = await execFileAsync(installedBin, ['--help'], {
       cwd: smokeProject,
       env: { ...process.env, HOME: smokeHome, USERPROFILE: smokeHome },
       shell: process.platform === 'win32',
     });
-    if (!help.stdout.includes('Usage: copilot-agents')) {
+    if (
+      !help.stdout.includes(`Usage: ${packageManifest.name}`) &&
+      !help.stdout.includes('Usage: copilot-agents')
+    ) {
       throw new Error('Installed copilot-agents bin did not print CLI help');
     }
 

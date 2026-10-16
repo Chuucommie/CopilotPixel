@@ -55,7 +55,7 @@ test('rejects source and preview files even when required files exist', () => {
 
 test('validates release tag, ref, repository, and monotonic version', () => {
   const manifest = {
-    name: 'copilot-agents',
+    name: 'copilot-pixel',
     version: '1.4.0',
     repository: { url: 'https://github.com/Chuucommie/CopilotPixel' },
   };

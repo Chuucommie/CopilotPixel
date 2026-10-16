@@ -119,6 +119,9 @@ export class CopilotAgentsViewProvider implements vscode.WebviewViewProvider {
   // session, even though webviewReady fires on every panel focus.
   private autoSpawnAttempted = false;
 
+  // Track event listener and webview disposables for clean deactivation
+  private readonly disposables: vscode.Disposable[] = [];
+
   constructor(
     private readonly context: vscode.ExtensionContext,
     adapter: StateAdapter,
@@ -926,35 +929,40 @@ export class CopilotAgentsViewProvider implements vscode.WebviewViewProvider {
       }
     });
 
-    vscode.window.onDidChangeActiveTerminal((terminal) => {
-      if (!terminal) return;
-      this.runtime.activeAgentId.current = null;
-      for (const [id, agent] of this.store) {
-        if (agent.terminalRef && agent.terminalRef === terminal) {
-          this.runtime.activeAgentId.current = id;
-          webviewView.webview.postMessage({ type: 'agentSelected', id });
-          break;
-        }
-      }
-    });
-
-    vscode.window.onDidCloseTerminal((closed) => {
-      for (const [id, agent] of this.store) {
-        if (agent.terminalRef && agent.terminalRef === closed) {
-          if (this.runtime.activeAgentId.current === id) {
-            this.runtime.activeAgentId.current = null;
+    this.disposables.push(
+      vscode.window.onDidChangeActiveTerminal((terminal) => {
+        if (!terminal) return;
+        this.runtime.activeAgentId.current = null;
+        for (const [id, agent] of this.store) {
+          if (agent.terminalRef && agent.terminalRef === terminal) {
+            this.runtime.activeAgentId.current = id;
+            webviewView.webview.postMessage({ type: 'agentSelected', id });
+            break;
           }
-          // If this is a team lead, remove its teammates
-          if (agent.isTeamLead) {
-            this.runtime.removeTeammates(id);
-          }
-          // Dismiss JSONL so external scanner doesn't re-adopt it
-          this.runtime.dismissalTracker.dismiss(agent.jsonlFile);
-          this.runtime.unregisterAgent(agent.sessionId);
-          this.runtime.removeAgent(id);
         }
-      }
-    });
+      }),
+      vscode.window.onDidCloseTerminal((closed) => {
+        for (const [id, agent] of this.store) {
+          if (agent.terminalRef && agent.terminalRef === closed) {
+            if (this.runtime.activeAgentId.current === id) {
+              this.runtime.activeAgentId.current = null;
+            }
+            // If this is a team lead, remove its teammates
+            if (agent.isTeamLead) {
+              this.runtime.removeTeammates(id);
+            }
+            // Dismiss JSONL so external scanner doesn't re-adopt it
+            this.runtime.dismissalTracker.dismiss(agent.jsonlFile);
+            this.runtime.unregisterAgent(agent.sessionId);
+            this.runtime.removeAgent(id);
+          }
+        }
+      }),
+      webviewView.onDidDispose(() => {
+        this.isWebviewReady = false;
+        this.webviewView = undefined;
+      }),
+    );
   }
 
   /** Export current saved layout as a versioned default-layout-{N}.json (dev utility) */
@@ -1052,6 +1060,15 @@ export class CopilotAgentsViewProvider implements vscode.WebviewViewProvider {
   }
 
   dispose() {
+    for (const d of this.disposables) {
+      try {
+        d.dispose();
+      } catch {
+        // ignore
+      }
+    }
+    this.disposables.length = 0;
+
     this.copilotAgentsServer?.stop();
     this.copilotAgentsServer = null;
     this.runtime.dispose();

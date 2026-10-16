@@ -160,7 +160,23 @@ function registerHookRoute(app: FastifyInstance, options: HttpServerOptions): vo
 // ── WebSocket ──────────────────────────────────────────────────
 
 function registerWebSocketRoute(app: FastifyInstance, options: HttpServerOptions): void {
+  const activeSockets = new Set<import('ws').WebSocket>();
+
+  app.addHook('onClose', (_instance, done) => {
+    for (const ws of activeSockets) {
+      try {
+        ws.terminate();
+      } catch {
+        // ignore
+      }
+    }
+    activeSockets.clear();
+    done();
+  });
+
   app.get('/ws', { websocket: true }, (socket, request) => {
+    const rawWs = socket as unknown as import('ws').WebSocket;
+    activeSockets.add(rawWs);
     // CONNECTION gate. Embedded (VS Code) requires the Bearer token. Standalone
     // requires a same-origin handshake instead (isAllowedWebSocketOrigin), so a
     // non-browser local client with no Origin can still watch the office. What
@@ -235,6 +251,7 @@ function registerWebSocketRoute(app: FastifyInstance, options: HttpServerOptions
     });
 
     socket.on('close', () => {
+      activeSockets.delete(rawWs);
       store.off('agentAdded', onAgentAdded);
       store.off('agentRemoved', onAgentRemoved);
       store.off('broadcast', onBroadcast);

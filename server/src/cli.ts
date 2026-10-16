@@ -66,7 +66,7 @@ export function parseArgs(argv: string[]): CliArgs {
       args.host = argv[i + 1];
       i++;
     } else if (argv[i] === '--help') {
-      console.log(`Usage: copilot-agents [options]
+      console.log(`Usage: copilot-agents [options] / copilot-pixel [options]
 
 Options:
   --port, -p <number>   Port to listen on (default: OS-assigned ephemeral port)

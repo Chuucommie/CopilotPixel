@@ -135,7 +135,11 @@ export class CopilotAgentsServer {
   /** Stop the server and clean up its discovery records (only if we own them). */
   stop(): void {
     if (this.app) {
-      this.app.close();
+      try {
+        void this.app.close();
+      } catch (e) {
+        console.error(`[CopilotAgents] Error closing HTTP server: ${e}`);
+      }
       this.app = null;
     }
     if (this.ownsServer) {

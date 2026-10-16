@@ -109,6 +109,21 @@ async function main() {
     await ctx.rebuild();
     await ctx.dispose();
     // Copy assets and hooks after build
+    // Copy assets and hooks after build
+    if (production) {
+      try {
+        const distDir = path.join(__dirname, 'dist');
+        if (fs.existsSync(distDir)) {
+          for (const entry of fs.readdirSync(distDir)) {
+            if (entry.endsWith('.map')) {
+              fs.unlinkSync(path.join(distDir, entry));
+            }
+          }
+        }
+      } catch (err) {
+        // ignore
+      }
+    }
     copyAssets();
     buildHooks();
     await buildCli();
