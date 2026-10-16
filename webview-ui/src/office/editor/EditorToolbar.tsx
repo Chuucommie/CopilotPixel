@@ -417,7 +417,15 @@ export function EditorToolbar({
                       Math.min(w / cached.width, h / cached.height) * PET_THUMB_SCALE_MARGIN;
                     const dw = cached.width * scale;
                     const dh = cached.height * scale;
+                    const isHighRes = sprites.idleDown[0].length > 32;
+                    if (isHighRes) {
+                      ctx.imageSmoothingEnabled = true;
+                      ctx.imageSmoothingQuality = 'high';
+                    }
                     ctx.drawImage(cached, (w - dw) / 2, (h - dh) / 2, dw, dh);
+                    if (isHighRes) {
+                      ctx.imageSmoothingEnabled = false;
+                    }
                   }}
                 />
               );

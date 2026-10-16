@@ -467,9 +467,13 @@ export function renderScene(
     if (!spriteData) continue;
 
     const cached = getCachedSprite(spriteData, zoom);
+    const resScale = spriteData.length / 32;
+    const targetW = cached.width / resScale;
+    const targetH = cached.height / resScale;
+
     // Anchor at bottom-center at (pet.x, pet.y) — round to integer device pixels
-    const drawX = Math.round(offsetX + pet.x * zoom - cached.width / 2);
-    const drawY = Math.round(offsetY + pet.y * zoom - cached.height);
+    const drawX = Math.round(offsetX + pet.x * zoom - targetW / 2);
+    const drawY = Math.round(offsetY + pet.y * zoom - targetH);
 
     // Z-sort key: matches the chair/character "row boundary" formula.
     // pet.y is the pixel center, so + TILE_SIZE/2 lifts us to the row's bottom edge.
@@ -478,7 +482,15 @@ export function renderScene(
     drawables.push({
       zY: petZY,
       draw: (c) => {
-        c.drawImage(cached, drawX, drawY);
+        if (resScale > 1) {
+          const prev = c.imageSmoothingEnabled;
+          c.imageSmoothingEnabled = true;
+          c.imageSmoothingQuality = 'high';
+          c.drawImage(cached, drawX, drawY, targetW, targetH);
+          c.imageSmoothingEnabled = prev;
+        } else {
+          c.drawImage(cached, drawX, drawY, targetW, targetH);
+        }
       },
     });
   }
