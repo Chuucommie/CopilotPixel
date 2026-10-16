@@ -119,7 +119,7 @@
 ### `@area:pets` (3 tests)
 
 - `e2e/copilot/hooks-off/pets.spec.ts:94` — pet sprites load, broadcast, and expose manifest names in the editor (Pets)
-- `e2e/copilot/hooks-off/pets.spec.ts:121` — placing a pet toggles it on/off and persists across a panel reload (Pets)
-- `e2e/copilot/hooks-off/pets.spec.ts:206` — clicking a pet shows a heart bubble that auto-dismisses and dismisses on re-click (Pets)
+- `e2e/copilot/hooks-off/pets.spec.ts:122` — placing a pet toggles it on/off and persists across a panel reload (Pets)
+- `e2e/copilot/hooks-off/pets.spec.ts:207` — clicking a pet shows a heart bubble that auto-dismisses and dismisses on re-click (Pets)
 
 <!-- END:E2E-INVENTORY -->
