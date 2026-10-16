@@ -40,6 +40,11 @@ import type {
 } from '../types.js';
 import { CharacterState, Direction, PetState, TILE_SIZE } from '../types.js';
 import { createCharacter, updateCharacter } from './characters.js';
+import {
+  loadCopilotPixelAgents,
+  removeCopilotPixelAgent,
+  saveOrUpdateCopilotPixelAgent,
+} from './copilotPixelStore.js';
 import { advanceMatrixEffect, startMatrixEffect } from './matrixEffectState.js';
 import { createPet, updatePet } from './petEntity.js';
 import { anchorTile, closestFreeSeat } from './seatPlacement.js';
@@ -565,6 +570,7 @@ export class OfficeState {
   removeAgent(id: number): void {
     const ch = this.characters.get(id);
     if (!ch) return;
+    if (ch.isCopilotPixelAgent) return; // Persistent CopilotPixel agents never disappear
     if (ch.matrixEffect === 'despawn') return; // already despawning
     // Free seat and clear selection immediately
     if (ch.seatId) {
@@ -705,8 +711,10 @@ export class OfficeState {
 
     const id = this.nextSubagentId--;
     const parentCh = this.characters.get(parentAgentId);
-    const palette = parentCh ? parentCh.palette : 0;
-    const hueShift = parentCh ? parentCh.hueShift : 0;
+    const parentPalette = parentCh ? parentCh.palette : 0;
+    // Guaranteed diverse palette (different from parent) and distinct hueShift
+    const palette = (parentPalette + 1 + Math.floor(Math.random() * 5)) % 6;
+    const hueShift = (Math.floor(Math.random() * 11) + 1) * 30;
 
     // Try to find a free seat in the office first, or fall back to closest walkable tile to parent
     const seatId = this.findFreeSeat(parentCh?.folderName);
@@ -736,6 +744,7 @@ export class OfficeState {
     }
     ch.isSubagent = true;
     ch.parentAgentId = parentAgentId;
+    ch.isCopilotPixelAgent = true;
     const existingSubNames = Array.from(this.characters.values())
       .map((c) => c.customName || '')
       .filter(Boolean);
@@ -791,6 +800,9 @@ export class OfficeState {
       if (meta && meta.parentAgentId === parentAgentId) {
         const ch = this.characters.get(id);
         if (ch) {
+          if (ch.isCopilotPixelAgent) {
+            continue; // Persistent CopilotPixel agents are kept alive
+          }
           if (ch.matrixEffect === 'despawn') {
             // Already despawning — just clean up maps
             this.subagentMeta.delete(id);
@@ -1223,12 +1235,36 @@ export class OfficeState {
   setAgentOrder(id: number, order: string, fromAgentName?: string): void {
     const ch = this.characters.get(id);
     if (ch) {
+      if (ch.isTakingBreak) {
+        this.returnAgentFromBreak(id);
+      }
+      ch.isActive = true;
       ch.currentOrder = order;
       ch.delegatedFrom = fromAgentName || null;
+      ch.orderStatus = 'running';
       updateAgentProfile(id, {
         currentOrder: order,
         delegatedFrom: fromAgentName || null,
       });
+      if (ch.isCopilotPixelAgent) {
+        saveOrUpdateCopilotPixelAgent({
+          id,
+          customName: ch.customName || `Agent #${id}`,
+          role: ch.role || 'Coder',
+          palette: ch.palette,
+          hueShift: ch.hueShift,
+          seatId: ch.seatId,
+          isSubagent: ch.isSubagent,
+          parentAgentId: ch.parentAgentId,
+          currentOrder: order,
+          delegatedFrom: fromAgentName || null,
+          orderStatus: 'running',
+          orderProgressMessage: null,
+          orderModelName: ch.orderModelName || null,
+          isTakingBreak: false,
+          breakType: null,
+        });
+      }
     }
   }
 
@@ -1259,7 +1295,217 @@ export class OfficeState {
       }
       if (status === 'completed') {
         ch.bubbleTimer = 3;
+        ch.isActive = false;
+        if (ch.isCopilotPixelAgent) {
+          this.startAgentBreak(id);
+        }
       }
+    }
+  }
+
+  startAgentBreak(id: number, breakType?: 'coffee' | 'snack' | 'steamdeck'): void {
+    const ch = this.characters.get(id);
+    if (!ch) return;
+
+    const availableBreakTypes: Array<'coffee' | 'snack' | 'steamdeck'> = [
+      'coffee',
+      'snack',
+      'steamdeck',
+    ];
+    const chosenType =
+      breakType || availableBreakTypes[Math.floor(Math.random() * availableBreakTypes.length)];
+
+    let targetTile: { col: number; row: number } | null = null;
+
+    if (chosenType === 'coffee') {
+      const coffeeItem = this.layout.furniture.find((f) => f.type.includes('COFFEE'));
+      if (coffeeItem) {
+        targetTile = this.closestFreeWalkableTile(coffeeItem.col, coffeeItem.row);
+      }
+    } else if (chosenType === 'snack') {
+      const tableItem = this.layout.furniture.find((f) => f.type.includes('TABLE'));
+      if (tableItem) {
+        targetTile = this.closestFreeWalkableTile(tableItem.col, tableItem.row);
+      }
+    } else if (chosenType === 'steamdeck') {
+      const sofaItem = this.layout.furniture.find(
+        (f) => f.type.includes('SOFA') || f.type.includes('BENCH'),
+      );
+      if (sofaItem) {
+        targetTile = this.closestFreeWalkableTile(sofaItem.col, sofaItem.row);
+      }
+    }
+
+    if (!targetTile && this.walkableTiles.length > 0) {
+      targetTile = this.walkableTiles[Math.floor(Math.random() * this.walkableTiles.length)];
+    }
+
+    ch.isTakingBreak = true;
+    ch.breakType = chosenType;
+    ch.bubbleType = null;
+    ch.bubbleTimer = 0;
+    ch.isActive = false;
+
+    if (targetTile) {
+      ch.breakTargetCol = targetTile.col;
+      ch.breakTargetRow = targetTile.row;
+      const path = findPath(
+        ch.tileCol,
+        ch.tileRow,
+        targetTile.col,
+        targetTile.row,
+        this.tileMap,
+        this.blockedTiles,
+      );
+      if (path.length > 0) {
+        ch.path = path;
+        ch.moveProgress = 0;
+        ch.state = CharacterState.WALK;
+      } else {
+        if (chosenType === 'coffee') ch.state = CharacterState.BREAK_COFFEE;
+        else if (chosenType === 'snack') ch.state = CharacterState.BREAK_SNACK;
+        else ch.state = CharacterState.BREAK_STEAMDECK;
+      }
+    }
+
+    if (ch.isCopilotPixelAgent) {
+      saveOrUpdateCopilotPixelAgent({
+        id,
+        customName: ch.customName || `Agent #${id}`,
+        role: ch.role || 'Coder',
+        palette: ch.palette,
+        hueShift: ch.hueShift,
+        seatId: ch.seatId,
+        isSubagent: ch.isSubagent,
+        parentAgentId: ch.parentAgentId,
+        currentOrder: ch.currentOrder,
+        delegatedFrom: ch.delegatedFrom,
+        orderStatus: ch.orderStatus,
+        orderProgressMessage: ch.orderProgressMessage,
+        orderModelName: ch.orderModelName,
+        isTakingBreak: true,
+        breakType: chosenType,
+      });
+    }
+  }
+
+  returnAgentFromBreak(id: number): void {
+    const ch = this.characters.get(id);
+    if (!ch) return;
+    ch.isTakingBreak = false;
+    ch.breakType = null;
+    ch.breakTargetCol = null;
+    ch.breakTargetRow = null;
+
+    if (ch.seatId) {
+      const seat = this.seats.get(ch.seatId);
+      if (seat) {
+        const path = findPath(
+          ch.tileCol,
+          ch.tileRow,
+          seat.seatCol,
+          seat.seatRow,
+          this.tileMap,
+          this.blockedTiles,
+        );
+        if (path.length > 0) {
+          ch.path = path;
+          ch.moveProgress = 0;
+          ch.state = CharacterState.WALK;
+        } else {
+          ch.state = CharacterState.TYPE;
+          ch.dir = seat.facingDir;
+        }
+      }
+    } else {
+      ch.state = CharacterState.TYPE;
+    }
+
+    if (ch.isCopilotPixelAgent) {
+      saveOrUpdateCopilotPixelAgent({
+        id,
+        customName: ch.customName || `Agent #${id}`,
+        role: ch.role || 'Coder',
+        palette: ch.palette,
+        hueShift: ch.hueShift,
+        seatId: ch.seatId,
+        isSubagent: ch.isSubagent,
+        parentAgentId: ch.parentAgentId,
+        currentOrder: ch.currentOrder,
+        delegatedFrom: ch.delegatedFrom,
+        orderStatus: ch.orderStatus,
+        orderProgressMessage: ch.orderProgressMessage,
+        orderModelName: ch.orderModelName,
+        isTakingBreak: false,
+        breakType: null,
+      });
+    }
+  }
+
+  restoreCopilotPixelAgents(): number[] {
+    const saved = loadCopilotPixelAgents();
+    const restoredIds: number[] = [];
+    for (const data of saved) {
+      if (this.characters.has(data.id)) {
+        restoredIds.push(data.id);
+        continue;
+      }
+      let seat = data.seatId ? (this.seats.get(data.seatId) ?? null) : null;
+      let seatId = data.seatId;
+      if (!seat || seat.assigned) {
+        seatId = this.findFreeSeat();
+        seat = seatId ? (this.seats.get(seatId) ?? null) : null;
+      }
+      if (seat) seat.assigned = true;
+
+      const spawn = seat
+        ? { col: seat.seatCol, row: seat.seatRow }
+        : this.walkableTiles[0] || { col: 1, row: 1 };
+
+      const ch = createCharacter(data.id, data.palette, seatId, seat, data.hueShift);
+      ch.x = spawn.col * TILE_SIZE + TILE_SIZE / 2;
+      ch.y = spawn.row * TILE_SIZE + TILE_SIZE / 2;
+      ch.tileCol = spawn.col;
+      ch.tileRow = spawn.row;
+      ch.customName = data.customName;
+      ch.role = data.role;
+      ch.isSubagent = data.isSubagent;
+      ch.parentAgentId = data.parentAgentId;
+      ch.currentOrder = data.currentOrder;
+      ch.delegatedFrom = data.delegatedFrom;
+      ch.orderStatus = (data.orderStatus as Character['orderStatus']) ?? null;
+      ch.orderProgressMessage = data.orderProgressMessage;
+      ch.orderModelName = data.orderModelName;
+      ch.isCopilotPixelAgent = true;
+
+      if (data.isTakingBreak) {
+        ch.isTakingBreak = true;
+        ch.breakType = data.breakType;
+        if (data.breakType === 'coffee') ch.state = CharacterState.BREAK_COFFEE;
+        else if (data.breakType === 'snack') ch.state = CharacterState.BREAK_SNACK;
+        else if (data.breakType === 'steamdeck') ch.state = CharacterState.BREAK_STEAMDECK;
+        else ch.state = CharacterState.BREAK_COFFEE;
+      } else {
+        ch.state = seat ? CharacterState.TYPE : CharacterState.IDLE;
+        if (seat) ch.dir = seat.facingDir;
+      }
+
+      this.characters.set(data.id, ch);
+      restoredIds.push(data.id);
+    }
+    return restoredIds;
+  }
+
+  despawnCopilotPixelAgent(id: number): void {
+    const ch = this.characters.get(id);
+    if (ch) {
+      ch.isCopilotPixelAgent = false;
+      removeCopilotPixelAgent(id);
+      if (ch.seatId) {
+        const seat = this.seats.get(ch.seatId);
+        if (seat) seat.assigned = false;
+      }
+      startMatrixEffect(ch, 'despawn');
     }
   }
 
@@ -1283,6 +1529,7 @@ export class OfficeState {
     const subId = this.addSubagent(parentAgentId, parentToolId);
     const subCh = this.characters.get(subId);
     if (subCh) {
+      subCh.isCopilotPixelAgent = true;
       if (name) {
         subCh.customName = name;
       }
@@ -1297,6 +1544,23 @@ export class OfficeState {
         role: subCh.role,
         currentOrder: subCh.currentOrder,
         delegatedFrom: subCh.delegatedFrom,
+      });
+      saveOrUpdateCopilotPixelAgent({
+        id: subId,
+        customName: subCh.customName || `Subagent #${subId}`,
+        role: subCh.role || 'Coder',
+        palette: subCh.palette,
+        hueShift: subCh.hueShift,
+        seatId: subCh.seatId,
+        isSubagent: true,
+        parentAgentId: parentAgentId,
+        currentOrder: subCh.currentOrder || null,
+        delegatedFrom: subCh.delegatedFrom || null,
+        orderStatus: subCh.orderStatus || null,
+        orderProgressMessage: subCh.orderProgressMessage || null,
+        orderModelName: subCh.orderModelName || null,
+        isTakingBreak: subCh.isTakingBreak,
+        breakType: subCh.breakType,
       });
     }
     return subId;

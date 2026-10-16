@@ -30,6 +30,9 @@ export const CharacterState = {
   IDLE: 'idle',
   WALK: 'walk',
   TYPE: 'type',
+  BREAK_COFFEE: 'break_coffee',
+  BREAK_SNACK: 'break_snack',
+  BREAK_STEAMDECK: 'break_steamdeck',
 } as const;
 export type CharacterState = (typeof CharacterState)[keyof typeof CharacterState];
 
@@ -264,6 +267,15 @@ export interface Character {
   orderProgressMessage?: string | null;
   /** Model running the order */
   orderModelName?: string | null;
+  /** True if this agent was created as a persistent CopilotPixel agent (does not vanish on chat close) */
+  isCopilotPixelAgent?: boolean;
+  /** True if currently taking a break in office common areas */
+  isTakingBreak?: boolean;
+  /** Active break activity */
+  breakType?: 'coffee' | 'snack' | 'steamdeck' | null;
+  /** Break target tile */
+  breakTargetCol?: number | null;
+  breakTargetRow?: number | null;
 
   // -- Context gauge --
   /** Tokens in the agent's context as of its newest turn; 0 until reported.

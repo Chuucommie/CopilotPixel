@@ -325,3 +325,26 @@ export const PET_THUMB_SCALE_MARGIN = 0.85;
 export const EMPTY_SPRITE_THUMBNAIL_BG = '#333';
 /** Maximum string length for a PlacedPet.id (defends against pathologically-long layout entries). */
 export const MAX_PET_ID_LENGTH = 128;
+
+// ── Break Animations Pixel Art Colors ────────────────────────
+export const BREAK_COFFEE_MUG_COLOR = '#ffffff';
+export const BREAK_COFFEE_MUG_SHADOW = '#9ca3af';
+export const BREAK_COFFEE_LIQUID_COLOR = '#451a03';
+export const BREAK_COFFEE_STEAM_COLOR_1 = '#e2e8f0';
+export const BREAK_COFFEE_STEAM_COLOR_2 = '#93c5fd';
+
+export const BREAK_SNACK_BASE_COLOR = '#b45309';
+export const BREAK_SNACK_FROSTING_COLOR = '#ec4899';
+export const BREAK_SNACK_CRUMB_COLOR = '#fef08a';
+
+export const BREAK_STEAMDECK_BODY_COLOR = '#1e293b';
+export const BREAK_STEAMDECK_BUTTON_COLOR = '#64748b';
+export const BREAK_STEAMDECK_SCREEN_ON_1 = '#06b6d4';
+export const BREAK_STEAMDECK_SCREEN_ON_2 = '#10b981';
+export const BREAK_STEAMDECK_SCREEN_ON_3 = '#8b5cf6';
+export const BREAK_STEAMDECK_GLOW_COLOR = '#38bdf8';
+
+// ── CopilotPixel Badge Colors ────────────────────────────────
+export const COPILOT_PIXEL_BADGE_BG = '#581c87';
+export const COPILOT_PIXEL_BADGE_BORDER = '#a855f7';
+export const COPILOT_PIXEL_BADGE_TEXT = '#facc15';

@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.4.8
+
+### Autonomous AI Delegation, Subagent Persistence, Break System & UI Reorganization
+
+- **Subagent Sprite Uniqueness & Permanent Persistence**:
+  - Subagents spawned from a parent agent receive a distinct character base palette and unique hue shift, ensuring they never look identical to the parent.
+  - Subagents and background agents are real, permanent entities marked with `isCopilotPixelAgent` that persist across layout edits, screen switches, and VS Code restarts (`copilotPixelStore`).
+  - Ephemeral chat closures no longer despawn or delete persistent CopilotPixel agents.
+- **Distinctive `👾 CPX` Badge**:
+  - Distinctive pixel-art retro badge (`👾 CPX` / `👾 CopilotPixel`) on character overlays and Agent Roster cards, clearly distinguishing background autonomous agents from temporary Copilot Chat agents.
+- **Autonomous AI Delegation & Auto-Spawning**:
+  - Autonomous agents can now self-delegate subtasks (`delegate_task`) to specific teammate roles (e.g., Tester, Architect, Reviewer) and spawn new helper subagents (`spawn_agent`) on the workspace on their own according to high-level directives.
+  - Live feedback and cascade task dispatches are displayed on screen and logged in the panel.
+- **Post-Task Break Routine ("Taking a break...") & Custom Pixel Art Animations**:
+  - Once completed, CopilotPixel agents never disappear from the office.
+  - Agents enter relaxing break routines in common areas:
+    - **Steaming Coffee Mug**: Walks to the coffee machine (`COFFEE` / `COFFEE_TABLE`) and drinks from a ceramic mug with animated rising steam wisps.
+    - **Snack Corner**: Visits snack tables (`TABLE` / `COFFEE_TABLE`) to enjoy pastries with nibble animations and crumbs.
+    - **Steam Deck on Sofa**: Sits on the sofa (`SOFA` / `BENCH`) playing with a handheld Steam Deck console featuring grip handles, controls, and an animated glowing retro screen.
+  - When given a new directive, agents immediately get up from the break area, walk back to their desk, and resume work. Break/working state is fully preserved across restarts.
+  - Manual break triggers (`☕ Coffee`, `🍩 Snack`, `🎮 Steam Deck`) and `💼 Resume Work` controls added to the Agent Roster.
+- **UI Reorganization**:
+  - **Layout Presets in Layout Mode**: Moved the Office Layout Presets selector into the Layout mode toolbar (`EditActionBar`), accessible anytime via the `📐 Presets` button to switch between 2 Normal, 2 Medium, 2 Large, and HQ layouts.
+  - **CopilotPixel Default Model in Settings**: Replaced presets in `SettingsModal` with a configuration selector for the default AI model used by CopilotPixel background agents (`Auto: Lowest Cost / Fast`, `GitHub Copilot Economy`, `Google Gemini Fast`).
+
 ## v1.4.7
 
 ### Autonomous Background Agent Execution & Low-Cost Copilot/Gemini Model Engine

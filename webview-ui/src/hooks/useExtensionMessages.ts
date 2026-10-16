@@ -236,6 +236,20 @@ export function useExtensionMessages(
           if (p.isHeadless) os.setHeadless(p.id, true);
         }
         pendingAgents = [];
+        const restoredIds = os.restoreCopilotPixelAgents();
+        if (restoredIds.length > 0) {
+          setAgents((prev) => {
+            const set = new Set(prev);
+            const next = [...prev];
+            for (const rId of restoredIds) {
+              if (!set.has(rId)) {
+                next.push(rId);
+                set.add(rId);
+              }
+            }
+            return next.sort((a, b) => a - b);
+          });
+        }
         layoutReadyRef.current = true;
         setLayoutReady(true);
         if (msg.wasReset) {
@@ -292,6 +306,11 @@ export function useExtensionMessages(
         saveAgentSeats(os);
       } else if (msg.type === 'agentClosed') {
         const id = msg.id as number;
+        const targetCh = os.characters.get(id);
+        if (targetCh?.isCopilotPixelAgent) {
+          // CopilotPixel agents never disappear when chat closes
+          return;
+        }
         setAgents((prev) => prev.filter((a) => a !== id));
         setSelectedAgent((prev) => (prev === id ? null : prev));
         setAgentTools((prev) => {
@@ -315,7 +334,12 @@ export function useExtensionMessages(
         // Remove all sub-agent characters belonging to this agent
         delete backgroundParentToolIdsRef.current[id];
         os.removeAllSubagents(id);
-        setSubagentCharacters((prev) => prev.filter((s) => s.parentAgentId !== id));
+        setSubagentCharacters((prev) =>
+          prev.filter((s) => {
+            const subCh = os.characters.get(s.id);
+            return s.parentAgentId !== id || subCh?.isCopilotPixelAgent;
+          }),
+        );
         os.removeAgent(id);
       } else if (msg.type === 'existingAgents') {
         const incoming = msg.agents as number[];
@@ -696,6 +720,39 @@ export function useExtensionMessages(
           msg.message,
           typeof msg.modelName === 'string' ? msg.modelName : undefined,
         );
+
+        if (msg.status === 'delegating' && msg.delegation) {
+          const toRole = msg.delegation.toRole;
+          const subTask = msg.delegation.task;
+          const target =
+            Array.from(os.characters.values()).find((c) => c.role === toRole && c.id !== id) ||
+            Array.from(os.characters.values()).find((c) => c.id !== id);
+          if (target) {
+            os.delegateOrder(id, target.id, subTask);
+            transport.send({
+              type: 'executeAgentOrder',
+              agentId: target.id,
+              order: subTask,
+              role: target.role,
+              agentName: target.customName,
+              delegatedFrom: os.characters.get(id)?.customName || `Agent #${id}`,
+            });
+          }
+        } else if (msg.status === 'spawning' && msg.delegation) {
+          const spawnRole = msg.delegation.spawnedRole || 'Coder';
+          const spawnName = msg.delegation.spawnedName;
+          const subTask = msg.delegation.task;
+          const newSubId = os.spawnSubagentWithRole(id, spawnRole, spawnName, subTask);
+          setAgents((prev) => (prev.includes(newSubId) ? prev : [...prev, newSubId]));
+          transport.send({
+            type: 'executeAgentOrder',
+            agentId: newSubId,
+            order: subTask,
+            role: spawnRole,
+            agentName: spawnName,
+            delegatedFrom: os.characters.get(id)?.customName || `Lead #${id}`,
+          });
+        }
       } else if (msg.type === 'settingsLoaded') {
         const soundOn = msg.soundEnabled as boolean;
         setSoundEnabled(soundOn);

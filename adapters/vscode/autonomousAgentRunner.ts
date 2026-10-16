@@ -202,7 +202,15 @@ You can interact with the workspace by responding with JSON action blocks. Avail
 \`\`\`json
 {"action": "write_file", "path": "path/to/file.ts", "content": "file content"}
 \`\`\`
-4. Finish task:
+4. Delegate sub-task to a teammate with a specific role:
+\`\`\`json
+{"action": "delegate_task", "targetRole": "Tester", "task": "Write unit tests for the changes"}
+\`\`\`
+5. Spawn a new helper subagent with a role:
+\`\`\`json
+{"action": "spawn_agent", "role": "Researcher", "name": "Sam", "task": "Investigate existing implementation"}
+\`\`\`
+6. Finish task:
 \`\`\`json
 {"action": "finish", "summary": "Detailed summary of what was analyzed, implemented, or recommended."}
 \`\`\`
@@ -403,6 +411,54 @@ Rules:
               `${writeResult}\nProceed with next step or finish.`,
             ),
           );
+        } else if (action.action === 'delegate_task') {
+          const targetRole = action.targetRole || 'Coder';
+          const subTask = action.task || 'Assist with task';
+          this.log(`[Agent #${agentId}] Delegating task to role ${targetRole}: "${subTask}"`);
+
+          postMessage({
+            type: 'agentOrderProgress',
+            agentId,
+            status: 'delegating',
+            message: `Delegated sub-task to ${targetRole}: "${subTask}"`,
+            modelName: model.name,
+            delegation: {
+              toRole: targetRole,
+              task: subTask,
+            },
+          });
+
+          messages.push(
+            vscode.LanguageModelChatMessage.User(
+              `Sub-task successfully delegated to ${targetRole}. You may continue your remaining work or call "finish".`,
+            ),
+          );
+        } else if (action.action === 'spawn_agent') {
+          const spawnRole = action.role || 'Coder';
+          const spawnName = action.name || 'Assistant';
+          const subTask = action.task || 'Assist with task';
+          this.log(
+            `[Agent #${agentId}] Spawning new agent ${spawnName} (${spawnRole}) for: "${subTask}"`,
+          );
+
+          postMessage({
+            type: 'agentOrderProgress',
+            agentId,
+            status: 'spawning',
+            message: `Spawned ${spawnName} (${spawnRole}) for directive: "${subTask}"`,
+            modelName: model.name,
+            delegation: {
+              spawnedRole: spawnRole,
+              spawnedName: spawnName,
+              task: subTask,
+            },
+          });
+
+          messages.push(
+            vscode.LanguageModelChatMessage.User(
+              `New subagent ${spawnName} (${spawnRole}) has been spawned in the office and assigned to "${subTask}". You may continue your work or call "finish".`,
+            ),
+          );
         } else {
           // Unknown action
           messages.push(
@@ -472,6 +528,10 @@ Rules:
     content?: string;
     pattern?: string;
     summary?: string;
+    targetRole?: string;
+    role?: string;
+    name?: string;
+    task?: string;
   } | null {
     const jsonMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
     if (jsonMatch) {

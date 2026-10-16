@@ -13,6 +13,9 @@ import {
   CONTEXT_GAUGE_HEIGHT_PX,
   CONTEXT_GAUGE_WIDTH_PX,
   CONTEXT_WARN_THRESHOLD,
+  COPILOT_PIXEL_BADGE_BG,
+  COPILOT_PIXEL_BADGE_BORDER,
+  COPILOT_PIXEL_BADGE_TEXT,
   TEAM_LEAD_COLOR,
   TOOL_OVERLAY_VERTICAL_OFFSET,
 } from '../../constants.js';
@@ -166,7 +169,9 @@ export function ToolOverlay({
         const hasWaitingBubble = ch.bubbleType === 'waiting';
         const subHasPermission = isSub && ch.bubbleType === 'permission';
         let activityText: string;
-        if (hasWaitingBubble && ch.waitingAwaitingInput) {
+        if (ch.isTakingBreak) {
+          activityText = `☕ Break (${ch.breakType || 'relax'})`;
+        } else if (hasWaitingBubble && ch.waitingAwaitingInput) {
           // Idle, waiting on the user -> dedicated label. A finished turn (Stop)
           // shows only the checkmark and falls through to the normal idle text.
           activityText = WAITING_INPUT_ACTIVITY_TEXT;
@@ -262,6 +267,20 @@ export function ToolOverlay({
                       </span>
                     );
                   })()}
+                  {ch.isCopilotPixelAgent && (
+                    <span
+                      className="text-2xs px-1.5 py-0.5 rounded border leading-none shrink-0 font-bold"
+                      style={{
+                        backgroundColor: COPILOT_PIXEL_BADGE_BG,
+                        borderColor: COPILOT_PIXEL_BADGE_BORDER,
+                        color: COPILOT_PIXEL_BADGE_TEXT,
+                        fontSize: '10px',
+                      }}
+                      title="Persistent CopilotPixel Background Agent"
+                    >
+                      👾 CPX
+                    </span>
+                  )}
                 </div>
                 <span
                   className="overflow-hidden text-ellipsis block leading-tight font-medium"

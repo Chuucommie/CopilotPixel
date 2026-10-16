@@ -325,10 +325,27 @@ export interface AgentOrderProgress {
   message: string;
   details?: string;
   modelName?: Record<string, any>[] | string;
+  delegation?: AgentOrderDelegation;
 }
 
 export type AgentOrderStatus =
-  'running' | 'reading' | 'writing' | 'completed' | 'error' | 'cancelled';
+  | 'running'
+  | 'reading'
+  | 'writing'
+  | 'delegating'
+  | 'spawning'
+  | 'completed'
+  | 'error'
+  | 'cancelled';
+
+export interface AgentOrderDelegation {
+  toRole?: string;
+  toAgentId?: number;
+  spawnedRole?: string;
+  spawnedName?: string;
+  task?: string;
+  additionalProperties?: Record<string, any>;
+}
 
 export interface WebviewReady {
   type: 'webviewReady';

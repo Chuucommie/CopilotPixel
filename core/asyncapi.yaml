@@ -808,6 +808,8 @@ components:
           type: string
           items:
             type: object
+        delegation:
+          $ref: '#/components/schemas/AgentOrderDelegation'
 
     # ── Client message variants ────────────────────────────────────
 
@@ -1123,7 +1125,21 @@ components:
 
     AgentOrderStatus:
       type: string
-      enum: [running, reading, writing, completed, error, cancelled]
+      enum: [running, reading, writing, delegating, spawning, completed, error, cancelled]
+
+    AgentOrderDelegation:
+      type: object
+      properties:
+        toRole:
+          type: string
+        toAgentId:
+          type: integer
+        spawnedRole:
+          type: string
+        spawnedName:
+          type: string
+        task:
+          type: string
 
     ModelPreference:
       type: string

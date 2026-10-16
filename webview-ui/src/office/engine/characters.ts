@@ -1,4 +1,18 @@
 import {
+  BREAK_COFFEE_LIQUID_COLOR,
+  BREAK_COFFEE_MUG_COLOR,
+  BREAK_COFFEE_MUG_SHADOW,
+  BREAK_COFFEE_STEAM_COLOR_1,
+  BREAK_COFFEE_STEAM_COLOR_2,
+  BREAK_SNACK_BASE_COLOR,
+  BREAK_SNACK_CRUMB_COLOR,
+  BREAK_SNACK_FROSTING_COLOR,
+  BREAK_STEAMDECK_BODY_COLOR,
+  BREAK_STEAMDECK_BUTTON_COLOR,
+  BREAK_STEAMDECK_GLOW_COLOR,
+  BREAK_STEAMDECK_SCREEN_ON_1,
+  BREAK_STEAMDECK_SCREEN_ON_2,
+  BREAK_STEAMDECK_SCREEN_ON_3,
   DEFAULT_MAX_CONTEXT_TOKENS,
   SEAT_REST_MAX_SEC,
   SEAT_REST_MIN_SEC,
@@ -231,6 +245,16 @@ export function updateCharacter(
         ch.x = center.x;
         ch.y = center.y;
 
+        if (ch.isTakingBreak) {
+          if (ch.breakType === 'coffee') ch.state = CharacterState.BREAK_COFFEE;
+          else if (ch.breakType === 'snack') ch.state = CharacterState.BREAK_SNACK;
+          else if (ch.breakType === 'steamdeck') ch.state = CharacterState.BREAK_STEAMDECK;
+          else ch.state = CharacterState.BREAK_COFFEE;
+          ch.frame = 0;
+          ch.frameTimer = 0;
+          break;
+        }
+
         if (ch.isActive) {
           if (!ch.seatId) {
             // No seat — type in place
@@ -321,7 +345,149 @@ export function updateCharacter(
       }
       break;
     }
+
+    case CharacterState.BREAK_COFFEE:
+    case CharacterState.BREAK_SNACK:
+    case CharacterState.BREAK_STEAMDECK: {
+      if (ch.frameTimer >= 0.35) {
+        ch.frameTimer -= 0.35;
+        ch.frame = (ch.frame + 1) % 4;
+      }
+      if (ch.isActive && !ch.isTakingBreak) {
+        if (ch.seatId) {
+          const seat = seats.get(ch.seatId);
+          if (seat) {
+            const path = findPath(
+              ch.tileCol,
+              ch.tileRow,
+              seat.seatCol,
+              seat.seatRow,
+              tileMap,
+              blockedTiles,
+            );
+            if (path.length > 0) {
+              ch.path = path;
+              ch.moveProgress = 0;
+              ch.state = CharacterState.WALK;
+              break;
+            }
+          }
+        }
+        ch.state = CharacterState.TYPE;
+      }
+      break;
+    }
   }
+}
+
+function cloneSprite(sprite: SpriteData): SpriteData {
+  return sprite.map((row) => [...row]);
+}
+
+/** Render a steaming coffee mug in front of the character */
+function renderCoffeeBreakSprite(base: SpriteData, frame: number, dir: Direction): SpriteData {
+  const sprite = cloneSprite(base);
+  const rows = sprite.length;
+  const cols = sprite[0]?.length ?? 0;
+  if (rows < 24 || cols < 16) return sprite;
+
+  const isRight = dir === Direction.RIGHT;
+  const isLeft = dir === Direction.LEFT;
+  const mugCol = isRight ? 9 : isLeft ? 5 : 7;
+  const mugRow = 19;
+
+  if (sprite[mugRow] && sprite[mugRow + 1] && sprite[mugRow + 2]) {
+    sprite[mugRow][mugCol] = BREAK_COFFEE_LIQUID_COLOR;
+    sprite[mugRow][mugCol + 1] = BREAK_COFFEE_LIQUID_COLOR;
+    sprite[mugRow + 1][mugCol] = BREAK_COFFEE_MUG_COLOR;
+    sprite[mugRow + 1][mugCol + 1] = BREAK_COFFEE_MUG_COLOR;
+    if (mugCol + 2 < cols) {
+      sprite[mugRow + 1][mugCol + 2] = BREAK_COFFEE_MUG_COLOR;
+    }
+    sprite[mugRow + 2][mugCol] = BREAK_COFFEE_MUG_SHADOW;
+    sprite[mugRow + 2][mugCol + 1] = BREAK_COFFEE_MUG_SHADOW;
+
+    const steamCycle = frame % 2;
+    const steamCol1 = steamCycle === 0 ? mugCol : mugCol + 1;
+    const steamCol2 = steamCycle === 0 ? mugCol + 1 : mugCol;
+    if (sprite[mugRow - 1]) sprite[mugRow - 1][steamCol1] = BREAK_COFFEE_STEAM_COLOR_1;
+    if (sprite[mugRow - 2]) sprite[mugRow - 2][steamCol2] = BREAK_COFFEE_STEAM_COLOR_2;
+    if (sprite[mugRow - 3]) sprite[mugRow - 3][steamCol1] = BREAK_COFFEE_STEAM_COLOR_1;
+  }
+
+  return sprite;
+}
+
+/** Render a snack/donut with nibbling animation */
+function renderSnackBreakSprite(base: SpriteData, frame: number, dir: Direction): SpriteData {
+  const sprite = cloneSprite(base);
+  const rows = sprite.length;
+  const cols = sprite[0]?.length ?? 0;
+  if (rows < 24 || cols < 16) return sprite;
+
+  const isRight = dir === Direction.RIGHT;
+  const isLeft = dir === Direction.LEFT;
+  const snackCol = isRight ? 9 : isLeft ? 5 : 7;
+  const isNibble = frame % 2 === 1;
+  const snackRow = isNibble ? 17 : 19;
+
+  if (sprite[snackRow] && sprite[snackRow + 1]) {
+    sprite[snackRow][snackCol] = BREAK_SNACK_FROSTING_COLOR;
+    sprite[snackRow][snackCol + 1] = BREAK_SNACK_FROSTING_COLOR;
+    sprite[snackRow + 1][snackCol] = BREAK_SNACK_BASE_COLOR;
+    sprite[snackRow + 1][snackCol + 1] = BREAK_SNACK_BASE_COLOR;
+
+    if (isNibble && sprite[snackRow + 2]) {
+      sprite[snackRow + 2][snackCol - 1] = BREAK_SNACK_CRUMB_COLOR;
+    }
+  }
+
+  return sprite;
+}
+
+/** Render handheld Steam Deck console with vibrant animated gaming screen */
+function renderSteamDeckBreakSprite(base: SpriteData, frame: number): SpriteData {
+  const sprite = cloneSprite(base);
+  const rows = sprite.length;
+  const cols = sprite[0]?.length ?? 0;
+  if (rows < 24 || cols < 16) return sprite;
+
+  const deckRow = 19;
+  const deckStartCol = 3;
+
+  for (let r = 0; r < 3; r++) {
+    const curRow = deckRow + r;
+    if (!sprite[curRow]) continue;
+    for (let c = deckStartCol; c <= deckStartCol + 9; c++) {
+      sprite[curRow][c] = BREAK_STEAMDECK_BODY_COLOR;
+    }
+  }
+
+  if (sprite[deckRow] && sprite[deckRow + 1]) {
+    sprite[deckRow][deckStartCol + 1] = BREAK_STEAMDECK_BUTTON_COLOR;
+    sprite[deckRow + 1][deckStartCol] = BREAK_STEAMDECK_BUTTON_COLOR;
+    sprite[deckRow][deckStartCol + 8] = BREAK_STEAMDECK_BUTTON_COLOR;
+    sprite[deckRow + 1][deckStartCol + 9] = BREAK_STEAMDECK_BUTTON_COLOR;
+  }
+
+  const screenPalette = [
+    [BREAK_STEAMDECK_SCREEN_ON_1, BREAK_STEAMDECK_SCREEN_ON_2, BREAK_STEAMDECK_SCREEN_ON_3],
+    [BREAK_STEAMDECK_SCREEN_ON_2, BREAK_STEAMDECK_GLOW_COLOR, BREAK_STEAMDECK_SCREEN_ON_1],
+    [BREAK_STEAMDECK_SCREEN_ON_3, BREAK_STEAMDECK_SCREEN_ON_1, BREAK_STEAMDECK_SCREEN_ON_2],
+    [BREAK_STEAMDECK_GLOW_COLOR, BREAK_STEAMDECK_SCREEN_ON_3, BREAK_STEAMDECK_SCREEN_ON_1],
+  ];
+  const curPal = screenPalette[frame % 4];
+
+  for (let r = 0; r < 2; r++) {
+    const curRow = deckRow + r;
+    if (!sprite[curRow]) continue;
+    for (let c = deckStartCol + 2; c <= deckStartCol + 7; c++) {
+      const colorIdx = (c + r + frame) % 3;
+      sprite[curRow][c] = curPal[colorIdx];
+    }
+  }
+
+  return sprite;
 }
 
 /** Get the correct sprite frame for a character's current state and direction */
@@ -336,6 +502,12 @@ export function getCharacterSprite(ch: Character, sprites: CharacterSprites): Sp
       return sprites.walk[ch.dir][ch.frame % 4];
     case CharacterState.IDLE:
       return sprites.walk[ch.dir][1];
+    case CharacterState.BREAK_COFFEE:
+      return renderCoffeeBreakSprite(sprites.walk[ch.dir][1], ch.frame, ch.dir);
+    case CharacterState.BREAK_SNACK:
+      return renderSnackBreakSprite(sprites.walk[ch.dir][1], ch.frame, ch.dir);
+    case CharacterState.BREAK_STEAMDECK:
+      return renderSteamDeckBreakSprite(sprites.walk[ch.dir][1], ch.frame);
     default:
       return sprites.walk[ch.dir][1];
   }

@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 
 import { isSoundEnabled, setSoundEnabled } from '../notificationSound.js';
-import { getLayoutPresets, type LayoutPresetDefinition } from '../office/layout/layoutPresets.js';
 import { isBrowserRuntime } from '../runtime.js';
 import { transport } from '../transport/index.js';
 import { Button } from './ui/Button.js';
@@ -37,8 +36,6 @@ interface SettingsModalProps {
   onExportLayout: () => void;
   /** Browser-native layout import from a chosen file (standalone only). */
   onImportLayout: (file: File) => void;
-  /** Apply pre-defined office layout preset */
-  onApplyPreset?: (preset: LayoutPresetDefinition) => void;
 }
 
 export function SettingsModal({
@@ -60,10 +57,25 @@ export function SettingsModal({
   showAreasAvailable,
   onExportLayout,
   onImportLayout,
-  onApplyPreset,
 }: SettingsModalProps) {
   const [soundLocal, setSoundLocal] = useState(isSoundEnabled);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [cpxModelPref, setCpxModelPref] = useState<'cheapest' | 'copilot' | 'gemini'>(() => {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('copilotpixel_model_preference');
+      if (saved === 'cheapest' || saved === 'copilot' || saved === 'gemini') {
+        return saved;
+      }
+    }
+    return 'cheapest';
+  });
+
+  const handleSetCpxModel = (val: 'cheapest' | 'copilot' | 'gemini') => {
+    setCpxModelPref(val);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('copilotpixel_model_preference', val);
+    }
+  };
   const [assetDirDraft, setAssetDirDraft] = useState('');
 
   return (
@@ -173,45 +185,69 @@ export function SettingsModal({
           </Button>
         </div>
       ))}
-      {/* Office Layout Presets */}
+      {/* CopilotPixel Background AI Model Configuration */}
       <div className="py-4 px-10 border-t border-border">
         <div className="text-xs font-bold uppercase tracking-wider text-accent-bright mb-2">
-          Office Layout Presets
+          CopilotPixel Background AI Model
         </div>
         <p className="text-2xs text-text-muted mb-3">
-          Choose a pre-configured office layout (2 Normal, 2 Medium, 2 Large, or Default HQ).
+          Select which model CopilotPixel background agents should prefer. Prioritizing lightweight
+          economy models saves subscription limits while keeping background autonomy fast.
         </p>
-        <div className="flex flex-col gap-2 max-h-56 overflow-y-auto pr-1">
-          {getLayoutPresets().map((preset) => (
-            <div
-              key={preset.id}
-              className="flex items-center justify-between p-2 rounded border border-border/60 hover:border-accent hover:bg-white/5 transition-colors gap-2"
-            >
-              <div className="flex flex-col overflow-hidden">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-xs text-text">{preset.name}</span>
-                  <span className="text-2xs uppercase px-1.5 py-0.5 rounded bg-accent/20 text-accent-bright border border-accent/40 font-semibold">
-                    {preset.category}
-                  </span>
-                </div>
-                <span className="text-2xs text-text-muted truncate" title={preset.description}>
-                  {preset.description} ({preset.layout.cols}x{preset.layout.rows})
-                </span>
-              </div>
-              <Button
-                variant="accent"
-                size="sm"
-                onClick={() => {
-                  if (onApplyPreset) {
-                    onApplyPreset(preset);
-                    onClose();
-                  }
-                }}
-              >
-                Apply
-              </Button>
+        <div className="flex flex-col gap-2">
+          <label className="flex items-start gap-2.5 p-2 rounded border border-border/60 hover:border-accent hover:bg-white/5 cursor-pointer transition-colors">
+            <input
+              type="radio"
+              name="cpx_model"
+              value="cheapest"
+              checked={cpxModelPref === 'cheapest'}
+              onChange={() => handleSetCpxModel('cheapest')}
+              className="mt-0.5"
+            />
+            <div className="flex flex-col">
+              <span className="text-xs font-bold text-text">
+                Auto: Lowest Cost / Fast (Recommended)
+              </span>
+              <span className="text-2xs text-text-muted">
+                Automatically uses lightweight models across active providers (e.g. gpt-4o-mini,
+                gemini-flash, luna).
+              </span>
             </div>
-          ))}
+          </label>
+          <label className="flex items-start gap-2.5 p-2 rounded border border-border/60 hover:border-accent hover:bg-white/5 cursor-pointer transition-colors">
+            <input
+              type="radio"
+              name="cpx_model"
+              value="copilot"
+              checked={cpxModelPref === 'copilot'}
+              onChange={() => handleSetCpxModel('copilot')}
+              className="mt-0.5"
+            />
+            <div className="flex flex-col">
+              <span className="text-xs font-bold text-text">GitHub Copilot Economy</span>
+              <span className="text-2xs text-text-muted">
+                Routes exclusively through GitHub Copilot using low-tier models (gpt-4o-mini /
+                luna).
+              </span>
+            </div>
+          </label>
+          <label className="flex items-start gap-2.5 p-2 rounded border border-border/60 hover:border-accent hover:bg-white/5 cursor-pointer transition-colors">
+            <input
+              type="radio"
+              name="cpx_model"
+              value="gemini"
+              checked={cpxModelPref === 'gemini'}
+              onChange={() => handleSetCpxModel('gemini')}
+              className="mt-0.5"
+            />
+            <div className="flex flex-col">
+              <span className="text-xs font-bold text-text">Google Gemini Fast</span>
+              <span className="text-2xs text-text-muted">
+                Routes through Google Gemini using fast high-quota models (e.g. gemini-flash / 3.8
+                flash).
+              </span>
+            </div>
+          </label>
         </div>
       </div>
 

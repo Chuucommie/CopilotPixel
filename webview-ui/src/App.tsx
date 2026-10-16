@@ -386,8 +386,12 @@ function App() {
             style={{ background: 'var(--vignette)' }}
           />
 
-          {editor.isEditMode && editor.isDirty && (
-            <EditActionBar editor={editor} editorState={editorState} />
+          {editor.isEditMode && (
+            <EditActionBar
+              editor={editor}
+              editorState={editorState}
+              onApplyPreset={handleApplyPreset}
+            />
           )}
 
           {showRotateHint && (
@@ -611,7 +615,6 @@ function App() {
         showAreasAvailable={areasAvailable}
         onExportLayout={handleExportLayout}
         onImportLayout={handleImportLayout}
-        onApplyPreset={handleApplyPreset}
       />
 
       {showMigrationNotice && (

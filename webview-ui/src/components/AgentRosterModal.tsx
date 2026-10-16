@@ -5,6 +5,9 @@ import {
   AGENT_STATUS_ACTIVE_DOT_COLOR,
   AGENT_STATUS_IDLE_DOT_COLOR,
   AGENT_STATUS_RUNNING_DOT_COLOR,
+  COPILOT_PIXEL_BADGE_BG,
+  COPILOT_PIXEL_BADGE_BORDER,
+  COPILOT_PIXEL_BADGE_TEXT,
 } from '../constants.js';
 import { getAllRoles, getRandomEnglishName, getRoleDefinition } from '../office/agentRoles.js';
 import type { OfficeState } from '../office/engine/officeState.js';
@@ -35,7 +38,15 @@ export function AgentRosterModal({
 
   // Form states for orders & delegation
   const [orderInput, setOrderInput] = useState('');
-  const [modelPreference, setModelPreference] = useState<ModelPreference>('cheapest');
+  const [modelPreference, setModelPreference] = useState<ModelPreference>(() => {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('copilotpixel_model_preference');
+      if (saved === 'cheapest' || saved === 'copilot' || saved === 'gemini') {
+        return saved;
+      }
+    }
+    return 'cheapest';
+  });
   const [delegateTargetId, setDelegateTargetId] = useState<number | null>(null);
   const [delegateInput, setDelegateInput] = useState('');
   const [spawnRole, setSpawnRole] = useState('Coder');
@@ -288,6 +299,19 @@ export function AgentRosterModal({
                             sub
                           </span>
                         )}
+                        {ch.isCopilotPixelAgent && (
+                          <span
+                            className="text-2xs px-1.5 py-0.5 rounded border font-semibold flex items-center gap-0.5 shrink-0"
+                            style={{
+                              backgroundColor: COPILOT_PIXEL_BADGE_BG,
+                              borderColor: COPILOT_PIXEL_BADGE_BORDER,
+                              color: COPILOT_PIXEL_BADGE_TEXT,
+                            }}
+                            title="Persistent CopilotPixel Background Agent"
+                          >
+                            👾 CPX
+                          </span>
+                        )}
                       </div>
                       <span
                         className="text-2xs px-2 py-0.5 rounded border shrink-0 font-medium"
@@ -301,7 +325,14 @@ export function AgentRosterModal({
                       </span>
                     </div>
 
-                    <div className="text-2xs text-text-muted truncate">{status}</div>
+                    <div className="text-2xs text-text-muted truncate flex items-center gap-1">
+                      <span>{status}</span>
+                      {ch.isTakingBreak && (
+                        <span className="text-accent-bright font-semibold">
+                          • ☕ Break ({ch.breakType || 'relax'})
+                        </span>
+                      )}
+                    </div>
 
                     {isRunningOrder ? (
                       <div className="text-2xs text-yellow-400 truncate font-medium flex items-center gap-1">
@@ -381,8 +412,89 @@ export function AgentRosterModal({
                   </div>
                 </div>
 
-                <div className="text-xs text-text-muted bg-black/20 p-2 rounded">
-                  {getRoleDefinition(activeChar.role).description}
+                <div className="text-xs text-text-muted bg-black/20 p-2 rounded flex items-center justify-between gap-2">
+                  <span>{getRoleDefinition(activeChar.role).description}</span>
+                  {activeChar.isCopilotPixelAgent && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-danger hover:bg-danger/20 shrink-0"
+                      onClick={() => {
+                        officeState.despawnCopilotPixelAgent(activeChar.id);
+                        showFeedback('Agent dismissed from office.');
+                        setSelectedAgentId(null);
+                      }}
+                      title="Permanently remove this background agent from CopilotPixel"
+                    >
+                      🗑️ Dismiss
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {/* Break Routine Controls */}
+              <div className="flex items-center justify-between p-2.5 rounded bg-black/20 border border-border">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">☕</span>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-text">Break Activity</span>
+                    <span className="text-2xs text-text-muted">
+                      {activeChar.isTakingBreak
+                        ? `Currently taking a break: ${activeChar.breakType || 'relaxing'} in the common area`
+                        : 'Agent is at their desk working or ready for tasks'}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {activeChar.isTakingBreak ? (
+                    <Button
+                      variant="accent"
+                      size="sm"
+                      onClick={() => {
+                        officeState.returnAgentFromBreak(activeChar.id);
+                        showFeedback('Agent called back to desk!');
+                      }}
+                      title="Call agent back to their desk"
+                    >
+                      💼 Resume Work
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          officeState.startAgentBreak(activeChar.id, 'coffee');
+                          showFeedback('Agent sent on Coffee Break!');
+                        }}
+                        title="Send to Coffee Machine"
+                      >
+                        ☕ Coffee
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          officeState.startAgentBreak(activeChar.id, 'snack');
+                          showFeedback('Agent sent for a Snack!');
+                        }}
+                        title="Send to Snack Corner"
+                      >
+                        🍩 Snack
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          officeState.startAgentBreak(activeChar.id, 'steamdeck');
+                          showFeedback('Agent sent to play Steam Deck on sofa!');
+                        }}
+                        title="Send to Sofa with Steam Deck"
+                      >
+                        🎮 Steam Deck
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
 
