@@ -7,10 +7,10 @@
 # that's expected and harmless until Modelina catches up.
 asyncapi: 3.0.0
 info:
-  title: CopilotPixel Protocol
+  title: CopilotAgents Protocol
   version: 1.0.0
   description: |
-    Bidirectional WebSocket protocol between the CopilotPixel server and any UI client
+    Bidirectional WebSocket protocol between the CopilotAgents server and any UI client
     (the bundled VS Code webview, the standalone browser SPA, or future third-party
     clients). The server watches AI-coding-agent transcripts, parses tool activity, 
     owns office layout, and streams events to all connected clients. 
@@ -22,14 +22,14 @@ info:
   license:
     name: MIT
   contact:
-    name: CopilotPixel
-    url: https://github.com/Chuucommie/CopilotPixel
+    name: CopilotAgents
+    url: https://github.com/Chuucommie/CopilotAgents
 
 servers:
   local:
     host: 127.0.0.1:3100
     protocol: ws
-    description: Local CopilotPixel server (default port 3100)
+    description: Local CopilotAgents server (default port 3100)
     pathname: /ws
 
 channels:
@@ -687,7 +687,7 @@ components:
           type: string
           description: >-
             The hook provider this install state is about (HookProvider.id,
-            e.g. "claude"). Consumers keyed on install state must never mix
+            e.g. "copilot"). Consumers keyed on install state must never mix
             one provider's status into another's — the Intro's install
             verdict in particular reads only the provider it asked about.
         installed:
@@ -798,7 +798,7 @@ components:
           const: webviewReady
 
     LaunchAgent:
-      description: Launch a new Claude agent in a new terminal.
+      description: Launch a new agent in a new terminal.
       type: object
       additionalProperties: false
       required: [type]
@@ -848,7 +848,7 @@ components:
             $ref: '#/components/schemas/SeatAssignment'
 
     SaveLayout:
-      description: Save the office layout to ~/.pixel-agents/layout.json.
+      description: Save the office layout to ~/.copilot-agents/layout.json.
       type: object
       additionalProperties: false
       required: [type, layout]
@@ -995,7 +995,7 @@ components:
           const: importLayout
 
     OpenSessionsFolder:
-      description: Open ~/.claude/projects in the OS file manager.
+      description: Open session folder in the OS file manager.
       type: object
       additionalProperties: false
       required: [type]

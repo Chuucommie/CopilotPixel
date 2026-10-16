@@ -1,15 +1,15 @@
-# CopilotPixel
+# CopilotAgents
 
-CopilotPixel turns AI coding sessions into animated characters in a pixel-art office. This glossary is the canonical language for contributors and integrators; end-user docs may simplify it but must never contradict it.
+CopilotAgents turns AI coding sessions into animated characters in a pixel-art office. This glossary is the canonical language for contributors and integrators; end-user docs may simplify it but must never contradict it.
 
 ## Hosts & Adapters
 
 **Host**:
-The machine CopilotPixel runs on — a laptop, a phone, a VPS, a Raspberry Pi. The office is the same on every host, and can be reached from another device.
+The machine CopilotAgents runs on — a laptop, a phone, a VPS, a Raspberry Pi. The office is the same on every host, and can be reached from another device.
 _Avoid_: platform, environment, server (that's the runtime process)
 
 **Adapter**:
-The integration that connects one editor or application — VS Code, standalone, a macOS app, and the like — to CopilotPixel. An adapter composes the runtime and the office UI, and binds them to that environment's terminals, storage, and conventions. One adapter per editor or application; VS Code and standalone are the two today.
+The integration that connects one editor or application — VS Code, standalone, a macOS app, and the like — to CopilotAgents. An adapter composes the runtime and the office UI, and binds them to that environment's terminals, storage, and conventions. One adapter per editor or application; VS Code and standalone are the two today.
 _Avoid_: host (that's the machine it runs on), surface, flavor, platform, edition
 
 **Standalone**:
@@ -19,7 +19,7 @@ _Avoid_: CLI (that's the entry command, not the adapter), browser mode
 ## Agents & Teams
 
 **Agent**:
-An AI coding session tracked by CopilotPixel, whether spawned from the office or adopted from an external terminal.
+An AI coding session tracked by CopilotAgents, whether spawned from the office or adopted from an external terminal.
 _Avoid_: bot, terminal (as a synonym), session (as a synonym)
 
 **Headless agent**:
@@ -180,11 +180,11 @@ _Avoid_: roam, patrol
 ## Activity Detection
 
 **Hook**:
-A push notification an AI tool sends about its own session activity, delivered to CopilotPixel as it happens.
+A push notification an AI tool sends about its own session activity, delivered to CopilotAgents as it happens.
 
 **Transcript**:
 The append-only record of a session. Read in both detection modes for tool content.
-_Avoid_: JSONL (Claude's file format, not the concept), log
+_Avoid_: JSONL (the underlying file format, not the concept), log
 
 **Hooks mode**:
 The preferred detection mode, in which agent status is driven by hooks.
@@ -196,7 +196,7 @@ _Avoid_: file fallback, transcript mode, polling mode
 ## Integration Boundary
 
 **Provider**:
-The integration that connects one coding-agent CLI to CopilotPixel. A provider normalizes that CLI's raw activity into agent events and knows how to install its hooks. GitHub Copilot CLI is the active provider; the Claude Code provider remains available only as an unregistered compatibility implementation.
+The integration that connects one coding-agent CLI to CopilotAgents. A provider normalizes that CLI's raw activity into agent events and knows how to install its hooks. GitHub Copilot CLI is the active provider.
 _Avoid_: plugin, connector
 
 **Agent event**:

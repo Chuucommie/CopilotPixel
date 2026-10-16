@@ -11,7 +11,7 @@ const HOOK_SETUP_TIMEOUT_MS = 20_000;
 const INVOCATION_TIMEOUT_MS = 20_000;
 const SCENARIO_SCHEMA_VERSION = 1;
 
-export interface ClaudeMockSessionDefinition {
+export interface CopilotMockSessionDefinition {
   alias: string;
   sessionIdTemplate: string;
   cwdTemplate?: string;
@@ -20,64 +20,64 @@ export interface ClaudeMockSessionDefinition {
   sidecarJson?: Record<string, unknown>;
 }
 
-export interface ClaudeMockAppendJsonlAction {
+export interface CopilotMockAppendJsonlAction {
   kind: 'appendJsonl';
   atMs: number;
   session: string;
   record: Record<string, unknown>;
 }
 
-export interface ClaudeMockEmitHookAction {
+export interface CopilotMockEmitHookAction {
   kind: 'emitHook';
   atMs: number;
   payload: Record<string, unknown>;
 }
 
-export interface ClaudeMockWriteJsonAction {
+export interface CopilotMockWriteJsonAction {
   kind: 'writeJson';
   atMs: number;
   filePath: string;
   value: Record<string, unknown>;
 }
 
-export interface ClaudeMockDeletePathAction {
+export interface CopilotMockDeletePathAction {
   kind: 'deletePath';
   atMs: number;
   filePath: string;
 }
 
-export interface ClaudeMockExitAction {
+export interface CopilotMockExitAction {
   kind: 'exit';
   atMs: number;
   code?: number;
 }
 
-export type ClaudeMockAction =
-  | ClaudeMockAppendJsonlAction
-  | ClaudeMockEmitHookAction
-  | ClaudeMockWriteJsonAction
-  | ClaudeMockDeletePathAction
-  | ClaudeMockExitAction;
+export type CopilotMockAction =
+  | CopilotMockAppendJsonlAction
+  | CopilotMockEmitHookAction
+  | CopilotMockWriteJsonAction
+  | CopilotMockDeletePathAction
+  | CopilotMockExitAction;
 
-export interface ClaudeMockScenario {
+export interface CopilotMockScenario {
   schemaVersion: number;
   name?: string;
   autoInit: boolean;
   holdOpenMs: number;
-  sessions: ClaudeMockSessionDefinition[];
-  actions: ClaudeMockAction[];
+  sessions: CopilotMockSessionDefinition[];
+  actions: CopilotMockAction[];
 }
 
 class TimedScenarioStepBuilder {
   constructor(
-    private readonly scenario: ClaudeMockScenarioBuilder,
+    private readonly scenario: CopilotMockScenarioBuilder,
     private readonly atMs: number,
   ) {}
 
   appendJsonl(
     record: Record<string, unknown>,
     options?: { session?: string },
-  ): ClaudeMockScenarioBuilder {
+  ): CopilotMockScenarioBuilder {
     this.scenario.pushAction({
       kind: 'appendJsonl',
       atMs: this.atMs,
@@ -87,7 +87,7 @@ class TimedScenarioStepBuilder {
     return this.scenario;
   }
 
-  emitHook(payload: Record<string, unknown>): ClaudeMockScenarioBuilder {
+  emitHook(payload: Record<string, unknown>): CopilotMockScenarioBuilder {
     this.scenario.pushAction({
       kind: 'emitHook',
       atMs: this.atMs,
@@ -96,7 +96,7 @@ class TimedScenarioStepBuilder {
     return this.scenario;
   }
 
-  writeJson(filePath: string, value: Record<string, unknown>): ClaudeMockScenarioBuilder {
+  writeJson(filePath: string, value: Record<string, unknown>): CopilotMockScenarioBuilder {
     this.scenario.pushAction({
       kind: 'writeJson',
       atMs: this.atMs,
@@ -106,7 +106,7 @@ class TimedScenarioStepBuilder {
     return this.scenario;
   }
 
-  deletePath(filePath: string): ClaudeMockScenarioBuilder {
+  deletePath(filePath: string): CopilotMockScenarioBuilder {
     this.scenario.pushAction({
       kind: 'deletePath',
       atMs: this.atMs,
@@ -115,7 +115,7 @@ class TimedScenarioStepBuilder {
     return this.scenario;
   }
 
-  exit(code = 0): ClaudeMockScenarioBuilder {
+  exit(code = 0): CopilotMockScenarioBuilder {
     this.scenario.pushAction({
       kind: 'exit',
       atMs: this.atMs,
@@ -125,11 +125,11 @@ class TimedScenarioStepBuilder {
   }
 }
 
-export class ClaudeMockScenarioBuilder {
+export class CopilotMockScenarioBuilder {
   private autoInit = true;
   private holdOpenMs = DEFAULT_HOLD_OPEN_MS;
-  private readonly sessions: ClaudeMockSessionDefinition[] = [];
-  private readonly actions: ClaudeMockAction[] = [];
+  private readonly sessions: CopilotMockSessionDefinition[] = [];
+  private readonly actions: CopilotMockAction[] = [];
 
   constructor(private readonly name?: string) {}
 
@@ -142,7 +142,7 @@ export class ClaudeMockScenarioBuilder {
       sidecarPathTemplate?: string;
       sidecarJson?: Record<string, unknown>;
     },
-  ): ClaudeMockScenarioBuilder {
+  ): CopilotMockScenarioBuilder {
     this.sessions.push({
       alias,
       sessionIdTemplate,
@@ -154,12 +154,12 @@ export class ClaudeMockScenarioBuilder {
     return this;
   }
 
-  withoutAutoInit(): ClaudeMockScenarioBuilder {
+  withoutAutoInit(): CopilotMockScenarioBuilder {
     this.autoInit = false;
     return this;
   }
 
-  holdOpenFor(ms: number): ClaudeMockScenarioBuilder {
+  holdOpenFor(ms: number): CopilotMockScenarioBuilder {
     this.holdOpenMs = ms;
     return this;
   }
@@ -168,7 +168,7 @@ export class ClaudeMockScenarioBuilder {
     return new TimedScenarioStepBuilder(this, ms);
   }
 
-  exitAt(ms: number, code = 0): ClaudeMockScenarioBuilder {
+  exitAt(ms: number, code = 0): CopilotMockScenarioBuilder {
     this.pushAction({
       kind: 'exit',
       atMs: ms,
@@ -177,11 +177,11 @@ export class ClaudeMockScenarioBuilder {
     return this;
   }
 
-  pushAction(action: ClaudeMockAction): void {
+  pushAction(action: CopilotMockAction): void {
     this.actions.push(action);
   }
 
-  build(): ClaudeMockScenario {
+  build(): CopilotMockScenario {
     return {
       schemaVersion: SCENARIO_SCHEMA_VERSION,
       name: this.name,
@@ -193,11 +193,11 @@ export class ClaudeMockScenarioBuilder {
   }
 }
 
-export function claudeScenario(name?: string): ClaudeMockScenarioBuilder {
-  return new ClaudeMockScenarioBuilder(name);
+export function copilotScenario(name?: string): CopilotMockScenarioBuilder {
+  return new CopilotMockScenarioBuilder(name);
 }
 
-export function mockClaudeInitRecord(content = 'mock-claude-ready'): Record<string, unknown> {
+export function mockCopilotInitRecord(content = 'mock-copilot-ready'): Record<string, unknown> {
   return {
     type: 'system',
     subtype: 'init',
@@ -210,25 +210,25 @@ function sleep(ms: number): Promise<void> {
 }
 
 function getMockRoot(tmpHome: string): string {
-  return path.join(tmpHome, '.claude-mock');
+  return path.join(tmpHome, '.copilot-mock');
 }
 
 function getScenarioQueuePath(tmpHome: string): string {
   return path.join(getMockRoot(tmpHome), 'scenario-queue.json');
 }
 
-function readScenarioQueue(tmpHome: string): ClaudeMockScenario[] {
+function readScenarioQueue(tmpHome: string): CopilotMockScenario[] {
   const queuePath = getScenarioQueuePath(tmpHome);
   try {
     const raw = fs.readFileSync(queuePath, 'utf8');
     const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed) ? (parsed as ClaudeMockScenario[]) : [];
+    return Array.isArray(parsed) ? (parsed as CopilotMockScenario[]) : [];
   } catch {
     return [];
   }
 }
 
-function writeScenarioQueue(tmpHome: string, queue: ClaudeMockScenario[]): void {
+function writeScenarioQueue(tmpHome: string, queue: CopilotMockScenario[]): void {
   const queuePath = getScenarioQueuePath(tmpHome);
   fs.mkdirSync(path.dirname(queuePath), { recursive: true });
   fs.writeFileSync(queuePath, JSON.stringify(queue, null, 2));
@@ -258,11 +258,11 @@ function hooksInstalledInSettings(settingsPath: string): boolean {
   }
 }
 
-export async function waitForClaudeHookSetup(tmpHome: string): Promise<void> {
+export async function waitForCopilotHookSetup(tmpHome: string): Promise<void> {
   await waitForHookServer(tmpHome);
 
-  const settingsPath = path.join(tmpHome, '.claude', 'settings.json');
-  const hookScriptPath = path.join(tmpHome, '.pixel-agents', 'hooks', 'claude-hook.js');
+  const settingsPath = path.join(tmpHome, '.copilot', 'settings.json');
+  const hookScriptPath = path.join(tmpHome, '.copilot-agents', 'hooks', 'copilot-hook.js');
   const deadline = Date.now() + HOOK_SETUP_TIMEOUT_MS;
 
   while (Date.now() < deadline) {
@@ -273,30 +273,30 @@ export async function waitForClaudeHookSetup(tmpHome: string): Promise<void> {
   }
 
   throw new Error(
-    `Timed out waiting for Claude hook setup at ${settingsPath} and ${hookScriptPath}`,
+    `Timed out waiting for Copilot hook setup at ${settingsPath} and ${hookScriptPath}`,
   );
 }
 
-export async function arrangeNextClaudeInvocation(
+export async function arrangeNextCopilotInvocation(
   tmpHome: string,
-  scenario: ClaudeMockScenario,
+  scenario: CopilotMockScenario,
 ): Promise<void> {
   const queue = readScenarioQueue(tmpHome);
   queue.push(scenario);
   writeScenarioQueue(tmpHome, queue);
 }
 
-function getMockClaudeBinaryPath(tmpHome: string): string {
+function getMockCopilotBinaryPath(tmpHome: string): string {
   const binDir = path.resolve(tmpHome, '..', 'bin');
-  return path.join(binDir, process.platform === 'win32' ? 'claude.cmd' : 'claude');
+  return path.join(binDir, process.platform === 'win32' ? 'copilot.cmd' : 'copilot');
 }
 
 /**
  * Point a child process's home at the isolated test home on every platform.
  *
  * macOS/Linux: Node's os.homedir() honors $HOME, so setting HOME is enough.
- * Windows: os.homedir() reads USERPROFILE and IGNORES $HOME. The mock claude
- * runner (and the extension) resolve ~/.claude via os.homedir(), so without
+ * Windows: os.homedir() reads USERPROFILE and IGNORES $HOME. The mock copilot
+ * runner (and the extension) resolve ~/.copilot via os.homedir(), so without
  * USERPROFILE they read/write the REAL user profile while the test asserts on
  * tmpHome — every external-spawn test times out on Windows only. Set both, and
  * clear the legacy HOMEDRIVE/HOMEPATH fallbacks libuv consults when USERPROFILE
@@ -312,17 +312,17 @@ export function applyMockHomeEnv(base: NodeJS.ProcessEnv, tmpHome: string): Node
   return env;
 }
 
-export interface ExternalClaudeSpawn {
+export interface ExternalCopilotSpawn {
   process: ChildProcess;
   sessionId: string;
 }
 
-/** Module-level registry of external mock-claude processes so fixture teardown
+/** Module-level registry of external mock-copilot processes so fixture teardown
  *  can kill any that the test forgot to clean up. Suite runs with workers: 1,
  *  so cross-test contamination is impossible. */
 const trackedExternalProcesses = new Set<ChildProcess>();
 
-/** Kill any mock-claude processes spawned via spawnExternalClaudeScenario
+/** Kill any mock-copilot processes spawned via spawnExternalCopilotScenario
  *  that are still alive. Called from the test fixture's teardown. */
 export async function killTrackedExternalProcesses(): Promise<void> {
   for (const child of trackedExternalProcesses) {
@@ -337,26 +337,26 @@ export async function killTrackedExternalProcesses(): Promise<void> {
   trackedExternalProcesses.clear();
 }
 
-export async function spawnExternalClaudeScenario(options: {
+export async function spawnExternalCopilotScenario(options: {
   tmpHome: string;
   workspaceDir: string;
   mockLogFile: string;
-  scenario: ClaudeMockScenario;
+  scenario: CopilotMockScenario;
   sessionId: string;
-}): Promise<ExternalClaudeSpawn> {
+}): Promise<ExternalCopilotSpawn> {
   // Universal narration moment (cosmetic): every external spawn is a detached
-  // session CopilotPixel adopts rather than launches. Its own magenta stdout
+  // session CopilotAgents adopts rather than launches. Its own magenta stdout
   // narrates the per-hook timeline in the monitor tab.
   narrate.step('spawning a detached external mock session (adopted, not launched)');
-  await arrangeNextClaudeInvocation(options.tmpHome, options.scenario);
+  await arrangeNextCopilotInvocation(options.tmpHome, options.scenario);
 
-  const claudeBinary = getMockClaudeBinaryPath(options.tmpHome);
+  const copilotBinary = getMockCopilotBinaryPath(options.tmpHome);
   const env = {
     ...applyMockHomeEnv(process.env, options.tmpHome),
-    PATH: `${path.dirname(claudeBinary)}${path.delimiter}${process.env['PATH'] ?? ''}`,
-    PIXEL_AGENTS_NODE_BIN: process.execPath,
+    PATH: `${path.dirname(copilotBinary)}${path.delimiter}${process.env['PATH'] ?? ''}`,
+    COPILOT_AGENTS_NODE_BIN: process.execPath,
     // Switches the runner's narration to the magenta [external·tag] style.
-    PIXEL_AGENTS_MOCK_EXTERNAL: '1',
+    COPILOT_AGENTS_MOCK_EXTERNAL: '1',
   };
 
   // Pipe stderr so we can surface diagnostics on timeout. stdout (the mock's
@@ -365,7 +365,7 @@ export async function spawnExternalClaudeScenario(options: {
   const narrationLog = getExternalNarrationLogPath(options.tmpHome);
   fs.mkdirSync(path.dirname(narrationLog), { recursive: true });
   const narrationFd = fs.openSync(narrationLog, 'a');
-  const child = spawn(claudeBinary, ['--session-id', options.sessionId], {
+  const child = spawn(copilotBinary, ['--session-id', options.sessionId], {
     cwd: options.workspaceDir,
     env,
     shell: process.platform === 'win32',
@@ -404,7 +404,7 @@ export async function spawnExternalClaudeScenario(options: {
   while (Date.now() < deadline) {
     if (watch.spawnError) {
       throw new Error(
-        `External mock Claude session ${options.sessionId} failed to spawn: ${watch.spawnError.message}`,
+        `External mock Copilot session ${options.sessionId} failed to spawn: ${watch.spawnError.message}`,
       );
     }
     const invocationLog = readTextIfExists(options.mockLogFile);
@@ -417,7 +417,7 @@ export async function spawnExternalClaudeScenario(options: {
     if (watch.earlyExit) {
       const stderrText = Buffer.concat(watch.stderrChunks).toString('utf8').trim();
       throw new Error(
-        `External mock Claude session ${options.sessionId} exited early ` +
+        `External mock Copilot session ${options.sessionId} exited early ` +
           `(code=${watch.earlyExit.code}, signal=${watch.earlyExit.signal}) before logging an invocation. ` +
           `stderr: ${stderrText || '<empty>'}`,
       );
@@ -427,7 +427,7 @@ export async function spawnExternalClaudeScenario(options: {
 
   const stderrText = Buffer.concat(watch.stderrChunks).toString('utf8').trim();
   throw new Error(
-    `Timed out waiting for external mock Claude session ${options.sessionId}. ` +
+    `Timed out waiting for external mock Copilot session ${options.sessionId}. ` +
       `stderr so far: ${stderrText || '<empty>'}`,
   );
 }

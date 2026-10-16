@@ -21,7 +21,7 @@ export function toMajorMinor(version: string): string {
   return parts.length >= 2 ? `${parts[0]}.${parts[1]}` : version;
 }
 
-export const CHANGELOG_REPO_URL = 'https://github.com/Chuucommie/CopilotPixel';
+export const CHANGELOG_REPO_URL = 'https://github.com/Chuucommie/CopilotAgents';
 
 export const DISCORD_INVITE_URL = 'https://discord.gg/Yk7jXebv9H';
 
@@ -40,7 +40,7 @@ export const changelogEntries: ChangelogEntry[] = [
       {
         title: 'Packaging',
         items: [
-          'Updated Marketplace and npm identities for CopilotPixel',
+          'Updated Marketplace and npm identities for CopilotAgents',
           'Added release metadata and a standalone installation guide',
         ],
       },

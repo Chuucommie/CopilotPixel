@@ -1,24 +1,24 @@
-# CopilotPixel manual hook server requests
+# CopilotAgents manual hook server requests
 #
 # Usage:
-# 1. Start the VS Code extension or run `npx copilot-pixe` so the local hook server is running.
-# 2. Copy `port` and `token` from `~/.pixel-agents/server.json` into the variables below.
+# 1. Start the VS Code extension or run `npx copilot-agents` so the local hook server is running.
+# 2. Copy `port` and `token` from `~/.copilot-agents/server.json` into the variables below.
 # 3. Set `cwd` to a workspace folder opened in the Extension Development Host,
-#    or enable "Watch All Sessions" in CopilotPixel.
+#    or enable "Watch All Sessions" in CopilotAgents.
 # 4. Run the requests in order with a REST client that supports `.http` files.
 #
 # Notes:
 # - `SessionStart` only stages a pending external session. A follow-up event such as
 #   `PreToolUse`, `Stop`, `Notification`, or `PermissionRequest` is what actually
-#   creates the agent in CopilotPixel.
+#   creates the agent in CopilotAgents.
 # - These examples omit `transcript_path` so the agent is created as a hooks-only
 #   external session. That keeps manual testing simple and avoids needing a real JSONL file.
 # - On Windows, use forward slashes in `cwd` or escape backslashes in the JSON string.
 
 @host = 127.0.0.1
 @port = 3100
-@token = paste-token-from-~/.pixel-agents/server.json
-@provider = claude
+@token = paste-token-from-~/.copilot-agents/server.json
+@provider = copilot
 @sessionId = manual-session-1
 @replacementSessionId = manual-session-2
 @cwd = /absolute/path/to/your/workspace
@@ -90,7 +90,7 @@ Content-Type: application/json
 }
 
 ###
-# Alternative waiting signal when Claude finishes its turn
+# Alternative waiting signal when agent finishes its turn
 POST http://{{host}}:{{port}}/api/hooks/{{provider}}
 Authorization: Bearer {{token}}
 Content-Type: application/json

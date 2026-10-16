@@ -206,7 +206,7 @@ function App() {
   // geometry — the handlers still own undo/dirty/rebuild. Guarded on isE2E.
   useEffect(() => {
     if (!isE2E || typeof window === 'undefined') return;
-    const hooks = (window.__pixelAgentsTestHooks ??= {});
+    const hooks = (window.__copilotAgentsTestHooks ??= {});
     hooks.editorTileAction = (col, row) => editor.handleEditorTileAction(col, row);
     hooks.editorEraseAction = (col, row) => editor.handleEditorEraseAction(col, row);
     hooks.getShowAreas = () => effectiveShowAreas;
@@ -486,14 +486,14 @@ function App() {
         zIndex={52}
       >
         <div className="text-base text-text px-10" style={{ lineHeight: 1.4 }}>
-          <p className="mb-8">Your CopilotPixel office now reacts in real-time:</p>
+          <p className="mb-8">Your CopilotAgents office now reacts in real-time:</p>
           <ul className="mb-8 pl-18 list-disc m-0">
             <li className="text-sm mb-2">Permission prompts appear instantly</li>
             <li className="text-sm mb-2">Turn completions detected the moment they happen</li>
             <li className="text-sm mb-2">Sound notifications play immediately</li>
           </ul>
           <p className="mb-12 text-text-muted">
-            This works through GitHub Copilot CLI hooks, which notify CopilotPixel when your
+            This works through GitHub Copilot CLI hooks, which notify CopilotAgents when your
             sessions start, use tools, or request permission.
           </p>
           <div className="text-center">

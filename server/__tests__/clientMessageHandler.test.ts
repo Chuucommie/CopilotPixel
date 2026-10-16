@@ -139,10 +139,10 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
       handleClientMessage({ type: 'setShowAreas', enabled: true }, (m) => sent.push(m), ctx);
 
       const adapter = store.getAdapter()!;
-      expect(adapter.getSetting('pixel-agents.showAreas', false)).toBe(true);
+      expect(adapter.getSetting('copilot-agents.showAreas', false)).toBe(true);
 
       handleClientMessage({ type: 'setShowAreas', enabled: false }, (m) => sent.push(m), ctx);
-      expect(adapter.getSetting('pixel-agents.showAreas', true)).toBe(false);
+      expect(adapter.getSetting('copilot-agents.showAreas', true)).toBe(false);
     });
   });
 
@@ -184,9 +184,9 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
   describe('setHooksEnabled persistence', () => {
     /** Put our command on every installed event, as a real install would. */
     function seedInstalledHooks(): void {
-      const hookPath = path.join(tempHome, '.pixel-agents', 'hooks', 'copilot-hook.js');
+      const hookPath = path.join(tempHome, '.copilot-agents', 'hooks', 'copilot-hook.js');
       const entry = { type: 'command', exec: 'node', args: [hookPath], timeoutSec: 5 };
-      const configPath = path.join(tempHome, '.copilot', 'hooks', 'copilotpixel.json');
+      const configPath = path.join(tempHome, '.copilot', 'hooks', 'copilotagents.json');
       fs.mkdirSync(path.dirname(configPath), { recursive: true });
       fs.writeFileSync(
         configPath,
@@ -265,7 +265,7 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
     });
 
     // A non-local client (LAN peer, rebound page) never reaches the side effect
-    // at all: granting consent to modify ~/.claude/settings.json is not a
+    // at all: granting consent to modify hook settings is not a
     // decision a remote peer gets to make. See httpServerWs.test.ts.
     it('ignores the toggle entirely when the client is not privileged', async () => {
       let sideEffectRan = false;
@@ -372,7 +372,7 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
     it('emits carpetTilesLoaded after wallTilesLoaded when both are present in the cache', () => {
       // Hex placeholders are test fixtures, not UI tokens — disable the
       // centralized-color rule just for this cache literal.
-      /* eslint-disable pixel-agents/no-inline-colors */
+      /* eslint-disable copilot-agents/no-inline-colors */
       const cache: AssetCache = {
         characters: null,
         pets: null,
@@ -382,7 +382,7 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
         furniture: null,
         defaultLayout: null,
       };
-      /* eslint-enable pixel-agents/no-inline-colors */
+      /* eslint-enable copilot-agents/no-inline-colors */
       ctx = freshCtx(cache);
 
       handleClientMessage({ type: 'webviewReady' }, (m) => sent.push(m), ctx);

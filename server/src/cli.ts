@@ -28,7 +28,7 @@ import {
 import { MAX_PORT, MIN_PORT } from './constants.js';
 import { FileStateAdapter } from './fileStateAdapter.js';
 import { copilotProvider, copyHookScript, hookProviderById } from './providers/index.js';
-import { PixelAgentsServer } from './server.js';
+import { CopilotAgentsServer } from './server.js';
 
 // ── Argument parsing ──────────────────────────────────────────
 
@@ -88,7 +88,7 @@ Options:
 // migration below (our hooks already installed by a pre-consent version).
 
 /**
- * Copy the bundled hook script into ~/.pixel-agents/hooks/, reporting failure.
+ * Copy the bundled hook script into ~/.copilot-agents/hooks/, reporting failure.
  *
  * Callers run this BEFORE installing the settings.json entries and abort when
  * it returns false: an entry whose command points at a missing script makes
@@ -97,7 +97,7 @@ Options:
  */
 function copyHookScriptOrReport(packageRoot: string, context = ''): boolean {
   if (copyHookScript(packageRoot)) return true;
-  console.error(`[CopilotPixel] Hooks NOT installed${context}: hook script missing.`);
+  console.error(`[CopilotAgents] Hooks NOT installed${context}: hook script missing.`);
   return false;
 }
 
@@ -108,7 +108,7 @@ async function main(): Promise<void> {
   try {
     args = parseArgs(process.argv.slice(2));
   } catch (err) {
-    console.error(`[CopilotPixel] ${err instanceof Error ? err.message : String(err)}`);
+    console.error(`[CopilotAgents] ${err instanceof Error ? err.message : String(err)}`);
     process.exit(1);
   }
 
@@ -121,7 +121,7 @@ async function main(): Promise<void> {
   // External asset directories are merged at startup too, so directories added
   // in a previous session survive a restart. buildAssetCache is the shared
   // loader used by both the standalone server and the VS Code adapter.
-  console.log('[CopilotPixel] Loading assets...');
+  console.log('[CopilotAgents] Loading assets...');
   const assetCache: AssetCache = await buildAssetCache(
     distRoot,
     readConfig().externalAssetDirectories,
@@ -130,7 +130,7 @@ async function main(): Promise<void> {
   const petCount = assetCache.pets?.pets.length ?? 0;
   const furnitureCount = assetCache.furniture?.catalog.length ?? 0;
   console.log(
-    `[CopilotPixel] Assets loaded: ${charCount} characters, ${petCount} pets, ${furnitureCount} furniture items`,
+    `[CopilotAgents] Assets loaded: ${charCount} characters, ${petCount} pets, ${furnitureCount} furniture items`,
   );
 
   // ── Store + adapter (shared settings + standalone-scoped agents/seats) ──
@@ -139,7 +139,7 @@ async function main(): Promise<void> {
   store.setAdapter(adapter);
 
   // ── Create server ──
-  const server = new PixelAgentsServer();
+  const server = new CopilotAgentsServer();
 
   try {
     // Create runtime first (before server.start, so we can pass it in)
@@ -171,16 +171,16 @@ async function main(): Promise<void> {
             currentConfig.token,
           );
         } catch (err) {
-          console.error(`[CopilotPixel] ${err instanceof Error ? err.message : String(err)}`);
+          console.error(`[CopilotAgents] ${err instanceof Error ? err.message : String(err)}`);
           return;
         }
-        console.log('[CopilotPixel] Hooks installed (user toggle)');
+        console.log('[CopilotAgents] Hooks installed (user toggle)');
       } else {
         try {
           await provider.uninstallHooks();
-          console.log('[CopilotPixel] Hooks uninstalled (user toggle)');
+          console.log('[CopilotAgents] Hooks uninstalled (user toggle)');
         } catch (err) {
-          console.error(`[CopilotPixel] ${err instanceof Error ? err.message : String(err)}`);
+          console.error(`[CopilotAgents] ${err instanceof Error ? err.message : String(err)}`);
         }
       }
     };
@@ -219,7 +219,7 @@ async function main(): Promise<void> {
           sprites: Object.fromEntries(furniture.sprites),
         });
       }
-      console.log('[CopilotPixel] Assets reloaded (external directory change)');
+      console.log('[CopilotAgents] Assets reloaded (external directory change)');
     };
 
     const config = await server.start({
@@ -237,7 +237,7 @@ async function main(): Promise<void> {
 
     // Sync runtime refs with persisted settings BEFORE first scan tick.
     runtime.hooksEnabled.current = getHooksEnabled(copilotProvider.id);
-    runtime.watchAllSessions.current = adapter.getSetting('pixel-agents.watchAllSessions', false);
+    runtime.watchAllSessions.current = adapter.getSetting('copilot-agents.watchAllSessions', false);
 
     // Install hooks on startup if the persisted setting says so — gated on the
     // one-time consent to modify the Copilot hook config.
@@ -252,21 +252,21 @@ async function main(): Promise<void> {
       }
       if (!consent) {
         console.log(
-          '[CopilotPixel] Hooks not installed: modifying the Copilot hook config needs one-time approval — open the URL below to review and approve it.',
+          '[CopilotAgents] Hooks not installed: modifying the Copilot hook config needs one-time approval — open the URL below to review and approve it.',
         );
       } else if (copyHookScriptOrReport(packageRoot)) {
         try {
           await copilotProvider.installHooks(`http://127.0.0.1:${config.port}`, config.token);
-          console.log('[CopilotPixel] Hooks installed');
+          console.log('[CopilotAgents] Hooks installed');
         } catch (err) {
-          console.error(`[CopilotPixel] ${err instanceof Error ? err.message : String(err)}`);
+          console.error(`[CopilotAgents] ${err instanceof Error ? err.message : String(err)}`);
         }
       }
     } else {
       // Without this line, a persisted hooks-off makes startup skip the entire
       // consent/install flow with zero output — indistinguishable from a bug.
       console.log(
-        '[CopilotPixel] Hooks disabled — enable "Instant Detection (Hooks)" in the UI settings to install them.',
+        '[CopilotAgents] Hooks disabled — enable "Instant Detection (Hooks)" in the UI settings to install them.',
       );
     }
 
@@ -275,7 +275,7 @@ async function main(): Promise<void> {
     const dirs = copilotProvider.getSessionDirs?.(cwd);
     if (dirs && dirs[0]) {
       const projectDir = dirs[0];
-      console.log(`[CopilotPixel] Scanning project dir: ${projectDir}`);
+      console.log(`[CopilotAgents] Scanning project dir: ${projectDir}`);
       runtime.startProjectScan(projectDir);
       runtime.startExternalScanning(projectDir);
       runtime.startStaleCheck();
@@ -291,7 +291,7 @@ async function main(): Promise<void> {
     const displayHost =
       args.host === '0.0.0.0' || args.host === '::' || args.host === '' ? '127.0.0.1' : args.host;
     console.log(
-      `\n  CopilotPixel server running at http://${displayHost}:${config.port}/?token=${config.token}\n`,
+      `\n  CopilotAgents server running at http://${displayHost}:${config.port}/?token=${config.token}\n`,
     );
 
     // ── Graceful shutdown ──

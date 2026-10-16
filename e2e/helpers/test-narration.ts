@@ -9,21 +9,21 @@ import { getExternalNarrationLogPath } from './external-monitor';
  * Test-action narrator: the yellow `[test]` voice in every VS Code run video.
  *
  * The narrator writes one line per action taken / assertion verified to a
- * per-test log (`<tmpHome>/.claude-mock/test-narration.log`). That log is
+ * per-test log (`<tmpHome>/.copilot-mock/test-narration.log`). That log is
  * displayed on two surfaces, both merely tailing the file:
  *   - the fixture's "e2e monitor" terminal (opened once per test), and
- *   - every mock-claude terminal tab (its wrapper backgrounds a headerless
+ *   - every mock-copilot terminal tab (its wrapper backgrounds a headerless
  *     tail so the story shows even when an agent tab takes focus).
  *
  * Two ways to narrate:
  *   - the fixture exposes the handle `setNarrationContext` returns as
- *     `narrator` on the pixelAgents payload — tests call `narrator.step()` /
+ *     `narrator` on the copilotAgents payload — tests call `narrator.step()` /
  *     `narrator.check()`;
  *   - `narrate` (module-level, same handle) lets shared helpers narrate
  *     universal moments (e.g. spawning an agent) without threading the handle
  *     through 60+ call sites. It no-ops until the fixture sets a context.
  *
- * STRICTLY COSMETIC. CopilotPixel never reads terminal output (its inputs are
+ * STRICTLY COSMETIC. CopilotAgents never reads terminal output (its inputs are
  * JSONL transcripts and hook POSTs), so no assertion may depend on narration —
  * deleting every step()/check() call must leave all tests passing. Every
  * failure here is swallowed. The suite runs with workers:1, so the single
@@ -47,7 +47,7 @@ export interface TestNarrator {
 let context: { logPath: string; startedAt: number } | null = null;
 
 export function getTestNarrationLogPath(tmpHome: string): string {
-  return path.join(tmpHome, '.claude-mock', 'test-narration.log');
+  return path.join(tmpHome, '.copilot-mock', 'test-narration.log');
 }
 
 function write(line: string): void {
@@ -77,7 +77,7 @@ export const narrate: TestNarrator = {
 /**
  * Begin narration for a test. Touches the log file (so the tails have a file to
  * follow immediately) and starts the relative-timestamp clock. Returns the
- * module-level narrator for the fixture to expose. Called by the pixelAgents
+ * module-level narrator for the fixture to expose. Called by the copilotAgents
  * fixture at setup, before use().
  */
 export function setNarrationContext(tmpHome: string): TestNarrator {

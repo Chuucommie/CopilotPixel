@@ -1,6 +1,6 @@
 import type { Frame } from '@playwright/test';
 
-import { test } from '../../../fixtures/pixel-agents';
+import { test } from '../../../fixtures/copilot-agents';
 import {
   permissionRequest,
   preToolUseAgent,
@@ -20,11 +20,11 @@ import {
   withTmuxTeammateSession,
 } from '../../../helpers/lifecycle';
 import {
-  arrangeNextClaudeInvocation,
-  claudeScenario,
-  spawnExternalClaudeScenario,
-  waitForClaudeHookSetup,
-} from '../../../helpers/mock-claude';
+  arrangeNextCopilotInvocation,
+  copilotScenario,
+  spawnExternalCopilotScenario,
+  waitForCopilotHookSetup,
+} from '../../../helpers/mock-copilot';
 import {
   expectNoOverlayWithTexts,
   expectOverlayCount,
@@ -41,7 +41,11 @@ import {
   buildTeammateSpawnResultRecord,
   seedTeamConfig,
 } from '../../../helpers/team';
-import { getPixelAgentsFrame, openPixelAgentsPanel, setSettings } from '../../../helpers/webview';
+import {
+  getCopilotAgentsFrame,
+  openCopilotAgentsPanel,
+  setSettings,
+} from '../../../helpers/webview';
 
 const TEAMMATE_ROLE = 'web-researcher';
 
@@ -56,26 +60,26 @@ async function expectTeammateActivity(frame: Frame, text: string): Promise<void>
 }
 
 // All four tests are scenario-driven (mocking rule 1) with ~3s phases so run
-// videos show each routing step and the mock narrates it — in the Claude Code
+// videos show each routing step and the mock narrates it — in the GitHub Copilot CLI
 // terminal for internal leads, in the external-sessions monitor for external
 // ones. Inline teammates share the lead transcript; tmux teammates have a
 // separate session and send hooks with that session's identity.
 test.describe('Hooks ON / teams', () => {
   test('internal terminal lead with inline teammate routes tools to teammate @area:teams', async ({
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, window, tmpHome, mockLogFile, narrator } = pixelAgents;
+    const { frame, window, tmpHome, mockLogFile, narrator } = copilotAgents;
 
     const teamName = uniqueTeamName('hooks-on-internal-inline');
     narrator.step('seeding a team config: a lead plus a web-researcher teammate');
     seedTeamConfig(tmpHome, teamName, ['lead', TEAMMATE_ROLE]);
-    await waitForClaudeHookSetup(tmpHome);
+    await waitForCopilotHookSetup(tmpHome);
     narrator.step(
       'arranging the run: SubagentStart brings in the teammate, then Bash on the lead, WebSearch on the teammate',
     );
-    await arrangeNextClaudeInvocation(
+    await arrangeNextCopilotInvocation(
       tmpHome,
-      withInlineTeammateSession(claudeScenario('internal inline teammate routing hooks on'))
+      withInlineTeammateSession(copilotScenario('internal inline teammate routing hooks on'))
         .at(500)
         .appendJsonl(buildTeamMetadataRecord(teamName))
         .at(3_000)
@@ -93,7 +97,7 @@ test.describe('Hooks ON / teams', () => {
         .at(10_000)
         .appendJsonl(
           buildAssistantToolUseRecord('toolu-a3-teammate-search', 'WebSearch', {
-            query: 'pixel agents',
+            query: 'copilot agents',
           }),
           { session: INLINE_TEAMMATE_ALIAS },
         )
@@ -101,8 +105,8 @@ test.describe('Hooks ON / teams', () => {
         .build(),
     );
     await spawnInternalAgentAndWait(frame, tmpHome, mockLogFile);
-    await openPixelAgentsPanel(window);
-    const panelFrame = await getPixelAgentsFrame(window);
+    await openCopilotAgentsPanel(window);
+    const panelFrame = await getCopilotAgentsFrame(window);
 
     await expectOverlayVisibleWithTexts(panelFrame, ['LEAD']);
     narrator.check('the lead is on screen labelled "LEAD"');
@@ -119,20 +123,20 @@ test.describe('Hooks ON / teams', () => {
   });
 
   test('internal terminal lead with tmux teammate routes tools to teammate @area:teams', async ({
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, window, tmpHome, mockLogFile, narrator } = pixelAgents;
+    const { frame, window, tmpHome, mockLogFile, narrator } = copilotAgents;
 
     const teamName = uniqueTeamName('hooks-on-internal-tmux');
     narrator.step('seeding a team config: a lead plus a tmux teammate');
     seedTeamConfig(tmpHome, teamName, ['lead', TEAMMATE_ROLE]);
-    await waitForClaudeHookSetup(tmpHome);
+    await waitForCopilotHookSetup(tmpHome);
     narrator.step(
       'arranging the run: the lead delegates, then a distinct tmux teammate session runs Bash and requests permission',
     );
-    await arrangeNextClaudeInvocation(
+    await arrangeNextCopilotInvocation(
       tmpHome,
-      withTmuxTeammateSession(claudeScenario('internal tmux teammate routing hooks on'))
+      withTmuxTeammateSession(copilotScenario('internal tmux teammate routing hooks on'))
         .at(500)
         .appendJsonl(buildTeamMetadataRecord(teamName))
         // Lead's Agent tool_use with run_in_background — the lead overlay shows
@@ -174,8 +178,8 @@ test.describe('Hooks ON / teams', () => {
         .build(),
     );
     await spawnInternalAgentAndWait(frame, tmpHome, mockLogFile);
-    await openPixelAgentsPanel(window);
-    const panelFrame = await getPixelAgentsFrame(window);
+    await openCopilotAgentsPanel(window);
+    const panelFrame = await getCopilotAgentsFrame(window);
 
     await expectOverlayVisibleWithTexts(panelFrame, ['LEAD']);
     narrator.check('the lead is on screen labelled "LEAD"');
@@ -193,11 +197,11 @@ test.describe('Hooks ON / teams', () => {
   });
 
   test('new-harness background agent becomes a named teammate character @area:teams', async ({
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, window, tmpHome, mockLogFile, narrator } = pixelAgents;
+    const { frame, window, tmpHome, mockLogFile, narrator } = copilotAgents;
 
-    // Newer harnesses (Claude 5) run every Agent spawn in the background as an
+    // Newer harnesses (Copilot 5) run every Agent spawn in the background as an
     // implicit-team teammate: the tool_input has NO run_in_background flag, the
     // tool_result resolves in seconds with `agent_id: <name>@<team>`, and the
     // agent runs as its OWN top-level session whose records carry teamName/
@@ -209,13 +213,13 @@ test.describe('Hooks ON / teams', () => {
 
     narrator.step('seeding the implicit team config the harness writes on spawn');
     seedTeamConfig(tmpHome, teamName, ['team-lead', role]);
-    await waitForClaudeHookSetup(tmpHome);
+    await waitForCopilotHookSetup(tmpHome);
     narrator.step(
       'arranging the run: unflagged Agent spawn, quick spawn result, teammate as its own top-level tagged session',
     );
-    await arrangeNextClaudeInvocation(
+    await arrangeNextCopilotInvocation(
       tmpHome,
-      claudeScenario('new-harness background agent teammate')
+      copilotScenario('new-harness background agent teammate')
         .defineSession(teammateAlias, teammateSessionId)
         .at(3_000)
         .appendJsonl(
@@ -261,8 +265,8 @@ test.describe('Hooks ON / teams', () => {
         .build(),
     );
     await spawnInternalAgentAndWait(frame, tmpHome, mockLogFile);
-    await openPixelAgentsPanel(window);
-    const panelFrame = await getPixelAgentsFrame(window);
+    await openCopilotAgentsPanel(window);
+    const panelFrame = await getCopilotAgentsFrame(window);
 
     narrator.step('waiting for the spawn result to mark the internal agent as team lead');
     await expectOverlayVisibleWithTexts(panelFrame, ['LEAD']);
@@ -285,9 +289,9 @@ test.describe('Hooks ON / teams', () => {
   });
 
   test('unnamed background spawn stays a sub-agent with live activity and survives Stop @area:teams', async ({
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, window, tmpHome, mockLogFile, narrator } = pixelAgents;
+    const { frame, window, tmpHome, mockLogFile, narrator } = copilotAgents;
 
     // Unnamed Agent spawns (same CLI, no `name` in the input) take the async
     // path: "Async agent launched successfully", a transcript + sidecar under
@@ -300,9 +304,9 @@ test.describe('Hooks ON / teams', () => {
     narrator.step(
       'arranging the run: unnamed async spawn with a sidecar, Stop mid-run, then completion',
     );
-    await arrangeNextClaudeInvocation(
+    await arrangeNextCopilotInvocation(
       tmpHome,
-      claudeScenario('unnamed background spawn stays a sub-agent')
+      copilotScenario('unnamed background spawn stays a sub-agent')
         .defineSession('bg-agent', 'agent-bg1', {
           transcriptPathTemplate: '{{projectDir}}/{{sessionId}}/subagents/agent-bg1.jsonl',
           sidecarPathTemplate: '{{projectDir}}/{{sessionId}}/subagents/agent-bg1.meta.json',
@@ -334,8 +338,8 @@ test.describe('Hooks ON / teams', () => {
         .build(),
     );
     await spawnInternalAgentAndWait(frame, tmpHome, mockLogFile);
-    await openPixelAgentsPanel(window);
-    const panelFrame = await getPixelAgentsFrame(window);
+    await openCopilotAgentsPanel(window);
+    const panelFrame = await getCopilotAgentsFrame(window);
 
     narrator.step('waiting for the Subtask sub-character to spawn');
     await expectOverlayVisibleWithTexts(panelFrame, ['Say hello']);
@@ -356,9 +360,9 @@ test.describe('Hooks ON / teams', () => {
   });
 
   test('named background spawn becomes a teammate and badges the spawner LEAD @area:teams', async ({
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, window, tmpHome, mockLogFile, narrator } = pixelAgents;
+    const { frame, window, tmpHome, mockLogFile, narrator } = copilotAgents;
 
     // Same async flow, but the sidecar carries a `name` — and name is the
     // classifier: named = Teammate. The spawn becomes a seated character named
@@ -367,9 +371,9 @@ test.describe('Hooks ON / teams', () => {
     const spawnToolId = 'toolu-bg-named';
 
     narrator.step('arranging the run: NAMED async spawn with a sidecar, then completion');
-    await arrangeNextClaudeInvocation(
+    await arrangeNextCopilotInvocation(
       tmpHome,
-      claudeScenario('named background spawn becomes a teammate')
+      copilotScenario('named background spawn becomes a teammate')
         .defineSession('bg-agent', 'agent-bg2', {
           transcriptPathTemplate: '{{projectDir}}/{{sessionId}}/subagents/agent-bg2.jsonl',
           sidecarPathTemplate: '{{projectDir}}/{{sessionId}}/subagents/agent-bg2.meta.json',
@@ -401,8 +405,8 @@ test.describe('Hooks ON / teams', () => {
         .build(),
     );
     await spawnInternalAgentAndWait(frame, tmpHome, mockLogFile);
-    await openPixelAgentsPanel(window);
-    const panelFrame = await getPixelAgentsFrame(window);
+    await openCopilotAgentsPanel(window);
+    const panelFrame = await getCopilotAgentsFrame(window);
 
     narrator.step('waiting for the named spawn to join as a teammate');
     await expectOverlayVisibleWithTexts(panelFrame, ['ghost-writer']);
@@ -420,9 +424,9 @@ test.describe('Hooks ON / teams', () => {
   });
 
   test('external session lead with inline teammate routes tools to teammate @area:teams', async ({
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, tmpHome, workspaceDir, mockLogFile, narrator } = pixelAgents;
+    const { frame, tmpHome, workspaceDir, mockLogFile, narrator } = copilotAgents;
 
     narrator.step('enabling Watch All Sessions so the external hooks-only session is adopted');
     await setSettings(frame, {
@@ -432,16 +436,16 @@ test.describe('Hooks ON / teams', () => {
     const teamName = uniqueTeamName('hooks-on-external-inline');
     narrator.step('seeding a team config: a lead plus a web-researcher teammate');
     seedTeamConfig(tmpHome, teamName, ['lead', TEAMMATE_ROLE]);
-    await waitForClaudeHookSetup(tmpHome);
+    await waitForCopilotHookSetup(tmpHome);
     const sessionId = 'hooks-on-external-inline-session';
 
-    await spawnExternalClaudeScenario({
+    await spawnExternalCopilotScenario({
       tmpHome,
       workspaceDir,
       mockLogFile,
       sessionId,
       scenario: withInlineTeammateSession(
-        claudeScenario('external inline teammate routing hooks on'),
+        copilotScenario('external inline teammate routing hooks on'),
       )
         .at(200)
         .emitHook(
@@ -467,7 +471,7 @@ test.describe('Hooks ON / teams', () => {
         .at(17_000)
         .appendJsonl(
           buildAssistantToolUseRecord('toolu-a9-teammate-search', 'WebSearch', {
-            query: 'pixel agents',
+            query: 'copilot agents',
           }),
           { session: INLINE_TEAMMATE_ALIAS },
         )
@@ -492,9 +496,9 @@ test.describe('Hooks ON / teams', () => {
   });
 
   test('external session lead with tmux teammate routes tools to teammate @area:teams', async ({
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, tmpHome, workspaceDir, mockLogFile, narrator } = pixelAgents;
+    const { frame, tmpHome, workspaceDir, mockLogFile, narrator } = copilotAgents;
 
     narrator.step('enabling Watch All Sessions so the external hooks-only session is adopted');
     await setSettings(frame, {
@@ -504,15 +508,15 @@ test.describe('Hooks ON / teams', () => {
     const teamName = uniqueTeamName('hooks-on-external-tmux');
     narrator.step('seeding a team config: a lead plus a tmux teammate');
     seedTeamConfig(tmpHome, teamName, ['lead', TEAMMATE_ROLE]);
-    await waitForClaudeHookSetup(tmpHome);
+    await waitForCopilotHookSetup(tmpHome);
     const sessionId = 'hooks-on-external-tmux-session';
 
-    await spawnExternalClaudeScenario({
+    await spawnExternalCopilotScenario({
       tmpHome,
       workspaceDir,
       mockLogFile,
       sessionId,
-      scenario: withTmuxTeammateSession(claudeScenario('external tmux teammate routing hooks on'))
+      scenario: withTmuxTeammateSession(copilotScenario('external tmux teammate routing hooks on'))
         .at(200)
         .emitHook(
           sessionStartStartup(sessionId, '{{cwd}}', '{{transcriptPath}}') as Record<

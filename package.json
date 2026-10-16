@@ -1,6 +1,6 @@
 {
-  "name": "copilot-pixe",
-  "displayName": "CopilotPixel",
+  "name": "copilot-agents",
+  "displayName": "CopilotAgents",
   "description": "GitHub Copilot CLI session monitor for VS Code",
   "version": "1.4.1",
   "publisher": "chuucommie",
@@ -29,7 +29,7 @@
   ],
   "main": "./dist/extension.js",
   "bin": {
-    "copilot-pixe": "./dist/cli.js"
+    "copilot-agents": "./dist/cli.js"
   },
   "files": [
     "CHANGELOG.md",
@@ -45,41 +45,41 @@
   "contributes": {
     "commands": [
       {
-        "command": "pixel-agents.showPanel",
-        "title": "CopilotPixel: Show Panel"
+        "command": "copilot-agents.showPanel",
+        "title": "CopilotAgents: Show Panel"
       },
       {
-        "command": "pixel-agents.exportDefaultLayout",
-        "title": "CopilotPixel: Export Layout as Default"
+        "command": "copilot-agents.exportDefaultLayout",
+        "title": "CopilotAgents: Export Layout as Default"
       }
     ],
     "viewsContainers": {
       "panel": [
         {
-          "id": "pixel-agents-panel",
-          "title": "CopilotPixel",
+          "id": "copilot-agents-panel",
+          "title": "CopilotAgents",
           "icon": "$(window)"
         }
       ]
     },
     "views": {
-      "pixel-agents-panel": [
+      "copilot-agents-panel": [
         {
           "type": "webview",
-          "id": "pixel-agents.panelView",
-          "name": "CopilotPixel"
+          "id": "copilot-agents.panelView",
+          "name": "CopilotAgents"
         }
       ]
     },
     "configuration": {
-      "title": "CopilotPixel",
+      "title": "CopilotAgents",
       "properties": {
-        "pixel-agents.autoShowPanel": {
+        "copilot-agents.autoShowPanel": {
           "type": "boolean",
           "default": false,
-          "description": "Automatically open and focus the CopilotPixel panel when VS Code starts."
+          "description": "Automatically open and focus the CopilotAgents panel when VS Code starts."
         },
-        "pixel-agents.autoSpawnAgent": {
+        "copilot-agents.autoSpawnAgent": {
           "type": "boolean",
           "default": false,
           "description": "Automatically spawn a GitHub Copilot CLI session when VS Code starts, if no agents are currently running."

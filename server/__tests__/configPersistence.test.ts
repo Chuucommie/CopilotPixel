@@ -102,12 +102,12 @@ describe('configPersistence: areas', () => {
       expect(getHooksEnabled('copilot')).toBe(true);
       writeConfig(readConfig()); // full config on disk...
       const raw = JSON.parse(
-        fs.readFileSync(path.join(tempHome, '.copilotpixel', 'config.json'), 'utf-8'),
+        fs.readFileSync(path.join(tempHome, '.copilot-agents', 'config.json'), 'utf-8'),
       );
       delete raw.hooksConsent; // ...from an older shape
       delete raw.hooksEnabled;
       fs.writeFileSync(
-        path.join(tempHome, '.copilotpixel', 'config.json'),
+        path.join(tempHome, '.copilot-agents', 'config.json'),
         JSON.stringify(raw, null, 2),
       );
       expect(getHooksConsent('copilot')).toBe('unanswered');
@@ -115,9 +115,9 @@ describe('configPersistence: areas', () => {
     });
 
     it('drops junk values from hand-edited maps instead of crashing or trusting them', () => {
-      fs.mkdirSync(path.join(tempHome, '.copilotpixel'), { recursive: true });
+      fs.mkdirSync(path.join(tempHome, '.copilot-agents'), { recursive: true });
       fs.writeFileSync(
-        path.join(tempHome, '.copilotpixel', 'config.json'),
+        path.join(tempHome, '.copilot-agents', 'config.json'),
         JSON.stringify({
           hooksConsent: { copilot: 'GRANTED', other: 'declined', junk: 42 },
           hooksEnabled: { copilot: 'yes', other: false },
@@ -150,7 +150,7 @@ describe('configPersistence: areas', () => {
       // Both keys are genuinely gone — "never answered" and "answered and
       // reverted" must be indistinguishable on disk.
       const raw = JSON.parse(
-        fs.readFileSync(path.join(tempHome, '.copilotpixel', 'config.json'), 'utf-8'),
+        fs.readFileSync(path.join(tempHome, '.copilot-agents', 'config.json'), 'utf-8'),
       );
       expect('copilot' in (raw.hooksConsent ?? {})).toBe(false);
       expect('copilot' in (raw.hooksEnabled ?? {})).toBe(false);
@@ -168,7 +168,7 @@ describe('configPersistence: areas', () => {
       expect(getHooksConsent('copilot')).toBe('granted');
       expect(getHooksEnabled('copilot')).toBe(true);
       const raw = JSON.parse(
-        fs.readFileSync(path.join(tempHome, '.copilotpixel', 'config.json'), 'utf-8'),
+        fs.readFileSync(path.join(tempHome, '.copilot-agents', 'config.json'), 'utf-8'),
       );
       expect('copilot' in (raw.hooksEnabled ?? {})).toBe(false);
     });
@@ -190,7 +190,7 @@ describe('configPersistence: areas', () => {
       // The key is genuinely gone, not written back as true: "never answered"
       // and "answered and reverted" must be indistinguishable on disk.
       const raw = JSON.parse(
-        fs.readFileSync(path.join(tempHome, '.copilotpixel', 'config.json'), 'utf-8'),
+        fs.readFileSync(path.join(tempHome, '.copilot-agents', 'config.json'), 'utf-8'),
       );
       expect('copilot' in (raw.hooksEnabled ?? {})).toBe(false);
     });
@@ -244,7 +244,7 @@ describe('configPersistence: areas', () => {
     });
 
     it('coerces a hand-edited config.json with malformed areaMappings into defaults', () => {
-      const configDir = path.join(tempHome, '.copilotpixel');
+      const configDir = path.join(tempHome, '.copilot-agents');
       fs.mkdirSync(configDir, { recursive: true });
       fs.writeFileSync(
         path.join(configDir, 'config.json'),

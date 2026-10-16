@@ -36,9 +36,9 @@ describe('clientMessageHandler: hooks consent flow', () => {
 
   /** Put our command on every installed event, as a real install would. */
   function seedInstalledHooks(): void {
-    const hookPath = path.join(tempHome, '.pixel-agents', 'hooks', 'copilot-hook.js');
+    const hookPath = path.join(tempHome, '.copilot-agents', 'hooks', 'copilot-hook.js');
     const entry = { type: 'command', exec: 'node', args: [hookPath], timeoutSec: 5 };
-    const configPath = path.join(tempHome, '.copilot', 'hooks', 'copilotpixel.json');
+    const configPath = path.join(tempHome, '.copilot', 'hooks', 'copilotagents.json');
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
     fs.writeFileSync(
       configPath,
@@ -50,13 +50,13 @@ describe('clientMessageHandler: hooks consent flow', () => {
   }
 
   function settingsJsonExists(): boolean {
-    return fs.existsSync(path.join(tempHome, '.copilot', 'hooks', 'copilotpixel.json'));
+    return fs.existsSync(path.join(tempHome, '.copilot', 'hooks', 'copilotagents.json'));
   }
 
   /** The strongest possible "writes nothing": the config file was never even
    *  created. */
   function configJsonExists(): boolean {
-    return fs.existsSync(path.join(tempHome, '.copilotpixel', 'config.json'));
+    return fs.existsSync(path.join(tempHome, '.copilot-agents', 'config.json'));
   }
 
   function answer(choice: unknown, providerId: unknown = 'copilot'): void {
@@ -260,7 +260,7 @@ describe('clientMessageHandler: hooks consent flow', () => {
     // The provider id is echoed from the request, so an id naming no
     // registered provider is a crafted message — dropped exactly like junk.
     // A MISSING id too: the pre-providerId wire shape must not act on anything.
-    it.each([['claude'], [''], [42], [null], [{}], ['missing']])(
+    it.each([['unknown-provider'], [''], [42], [null], [{}], ['missing']])(
       'unknown providerId %j writes nothing, even with a real choice',
       async (junkId) => {
         let sideEffectRan = false;
@@ -308,7 +308,7 @@ describe('clientMessageHandler: hooks consent flow', () => {
     /** What a successful uninstall leaves behind. */
     function removeOurHooks(): void {
       fs.writeFileSync(
-        path.join(tempHome, '.copilot', 'hooks', 'copilotpixel.json'),
+        path.join(tempHome, '.copilot', 'hooks', 'copilotagents.json'),
         JSON.stringify({ version: 1, hooks: {} }),
       );
     }

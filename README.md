@@ -1,6 +1,6 @@
-# CopilotPixel
+# CopilotAgents
 
-CopilotPixel is a VS Code extension and local browser workspace for monitoring GitHub Copilot CLI sessions. It visualizes session activity, tool use, permissions, and delegated work in a pixel-art office.
+CopilotAgents is a VS Code extension and local browser workspace for monitoring GitHub Copilot CLI sessions. It visualizes session activity, tool use, permissions, and delegated work in a pixel-art office.
 
 ## Requirements
 
@@ -10,7 +10,7 @@ CopilotPixel is a VS Code extension and local browser workspace for monitoring G
 
 ## Install
 
-Install **CopilotPixel** from the Visual Studio Marketplace using extension ID `chuucommie.copilot-pixe`. Hook installation is consent-gated and can be managed from the extension settings.
+Install **CopilotAgents** from the Visual Studio Marketplace using extension ID `chuucommie.copilot-pixe`. Hook installation is consent-gated and can be managed from the extension settings.
 
 The standalone server is available as the `copilot-pixe` npm package:
 

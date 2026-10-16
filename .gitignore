@@ -32,7 +32,6 @@ allure-report/
 !.env.example
 
 # Project-specific
-.claude
 .mcp.json
 /sprites-export
 .vercel/
@@ -42,7 +41,6 @@ agent-orchestrator.yaml
 # Local notes (not for commit)
 /notes/
 /docs/e2e-*.md
-!/docs/e2e-claude-mocking.md
 
 .playwright-mcp/
 
@@ -50,3 +48,5 @@ agent-orchestrator.yaml
 .ao/
 .serena/
 tasks/
+# Chat backups & history
+backup chat/

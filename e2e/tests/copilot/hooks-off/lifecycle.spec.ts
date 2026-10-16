@@ -1,4 +1,4 @@
-import { expect, test } from '../../../fixtures/pixel-agents';
+import { expect, test } from '../../../fixtures/copilot-agents';
 import {
   spawnInternalAgentAndWait,
   spawnInternalAgentAndWaitForInvocation,
@@ -10,11 +10,11 @@ import {
   withInlineTeammateSession,
 } from '../../../helpers/lifecycle';
 import {
-  arrangeNextClaudeInvocation,
-  claudeScenario,
-  mockClaudeInitRecord,
-  spawnExternalClaudeScenario,
-} from '../../../helpers/mock-claude';
+  arrangeNextCopilotInvocation,
+  copilotScenario,
+  mockCopilotInitRecord,
+  spawnExternalCopilotScenario,
+} from '../../../helpers/mock-copilot';
 import {
   closeAgentFromOverlay,
   expectNoOverlay,
@@ -39,8 +39,8 @@ import {
   seedTeamConfig,
 } from '../../../helpers/team';
 import {
-  getPixelAgentsFrame,
-  openPixelAgentsPanel,
+  getCopilotAgentsFrame,
+  openCopilotAgentsPanel,
   runCommand,
   setSettings,
 } from '../../../helpers/webview';
@@ -57,9 +57,9 @@ function otherOverlayId(ids: number[], knownId: number): number {
 
 test.describe('Hooks OFF / lifecycle', () => {
   test('/clear on internal agent reassigns the same character via JSONL polling @area:lifecycle', async ({
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, window, tmpHome, mockLogFile, narrator } = pixelAgents;
+    const { frame, window, tmpHome, mockLogFile, narrator } = copilotAgents;
 
     narrator.step('hooks OFF — /clear must be detected from the JSONL stream alone');
     await setSettings(frame, {
@@ -67,12 +67,12 @@ test.describe('Hooks OFF / lifecycle', () => {
     });
 
     narrator.step('arranging /clear: new session file + /clear record, then "npm test"');
-    await arrangeNextClaudeInvocation(
+    await arrangeNextCopilotInvocation(
       tmpHome,
-      claudeScenario('/clear reassignment hooks off')
+      copilotScenario('/clear reassignment hooks off')
         .defineSession('replacement', '{{sessionId}}-clear')
         .at(3_500)
-        .appendJsonl(mockClaudeInitRecord('mock-claude-clear-ready'), {
+        .appendJsonl(mockCopilotInitRecord('mock-copilot-clear-ready'), {
           session: 'replacement',
         })
         .at(3_550)
@@ -97,8 +97,8 @@ test.describe('Hooks OFF / lifecycle', () => {
     );
 
     await spawnInternalAgentAndWait(frame, tmpHome, mockLogFile);
-    await openPixelAgentsPanel(window);
-    const panelFrame = await getPixelAgentsFrame(window);
+    await openCopilotAgentsPanel(window);
+    const panelFrame = await getCopilotAgentsFrame(window);
     const originalAgentId = await expectSingleAgentOverlay(panelFrame);
     narrator.check('one character on screen — our internal agent');
 
@@ -117,8 +117,8 @@ test.describe('Hooks OFF / lifecycle', () => {
 
   // Heuristic /resume reassignment at agent startup.
   //
-  // Scenario: user clicks + Agent → terminal runs `claude --session-id <UUID>`,
-  // but the user immediately types /resume (or aborts and runs claude --resume)
+  // Scenario: user clicks + Agent → terminal runs `copilot --session-id <UUID>`,
+  // but the user immediately types /resume (or aborts and runs copilot --resume)
   // so the session generates a DIFFERENT id and writes to <other-id>.jsonl. The
   // expected <UUID>.jsonl NEVER materializes (withoutAutoInit models this). The
   // heuristic in adapters/vscode/agentManager.ts:177-211 polls for the expected
@@ -127,7 +127,7 @@ test.describe('Hooks OFF / lifecycle', () => {
   // reassigns the agent to the newest candidate — hence the replacement landing
   // at t+11s, just past the >10-poll threshold. Note this is a STARTUP fallback:
   // there is no grace window in heuristic mode (that's hooks-mode vocabulary),
-  // and no conversation-content continuity is asserted — CopilotPixel tracks
+  // and no conversation-content continuity is asserted — CopilotAgents tracks
   // session files, not transcript content.
   //
   // Coexists with the /clear content-disambiguation heuristic in
@@ -135,9 +135,9 @@ test.describe('Hooks OFF / lifecycle', () => {
   // substring in the new JSONL to claim it as a /clear file); --resume traffic
   // doesn't carry that substring so the two heuristics route correctly.
   test('/resume at startup reassigns the same agent via JSONL polling @area:lifecycle', async ({
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, window, tmpHome, workspaceDir, mockLogFile, narrator } = pixelAgents;
+    const { frame, window, tmpHome, workspaceDir, mockLogFile, narrator } = copilotAgents;
 
     narrator.step('hooks OFF — startup /resume fallback runs on JSONL polling only');
     await setSettings(frame, {
@@ -147,13 +147,13 @@ test.describe('Hooks OFF / lifecycle', () => {
     narrator.step(
       'arranging a resume: the expected file never appears; a different one shows up at t+11s',
     );
-    await arrangeNextClaudeInvocation(
+    await arrangeNextCopilotInvocation(
       tmpHome,
-      claudeScenario('/resume reassignment hooks off')
+      copilotScenario('/resume reassignment hooks off')
         .withoutAutoInit()
         .defineSession('replacement', '{{sessionId}}-resume')
         .at(11_000)
-        .appendJsonl(mockClaudeInitRecord('mock-claude-resume-ready'), {
+        .appendJsonl(mockCopilotInitRecord('mock-copilot-resume-ready'), {
           session: 'replacement',
         })
         .at(11_500)
@@ -168,8 +168,8 @@ test.describe('Hooks OFF / lifecycle', () => {
     );
 
     await spawnInternalAgentAndWaitForInvocation(frame, tmpHome, workspaceDir, mockLogFile);
-    await openPixelAgentsPanel(window);
-    const panelFrame = await getPixelAgentsFrame(window);
+    await openCopilotAgentsPanel(window);
+    const panelFrame = await getCopilotAgentsFrame(window);
     const originalAgentId = await expectSingleAgentOverlay(panelFrame);
     narrator.check('one character seated for our agent');
 
@@ -181,9 +181,9 @@ test.describe('Hooks OFF / lifecycle', () => {
   });
 
   test('/clear edge case with a sibling agent in the same projectDir via JSONL polling @area:lifecycle', async ({
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, window, tmpHome, mockLogFile, narrator } = pixelAgents;
+    const { frame, window, tmpHome, mockLogFile, narrator } = copilotAgents;
 
     narrator.step('hooks OFF — two agents in one projectDir, only one does the /clear dance');
     await setSettings(frame, {
@@ -191,9 +191,9 @@ test.describe('Hooks OFF / lifecycle', () => {
     });
 
     narrator.step('arranging the sibling: it just runs "npm run sibling" and never clears');
-    await arrangeNextClaudeInvocation(
+    await arrangeNextCopilotInvocation(
       tmpHome,
-      claudeScenario('/clear edge sibling agent hooks off')
+      copilotScenario('/clear edge sibling agent hooks off')
         .at(2_500)
         .appendJsonl(
           buildAssistantToolUseRecord('toolu-b2-sibling', 'Bash', {
@@ -205,18 +205,18 @@ test.describe('Hooks OFF / lifecycle', () => {
     );
 
     await spawnInternalAgentAndWait(frame, tmpHome, mockLogFile);
-    await openPixelAgentsPanel(window);
-    let panelFrame = await getPixelAgentsFrame(window);
+    await openCopilotAgentsPanel(window);
+    let panelFrame = await getCopilotAgentsFrame(window);
     const siblingAgentId = await expectSingleAgentOverlay(panelFrame);
     narrator.check('sibling character on screen');
 
     narrator.step('arranging the clearing agent: /clear then "npm run cleared", plus a stale tool');
-    await arrangeNextClaudeInvocation(
+    await arrangeNextCopilotInvocation(
       tmpHome,
-      claudeScenario('/clear reassign with sibling present hooks off')
+      copilotScenario('/clear reassign with sibling present hooks off')
         .defineSession('replacement', '{{sessionId}}-clear')
         .at(3_500)
-        .appendJsonl(mockClaudeInitRecord('mock-claude-sibling-clear-ready'), {
+        .appendJsonl(mockCopilotInitRecord('mock-copilot-sibling-clear-ready'), {
           session: 'replacement',
         })
         .at(3_550)
@@ -241,8 +241,8 @@ test.describe('Hooks OFF / lifecycle', () => {
     );
 
     await spawnInternalAgentAndWait(panelFrame, tmpHome, mockLogFile);
-    await openPixelAgentsPanel(window);
-    panelFrame = await getPixelAgentsFrame(window);
+    await openCopilotAgentsPanel(window);
+    panelFrame = await getCopilotAgentsFrame(window);
     narrator.step('waiting for both characters to be present');
     await expectOverlayCount(panelFrame, 2, 12_000);
     const clearingAgentId = otherOverlayId(await readAgentOverlayIds(panelFrame), siblingAgentId);
@@ -266,9 +266,9 @@ test.describe('Hooks OFF / lifecycle', () => {
   });
 
   test('/clear retains its character after the terminal editor moves @area:lifecycle', async ({
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, window, tmpHome, mockLogFile, narrator } = pixelAgents;
+    const { frame, window, tmpHome, mockLogFile, narrator } = copilotAgents;
 
     narrator.step(
       'hooks OFF — keep two internal characters while one terminal moves during /clear',
@@ -277,9 +277,9 @@ test.describe('Hooks OFF / lifecycle', () => {
       hooksEnabled: false,
     });
 
-    await arrangeNextClaudeInvocation(
+    await arrangeNextCopilotInvocation(
       tmpHome,
-      claudeScenario('/clear terminal move sibling hooks off')
+      copilotScenario('/clear terminal move sibling hooks off')
         .at(2_500)
         .appendJsonl(
           buildAssistantToolUseRecord('toolu-b2-move-sibling', 'Bash', {
@@ -291,16 +291,16 @@ test.describe('Hooks OFF / lifecycle', () => {
     );
 
     await spawnInternalAgentAndWait(frame, tmpHome, mockLogFile);
-    await openPixelAgentsPanel(window);
-    let panelFrame = await getPixelAgentsFrame(window);
+    await openCopilotAgentsPanel(window);
+    let panelFrame = await getCopilotAgentsFrame(window);
     const siblingAgentId = await expectSingleAgentOverlay(panelFrame);
 
-    await arrangeNextClaudeInvocation(
+    await arrangeNextCopilotInvocation(
       tmpHome,
-      claudeScenario('/clear terminal move target hooks off')
+      copilotScenario('/clear terminal move target hooks off')
         .defineSession('replacement', '{{sessionId}}-clear-moved')
         .at(3_500)
-        .appendJsonl(mockClaudeInitRecord('mock-claude-clear-moved-ready'), {
+        .appendJsonl(mockCopilotInitRecord('mock-copilot-clear-moved-ready'), {
           session: 'replacement',
         })
         .at(3_550)
@@ -322,14 +322,14 @@ test.describe('Hooks OFF / lifecycle', () => {
     await expectOverlayCount(panelFrame, 2, 12_000);
     const clearingAgentId = otherOverlayId(await readAgentOverlayIds(panelFrame), siblingAgentId);
     narrator.check('captured the clearing character id before its terminal moves');
-    const terminalTab = window.getByText(/Claude Code #\d+/).last();
+    const terminalTab = window.getByText(/GitHub Copilot CLI #\d+/).last();
     await expect(terminalTab).toBeVisible({ timeout: 15_000 });
     await terminalTab.click();
     narrator.step('moving the focused clearing terminal editor into the next group');
     await runCommand(window, 'View: Move Editor into Next Group');
 
-    await openPixelAgentsPanel(window);
-    panelFrame = await getPixelAgentsFrame(window);
+    await openCopilotAgentsPanel(window);
+    panelFrame = await getCopilotAgentsFrame(window);
     await expectOverlayCount(panelFrame, 2, 12_000);
 
     await expectOverlayVisibleForAgent(panelFrame, clearingAgentId, 'Running: npm run moved-clear');
@@ -344,9 +344,9 @@ test.describe('Hooks OFF / lifecycle', () => {
   });
 
   test('heuristic late --resume after stale cleanup prevents zombie agents @area:lifecycle', async ({
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, tmpHome, workspaceDir, mockLogFile, narrator } = pixelAgents;
+    const { frame, tmpHome, workspaceDir, mockLogFile, narrator } = copilotAgents;
 
     narrator.step(
       'enabling Watch All Sessions + hooks OFF so an external session is adopted via polling',
@@ -356,12 +356,12 @@ test.describe('Hooks OFF / lifecycle', () => {
       hooksEnabled: false,
     });
 
-    await spawnExternalClaudeScenario({
+    await spawnExternalCopilotScenario({
       tmpHome,
       workspaceDir,
       mockLogFile,
       sessionId: 'late-resume-old-session',
-      scenario: claudeScenario('late resume after stale cleanup hooks off old')
+      scenario: copilotScenario('late resume after stale cleanup hooks off old')
         .at(5_000)
         .appendJsonl(
           buildAssistantToolUseRecord('toolu-b4-before', 'Bash', {
@@ -384,12 +384,12 @@ test.describe('Hooks OFF / lifecycle', () => {
     narrator.check('character gone — stale cleanup fired, no zombie left behind');
 
     narrator.step('a much later resume session starts — waiting for "npm run late-resume"');
-    await spawnExternalClaudeScenario({
+    await spawnExternalCopilotScenario({
       tmpHome,
       workspaceDir,
       mockLogFile,
       sessionId: 'late-resume-new-session',
-      scenario: claudeScenario('late resume after stale cleanup hooks off new')
+      scenario: copilotScenario('late resume after stale cleanup hooks off new')
         .at(5_000)
         .appendJsonl(
           buildAssistantToolUseRecord('toolu-b4-late', 'Bash', {
@@ -408,9 +408,9 @@ test.describe('Hooks OFF / lifecycle', () => {
   });
 
   test('three parallel Task subagents in one turn render distinct sub-characters via polling @area:lifecycle', async ({
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, window, tmpHome, mockLogFile, narrator } = pixelAgents;
+    const { frame, window, tmpHome, mockLogFile, narrator } = copilotAgents;
 
     narrator.step('hooks OFF — three parallel Task subagents detected by JSONL polling alone');
     await setSettings(frame, {
@@ -420,9 +420,9 @@ test.describe('Hooks OFF / lifecycle', () => {
     narrator.step(
       'arranging one batch record with three Task tool_uses, then results + turn_duration',
     );
-    await arrangeNextClaudeInvocation(
+    await arrangeNextCopilotInvocation(
       tmpHome,
-      claudeScenario('three parallel Task subagents in one turn hooks off')
+      copilotScenario('three parallel Task subagents in one turn hooks off')
         .at(2_500)
         .appendJsonl(
           buildAssistantToolUseBatchRecord([
@@ -458,8 +458,8 @@ test.describe('Hooks OFF / lifecycle', () => {
     );
 
     await spawnInternalAgentAndWait(frame, tmpHome, mockLogFile);
-    await openPixelAgentsPanel(window);
-    const panelFrame = await getPixelAgentsFrame(window);
+    await openCopilotAgentsPanel(window);
+    const panelFrame = await getCopilotAgentsFrame(window);
 
     narrator.step('waiting for all three Subtask sub-characters to appear');
     await expectOverlayVisible(panelFrame, 'Subtask: Parallel task 3');
@@ -476,9 +476,9 @@ test.describe('Hooks OFF / lifecycle', () => {
   });
 
   test('inline teammate removed from team config disappears within one second via polling @area:lifecycle', async ({
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, window, tmpHome, mockLogFile, narrator } = pixelAgents;
+    const { frame, window, tmpHome, mockLogFile, narrator } = copilotAgents;
     const teamName = uniqueTeamName('teammate-removal-hooks-off');
     narrator.step('seeding a team config: lead + one inline teammate');
     const configPath = seedTeamConfig(tmpHome, teamName, ['lead', INLINE_TEAMMATE_ROLE]);
@@ -491,9 +491,9 @@ test.describe('Hooks OFF / lifecycle', () => {
     narrator.step(
       'arranging: teammate joins and searches the web, then config is rewritten to lead-only at t+8s',
     );
-    await arrangeNextClaudeInvocation(
+    await arrangeNextCopilotInvocation(
       tmpHome,
-      withInlineTeammateSession(claudeScenario('inline teammate removed from config hooks off'))
+      withInlineTeammateSession(copilotScenario('inline teammate removed from config hooks off'))
         .at(500)
         .appendJsonl(buildTeamMetadataRecord(teamName))
         .at(1_500)
@@ -503,7 +503,7 @@ test.describe('Hooks OFF / lifecycle', () => {
         .at(2_500)
         .appendJsonl(
           buildAssistantToolUseRecord('toolu-b6-teammate-search', 'WebSearch', {
-            query: 'pixel agents lifecycle regressions',
+            query: 'copilot agents lifecycle regressions',
           }),
           { session: INLINE_TEAMMATE_ALIAS },
         )
@@ -514,8 +514,8 @@ test.describe('Hooks OFF / lifecycle', () => {
     );
 
     await spawnInternalAgentAndWait(frame, tmpHome, mockLogFile);
-    await openPixelAgentsPanel(window);
-    const panelFrame = await getPixelAgentsFrame(window);
+    await openCopilotAgentsPanel(window);
+    const panelFrame = await getCopilotAgentsFrame(window);
 
     narrator.step('waiting for the teammate to be discovered from the team metadata');
     await expectOverlayVisibleWithTexts(panelFrame, [INLINE_TEAMMATE_ROLE], 10_000);
@@ -538,9 +538,9 @@ test.describe('Hooks OFF / lifecycle', () => {
   });
 
   test('rapid /clear then new tool within 500ms lands on the reassigned agent via polling @area:lifecycle', async ({
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, window, tmpHome, mockLogFile, narrator } = pixelAgents;
+    const { frame, window, tmpHome, mockLogFile, narrator } = copilotAgents;
 
     narrator.step('hooks OFF — a compressed /clear-then-tool race, detected from JSONL alone');
     await setSettings(frame, {
@@ -550,12 +550,12 @@ test.describe('Hooks OFF / lifecycle', () => {
     narrator.step(
       'arranging: /clear then "npm run fresh" within 500ms, plus a ghost tool on the old file',
     );
-    await arrangeNextClaudeInvocation(
+    await arrangeNextCopilotInvocation(
       tmpHome,
-      claudeScenario('rapid clear then new tool under 500ms hooks off')
+      copilotScenario('rapid clear then new tool under 500ms hooks off')
         .defineSession('replacement', '{{sessionId}}-clear-fast')
         .at(3_000)
-        .appendJsonl(mockClaudeInitRecord('mock-claude-clear-fast-ready'), {
+        .appendJsonl(mockCopilotInitRecord('mock-copilot-clear-fast-ready'), {
           session: 'replacement',
         })
         .at(3_050)
@@ -580,8 +580,8 @@ test.describe('Hooks OFF / lifecycle', () => {
     );
 
     await spawnInternalAgentAndWait(frame, tmpHome, mockLogFile);
-    await openPixelAgentsPanel(window);
-    const panelFrame = await getPixelAgentsFrame(window);
+    await openCopilotAgentsPanel(window);
+    const panelFrame = await getCopilotAgentsFrame(window);
     const originalAgentId = await expectSingleAgentOverlay(panelFrame);
     narrator.check('one character for our agent');
 
@@ -599,9 +599,9 @@ test.describe('Hooks OFF / lifecycle', () => {
   });
 
   test('close via X prevents re-adoption of old JSONL during dismissal cooldown via polling @area:lifecycle', async ({
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, tmpHome, workspaceDir, mockLogFile, narrator } = pixelAgents;
+    const { frame, tmpHome, workspaceDir, mockLogFile, narrator } = copilotAgents;
 
     narrator.step('enabling Watch All Sessions + hooks OFF — external session adopted via polling');
     await setSettings(frame, {
@@ -609,12 +609,12 @@ test.describe('Hooks OFF / lifecycle', () => {
       hooksEnabled: false,
     });
 
-    await spawnExternalClaudeScenario({
+    await spawnExternalCopilotScenario({
       tmpHome,
       workspaceDir,
       mockLogFile,
       sessionId: 'dismissal-cooldown-old-session',
-      scenario: claudeScenario('dismissal cooldown hooks off old session')
+      scenario: copilotScenario('dismissal cooldown hooks off old session')
         .at(5_000)
         .appendJsonl(
           buildAssistantToolUseRecord('toolu-b12-old-live', 'Bash', {
@@ -640,12 +640,12 @@ test.describe('Hooks OFF / lifecycle', () => {
     narrator.check('character dismissed — count 0');
 
     narrator.step('a new session starts — its JSONL should get a fresh character');
-    await spawnExternalClaudeScenario({
+    await spawnExternalCopilotScenario({
       tmpHome,
       workspaceDir,
       mockLogFile,
       sessionId: 'dismissal-cooldown-new-session',
-      scenario: claudeScenario('dismissal cooldown hooks off new session')
+      scenario: copilotScenario('dismissal cooldown hooks off new session')
         .at(5_000)
         .appendJsonl(
           buildAssistantToolUseRecord('toolu-b12-new-live', 'Bash', {
@@ -673,9 +673,9 @@ test.describe('Hooks OFF / lifecycle', () => {
   });
 
   test('external basic subagent with run_in_background but no teamName routes to basic path @area:lifecycle', async ({
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, tmpHome, workspaceDir, mockLogFile, narrator } = pixelAgents;
+    const { frame, tmpHome, workspaceDir, mockLogFile, narrator } = copilotAgents;
 
     narrator.step('enabling Watch All Sessions + hooks OFF — a team-less lead read from JSONL');
     await setSettings(frame, {
@@ -689,12 +689,12 @@ test.describe('Hooks OFF / lifecycle', () => {
     // case is misrouting this to the teammate path, which would produce an
     // extra "general-purpose" teammate overlay alongside the basic Subtask
     // sub-character.
-    await spawnExternalClaudeScenario({
+    await spawnExternalCopilotScenario({
       tmpHome,
       workspaceDir,
       mockLogFile,
       sessionId: 'external-basic-background-subagent',
-      scenario: claudeScenario('external basic subagent no teamName hooks off')
+      scenario: copilotScenario('external basic subagent no teamName hooks off')
         .at(1_000)
         .appendJsonl(
           buildAssistantToolUseRecord('toolu-b8-off-agent', 'Agent', {
@@ -733,9 +733,9 @@ test.describe('Hooks OFF / lifecycle', () => {
   });
 
   test('agentToolsClear fires at turn end via turn_duration JSONL record @area:cross-cutting', async ({
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, window, tmpHome, mockLogFile, narrator } = pixelAgents;
+    const { frame, window, tmpHome, mockLogFile, narrator } = copilotAgents;
 
     narrator.step('hooks OFF — turn-end clear exercised through the JSONL parser path');
     await setSettings(frame, {
@@ -747,9 +747,9 @@ test.describe('Hooks OFF / lifecycle', () => {
     // The test runs in hooks-off so it exercises the JSONL parser path; a regression
     // here would leave a ghost "Running: ..." overlay even after the turn ended.
     narrator.step('arranging: a Bash tool, then tool_result + a turn_duration record');
-    await arrangeNextClaudeInvocation(
+    await arrangeNextCopilotInvocation(
       tmpHome,
-      claudeScenario('turn-end agentToolsClear')
+      copilotScenario('turn-end agentToolsClear')
         .at(1_000)
         .appendJsonl(buildAssistantToolUseRecord('toolu-c4-bash', 'Bash', { command: 'npm test' }))
         .at(3_000)
@@ -761,8 +761,8 @@ test.describe('Hooks OFF / lifecycle', () => {
     );
 
     await spawnInternalAgentAndWait(frame, tmpHome, mockLogFile);
-    await openPixelAgentsPanel(window);
-    const panelFrame = await getPixelAgentsFrame(window);
+    await openCopilotAgentsPanel(window);
+    const panelFrame = await getCopilotAgentsFrame(window);
 
     // First the active overlay should show the bash command.
     narrator.step('waiting for the active tool overlay');
@@ -786,9 +786,9 @@ test.describe('Hooks OFF / lifecycle', () => {
   // playPermissionSound() / playDoneSound() (see
   // webview-ui/src/hooks/useExtensionMessages.ts:354 and 341), which our
   // notificationSound.ts instrumentation records in
-  // window.__pixelAgentsTestHooks.playedSounds.
+  // window.__copilotAgentsTestHooks.playedSounds.
   //
-  // Uses EXTERNAL agent (no VS Code terminal) so the CopilotPixel panel
+  // Uses EXTERNAL agent (no VS Code terminal) so the CopilotAgents panel
   // stays at full size, dodging the layout race that breaks
   // closeAgentFromOverlay after an internal spawn (same close-via-overlay
   // pattern used by the dismissal-cooldown lifecycle test in this file).
@@ -798,9 +798,9 @@ test.describe('Hooks OFF / lifecycle', () => {
   // invisible from the webview — they require extension-host instrumentation
   // and are out of scope here.
   test('heuristic permission timer is cancelled when an agent is closed via overlay @area:cross-cutting', async ({
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, tmpHome, workspaceDir, mockLogFile, narrator } = pixelAgents;
+    const { frame, tmpHome, workspaceDir, mockLogFile, narrator } = copilotAgents;
 
     narrator.step(
       'enabling Watch All Sessions + hooks OFF — external agent runs a tool that never replies',
@@ -810,12 +810,12 @@ test.describe('Hooks OFF / lifecycle', () => {
       hooksEnabled: false,
     });
 
-    await spawnExternalClaudeScenario({
+    await spawnExternalCopilotScenario({
       tmpHome,
       workspaceDir,
       mockLogFile,
       sessionId: 'heuristic-timer-cancellation',
-      scenario: claudeScenario('heuristic timer cancellation on close hooks off')
+      scenario: copilotScenario('heuristic timer cancellation on close hooks off')
         .at(2_500)
         .appendJsonl(
           buildAssistantToolUseRecord('toolu-c7', 'Bash', {
@@ -842,9 +842,9 @@ test.describe('Hooks OFF / lifecycle', () => {
     narrator.step('resetting the recorded-sounds log so only post-close sounds count');
     await frame.evaluate(() => {
       const w = window as Window & {
-        __pixelAgentsTestHooks?: { playedSounds?: unknown[] };
+        __copilotAgentsTestHooks?: { playedSounds?: unknown[] };
       };
-      if (w.__pixelAgentsTestHooks) w.__pixelAgentsTestHooks.playedSounds = [];
+      if (w.__copilotAgentsTestHooks) w.__copilotAgentsTestHooks.playedSounds = [];
     });
 
     // Wait longer than the 7s permission timer + cushion. If a timer leaked,
@@ -855,9 +855,9 @@ test.describe('Hooks OFF / lifecycle', () => {
     await expectOverlayCount(frame, 0);
     const playedKinds = await frame.evaluate(() => {
       const w = window as Window & {
-        __pixelAgentsTestHooks?: { playedSounds?: Array<{ kind: string }> };
+        __copilotAgentsTestHooks?: { playedSounds?: Array<{ kind: string }> };
       };
-      return (w.__pixelAgentsTestHooks?.playedSounds ?? []).map((s) => s.kind);
+      return (w.__copilotAgentsTestHooks?.playedSounds ?? []).map((s) => s.kind);
     });
     expect(playedKinds).not.toContain('permission');
     expect(playedKinds).not.toContain('done');
@@ -874,12 +874,12 @@ test.describe('Hooks OFF / lifecycle', () => {
   //    tool (Bash). transcriptParser registers the sub-tool and starts the
   //    permission timer.
   // 3. ~5s with no further sub-agent data -> permission bubble appears on
-  //    both parent and sub-character (per CLAUDE.md "Sub-agent permission
+  //    both parent and sub-character (per AGENTS.md "Sub-agent permission
   //    detection" note).
   test('sub-agent permission bubble fires on stalled non-exempt sub-tool via heuristic timer @area:cross-cutting', async ({
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, window, tmpHome, mockLogFile, narrator } = pixelAgents;
+    const { frame, window, tmpHome, mockLogFile, narrator } = copilotAgents;
 
     narrator.step('hooks OFF — sub-agent permission handled by the heuristic timer');
     await setSettings(frame, {
@@ -890,9 +890,9 @@ test.describe('Hooks OFF / lifecycle', () => {
     const subToolId = 'toolu-c14-bash-sub';
 
     narrator.step('arranging: a Task, then a sub-agent Bash that stalls with no further data');
-    await arrangeNextClaudeInvocation(
+    await arrangeNextCopilotInvocation(
       tmpHome,
-      claudeScenario('sub-agent permission bubble hooks off')
+      copilotScenario('sub-agent permission bubble hooks off')
         .at(2_000)
         .appendJsonl(
           buildAssistantToolUseRecord(parentToolId, 'Task', {
@@ -921,15 +921,15 @@ test.describe('Hooks OFF / lifecycle', () => {
           },
         })
         // Hold open WAY past the 5s heuristic permission timer so the bubble
-        // has time to appear before mock-claude exits and the terminal closes.
+        // has time to appear before mock-copilot exits and the terminal closes.
         .holdOpenFor(15_000)
         .build(),
     );
 
     const spawned = await spawnInternalAgentAndWait(frame, tmpHome, mockLogFile);
     expect(spawned.sessionId).toBeTruthy();
-    await openPixelAgentsPanel(window);
-    const panelFrame = await getPixelAgentsFrame(window);
+    await openCopilotAgentsPanel(window);
+    const panelFrame = await getCopilotAgentsFrame(window);
 
     // Sub-character appears once the Task tool_use is parsed.
     narrator.step('waiting for the Subtask sub-character to appear');

@@ -3,7 +3,7 @@ import { expect } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
 
-import { getClaudeProjectDir } from './team';
+import { getCopilotProjectDir } from './team';
 import { narrate } from './test-narration';
 import { clickAddAgent } from './webview';
 
@@ -34,7 +34,7 @@ function countInvocations(invocationLog: string): number {
 }
 
 function findJsonlFileForSession(tmpHome: string, sessionId: string): string | null {
-  const projectsDir = path.join(tmpHome, '.claude', 'projects');
+  const projectsDir = path.join(tmpHome, '.copilot', 'projects');
   try {
     if (!fs.existsSync(projectsDir)) return null;
 
@@ -66,7 +66,7 @@ export async function spawnInternalAgentAndWait(
   // second spawn in the same test could read a stale log and return the first
   // agent's identity.
   const launchesBefore = countInvocations(readInvocationLog(mockLogFile));
-  narrate.step('clicking "+ Agent" — a terminal launches the mock claude');
+  narrate.step('clicking "+ Agent" — a terminal launches the mock copilot');
   await clickAddAgent(frame);
 
   await expect
@@ -96,7 +96,7 @@ export async function spawnInternalAgentAndWait(
     throw new Error(`No JSONL file found for session ${sessionId}`);
   }
 
-  narrate.check('mock claude launched with a --session-id and its JSONL exists');
+  narrate.check('mock copilot launched with a --session-id and its JSONL exists');
   return {
     sessionId,
     projectDir: path.dirname(jsonlFile),
@@ -116,7 +116,7 @@ export async function spawnInternalAgentAndWaitForInvocation(
   // second spawn in the same test could read a stale log and return the first
   // agent's identity.
   const launchesBefore = countInvocations(readInvocationLog(mockLogFile));
-  narrate.step('clicking "+ Agent" — a terminal launches the mock claude');
+  narrate.step('clicking "+ Agent" — a terminal launches the mock copilot');
   await clickAddAgent(frame);
 
   await expect
@@ -133,8 +133,8 @@ export async function spawnInternalAgentAndWaitForInvocation(
     throw new Error(`No session id found in mock invocation log at ${mockLogFile}`);
   }
 
-  narrate.check('mock claude invoked with a fresh --session-id');
-  const projectDir = getClaudeProjectDir(tmpHome, workspaceDir);
+  narrate.check('mock copilot invoked with a fresh --session-id');
+  const projectDir = getCopilotProjectDir(tmpHome, workspaceDir);
   return {
     sessionId,
     projectDir,

@@ -25,7 +25,7 @@ export function readLayoutFromFile(): Record<string, unknown> | null {
     const raw = fs.readFileSync(filePath, 'utf-8');
     return JSON.parse(raw) as Record<string, unknown>;
   } catch (err) {
-    console.error('[CopilotPixel] Failed to read layout file:', err);
+    console.error('[CopilotAgents] Failed to read layout file:', err);
     return null;
   }
 }
@@ -42,7 +42,7 @@ export function writeLayoutToFile(layout: Record<string, unknown>): void {
     fs.writeFileSync(tmpPath, json, 'utf-8');
     fs.renameSync(tmpPath, filePath);
   } catch (err) {
-    console.error('[CopilotPixel] Failed to write layout file:', err);
+    console.error('[CopilotAgents] Failed to write layout file:', err);
   }
 }
 
@@ -73,17 +73,17 @@ export function loadLayout(
     const defaultRevision = (defaultLayout?.[LAYOUT_REVISION_KEY] as number) ?? 0;
     if (defaultRevision > fileRevision) {
       console.log(
-        `[CopilotPixel] Layout revision outdated (${fileRevision} < ${defaultRevision}), resetting to bundled default`,
+        `[CopilotAgents] Layout revision outdated (${fileRevision} < ${defaultRevision}), resetting to bundled default`,
       );
       writeLayoutToFile(defaultLayout!);
       return { layout: defaultLayout!, wasReset: true };
     }
-    console.log('[CopilotPixel] Layout loaded from file');
+    console.log('[CopilotAgents] Layout loaded from file');
     return { layout: fromFile, wasReset: false };
   }
 
   if (defaultLayout) {
-    console.log('[CopilotPixel] Writing bundled default layout to file');
+    console.log('[CopilotAgents] Writing bundled default layout to file');
     writeLayoutToFile(defaultLayout);
     return { layout: defaultLayout, wasReset: false };
   }
@@ -92,7 +92,7 @@ export function loadLayout(
 }
 
 /**
- * Watch ~/.pixel-agents/layout.json for external changes (other VS Code windows).
+ * Watch ~/.copilot-agents/layout.json for external changes (other VS Code windows).
  * Uses hybrid fs.watch + polling (same pattern as JSONL watching).
  */
 export function watchLayoutFile(
@@ -129,10 +129,10 @@ export function watchLayoutFile(
 
       const raw = fs.readFileSync(filePath, 'utf-8');
       const layout = JSON.parse(raw) as Record<string, unknown>;
-      console.log('[CopilotPixel] External layout change detected');
+      console.log('[CopilotAgents] External layout change detected');
       onExternalChange(layout);
     } catch (err) {
-      console.error('[CopilotPixel] Error checking layout file:', err);
+      console.error('[CopilotAgents] Error checking layout file:', err);
     }
   }
 
@@ -145,7 +145,7 @@ export function watchLayoutFile(
       });
       fsWatcher.on('error', (err) => {
         // fs.watch can be unreliable on macOS (kqueue) and may hit inotify limits on Linux
-        console.log(`[CopilotPixel] Layout: fs.watch error: ${err.message}`);
+        console.log(`[CopilotAgents] Layout: fs.watch error: ${err.message}`);
         fsWatcher?.close();
         fsWatcher = null;
       });

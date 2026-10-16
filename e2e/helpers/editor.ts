@@ -2,7 +2,7 @@
  * Layout-editor driving helpers for carpet + area e2e specs.
  *
  * Tool selection goes through the REAL toolbar UI (same path a user takes).
- * Tile targeting goes through `window.__pixelAgentsTestHooks.editorTileAction`
+ * Tile targeting goes through `window.__copilotAgentsTestHooks.editorTileAction`
  * / `.editorEraseAction`, which call the same App-level handlers the canvas
  * calls — bypassing ONLY canvas pixel→tile geometry (mirrors the pets fixture's
  * petClick, see webview-ui/src/testHooks.ts). Selectors are read from the live
@@ -13,7 +13,7 @@ import { expect } from '@playwright/test';
 
 /** The carpet/area observability surface installed under the isE2E guard. */
 export interface TestHooksWindow extends Window {
-  __pixelAgentsTestHooks?: {
+  __copilotAgentsTestHooks?: {
     getCarpetTiles?: () => Array<{
       col: number;
       row: number;
@@ -108,7 +108,7 @@ export async function selectArea(frame: Frame, label: string): Promise<void> {
 /** Paint a tile with the active tool via the real tile-action handler (by col,row). */
 export async function paintTile(frame: Frame, col: number, row: number): Promise<void> {
   await frame.evaluate(
-    ([c, r]) => (window as TestHooksWindow).__pixelAgentsTestHooks?.editorTileAction?.(c, r),
+    ([c, r]) => (window as TestHooksWindow).__copilotAgentsTestHooks?.editorTileAction?.(c, r),
     [col, row] as const,
   );
 }
@@ -116,7 +116,7 @@ export async function paintTile(frame: Frame, col: number, row: number): Promise
 /** Erase a tile with the active tool via the real erase-action handler (by col,row). */
 export async function eraseTile(frame: Frame, col: number, row: number): Promise<void> {
   await frame.evaluate(
-    ([c, r]) => (window as TestHooksWindow).__pixelAgentsTestHooks?.editorEraseAction?.(c, r),
+    ([c, r]) => (window as TestHooksWindow).__copilotAgentsTestHooks?.editorEraseAction?.(c, r),
     [col, row] as const,
   );
 }
@@ -134,7 +134,7 @@ export async function readCarpetTiles(
 ): Promise<Array<{ col: number; row: number; variant: number }>> {
   return frame.evaluate(
     () =>
-      (window as TestHooksWindow).__pixelAgentsTestHooks?.getCarpetTiles?.().map((t) => ({
+      (window as TestHooksWindow).__copilotAgentsTestHooks?.getCarpetTiles?.().map((t) => ({
         col: t.col,
         row: t.row,
         variant: t.variant,
@@ -151,7 +151,7 @@ export async function readCarpetJunctionCase(
 ): Promise<number> {
   return frame.evaluate(
     ([x, y, v]) =>
-      (window as TestHooksWindow).__pixelAgentsTestHooks?.getCarpetJunctionCase?.(x, y, v) ?? 0,
+      (window as TestHooksWindow).__copilotAgentsTestHooks?.getCarpetJunctionCase?.(x, y, v) ?? 0,
     [jx, jy, variant] as const,
   );
 }
@@ -161,14 +161,14 @@ export async function readAreaTiles(
   frame: Frame,
 ): Promise<Array<{ col: number; row: number; label: string }>> {
   return frame.evaluate(
-    () => (window as TestHooksWindow).__pixelAgentsTestHooks?.getAreaTiles?.() ?? [],
+    () => (window as TestHooksWindow).__copilotAgentsTestHooks?.getAreaTiles?.() ?? [],
   );
 }
 
 /** Read the Area definitions from the test hook. */
 export async function readAreas(frame: Frame): Promise<Array<{ label: string; color: string }>> {
   return frame.evaluate(
-    () => (window as TestHooksWindow).__pixelAgentsTestHooks?.getAreas?.() ?? [],
+    () => (window as TestHooksWindow).__copilotAgentsTestHooks?.getAreas?.() ?? [],
   );
 }
 
@@ -179,7 +179,7 @@ export async function readSeats(
   Array<{ uid: string; col: number; row: number; areaLabel: string | null; assigned: boolean }>
 > {
   return frame.evaluate(
-    () => (window as TestHooksWindow).__pixelAgentsTestHooks?.getSeats?.() ?? [],
+    () => (window as TestHooksWindow).__copilotAgentsTestHooks?.getSeats?.() ?? [],
   );
 }
 
@@ -190,6 +190,6 @@ export async function readAgentSeats(
   Array<{ id: number; seatId: string | null; areaLabel: string | null; folderName?: string }>
 > {
   return frame.evaluate(
-    () => (window as TestHooksWindow).__pixelAgentsTestHooks?.getAgentSeats?.() ?? [],
+    () => (window as TestHooksWindow).__copilotAgentsTestHooks?.getAgentSeats?.() ?? [],
   );
 }

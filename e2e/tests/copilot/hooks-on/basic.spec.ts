@@ -1,6 +1,6 @@
 import path from 'path';
 
-import { expect, test } from '../../../fixtures/pixel-agents';
+import { expect, test } from '../../../fixtures/copilot-agents';
 import {
   permissionRequest,
   preToolUseBash,
@@ -11,11 +11,11 @@ import {
 } from '../../../helpers/hooks';
 import { spawnInternalAgentAndWait } from '../../../helpers/internal-agent';
 import {
-  arrangeNextClaudeInvocation,
-  claudeScenario,
-  spawnExternalClaudeScenario,
-  waitForClaudeHookSetup,
-} from '../../../helpers/mock-claude';
+  arrangeNextCopilotInvocation,
+  copilotScenario,
+  spawnExternalCopilotScenario,
+  waitForCopilotHookSetup,
+} from '../../../helpers/mock-copilot';
 import {
   expectCharacterGhosted,
   expectContextGauge,
@@ -28,13 +28,17 @@ import {
   buildAssistantUsageRecord,
   buildUserToolResultRecord,
 } from '../../../helpers/team';
-import { getPixelAgentsFrame, openPixelAgentsPanel, setSettings } from '../../../helpers/webview';
+import {
+  getCopilotAgentsFrame,
+  openCopilotAgentsPanel,
+  setSettings,
+} from '../../../helpers/webview';
 
 test.describe('Hooks ON / spawn paths', () => {
   test('internal terminal spawns agent and Task subagent appears then despawns @area:spawn', async ({
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, window, tmpHome, mockLogFile, narrator } = pixelAgents;
+    const { frame, window, tmpHome, mockLogFile, narrator } = copilotAgents;
 
     // Ghosting ships off, so turn it on before anything spawns. That makes the
     // "not a ghost" assertion below say something — that this agent owns a
@@ -50,9 +54,9 @@ test.describe('Hooks ON / spawn paths', () => {
     // t+5s to t+13s — a wide window for the polling assertions below, same
     // shape as the matrix "internal basic spawn" scenario.
     narrator.step('arming the mock: spawn a Task subtask at t+5s, close it at t+13s');
-    await arrangeNextClaudeInvocation(
+    await arrangeNextCopilotInvocation(
       tmpHome,
-      claudeScenario('internal terminal basic spawn')
+      copilotScenario('internal terminal basic spawn')
         .at(5_000)
         .appendJsonl(
           buildAssistantToolUseRecord('toolu-subagent-spawn', 'Task', {
@@ -70,17 +74,17 @@ test.describe('Hooks ON / spawn paths', () => {
 
     // Panel first: the "no subtask yet" count-1 assertion must land before the
     // scheduled Task append at t+5s. The timing-free plumbing checks follow.
-    await openPixelAgentsPanel(window);
-    const panelFrame = await getPixelAgentsFrame(window);
+    await openCopilotAgentsPanel(window);
+    const panelFrame = await getCopilotAgentsFrame(window);
     await expectOverlayCount(panelFrame, 1);
     narrator.check('the lead character is on screen — one agent, no subtask yet');
 
     expect(spawned.invocationLog).toContain(`session-id=${spawned.sessionId}`);
     expect(path.basename(spawned.jsonlFile)).toBe(`${spawned.sessionId}.jsonl`);
 
-    const terminalTab = window.getByText(/Claude Code #\d+/);
+    const terminalTab = window.getByText(/GitHub Copilot CLI #\d+/);
     await expect(terminalTab.first()).toBeVisible({ timeout: 15_000 });
-    narrator.check('a real "Claude Code #N" terminal tab is open');
+    narrator.check('a real "GitHub Copilot CLI #N" terminal tab is open');
 
     // The terminal above is exactly what makes this agent NOT headless: it has
     // one to focus, so it renders fully opaque (contrast: the adopted external
@@ -117,10 +121,10 @@ test.describe('Hooks ON / spawn paths', () => {
   // against scheduler drift AND keep each state on screen long enough to be
   // seen in the review videos.
   //
-  test('external Claude session adopted via hook confirmation lifecycle @area:spawn', async ({
-    pixelAgents,
+  test('external Copilot session adopted via hook confirmation lifecycle @area:spawn', async ({
+    copilotAgents,
   }) => {
-    const { frame, tmpHome, workspaceDir, mockLogFile, narrator } = pixelAgents;
+    const { frame, tmpHome, workspaceDir, mockLogFile, narrator } = copilotAgents;
 
     // Ghosting ships off, so the test turns it on — otherwise the adopted agent
     // below is headless but drawn at full opacity, which is the correct default
@@ -132,16 +136,16 @@ test.describe('Hooks ON / spawn paths', () => {
     });
 
     narrator.step('waiting for the hook install and hook server to be ready');
-    await waitForClaudeHookSetup(tmpHome);
+    await waitForCopilotHookSetup(tmpHome);
     await waitForHookServer(tmpHome);
     const sessionId = 'external-hook-session';
 
-    await spawnExternalClaudeScenario({
+    await spawnExternalCopilotScenario({
       tmpHome,
       workspaceDir,
       mockLogFile,
       sessionId,
-      scenario: claudeScenario('external hook-driven session adoption')
+      scenario: copilotScenario('external hook-driven session adoption')
         .at(200)
         .emitHook(
           sessionStartStartup(sessionId, '{{cwd}}', '{{transcriptPath}}') as Record<

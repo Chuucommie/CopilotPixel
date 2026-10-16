@@ -205,7 +205,7 @@ describe('dist/cli.js entry-point guard', () => {
    *  would be testing the helper. The trailing `\s` makes it wait for a
    *  complete line: stdout arrives in chunks, and a half-delivered URL still
    *  parses as a URL (`http://127.0.0.1:501`). */
-  const URL_LINE = /CopilotPixel server running at (\S+)\s/;
+  const URL_LINE = /CopilotAgents server running at (\S+)\s/;
 
   function printedUrl(output: string): URL {
     const match = URL_LINE.exec(output);
@@ -216,7 +216,7 @@ describe('dist/cli.js entry-point guard', () => {
   /** The token the server actually minted, read from its own discovery file —
    *  an independent witness, so a printed token that drifts from it fails. */
   function mintedToken(tmpHome: string): string {
-    const raw = fs.readFileSync(path.join(tmpHome, '.pixel-agents', 'server.json'), 'utf-8');
+    const raw = fs.readFileSync(path.join(tmpHome, '.copilot-agents', 'server.json'), 'utf-8');
     return (JSON.parse(raw) as { token: string }).token;
   }
 
@@ -276,7 +276,7 @@ describe('dist/cli.js entry-point guard', () => {
       // Give the startup consent/install path time to have run (it is awaited
       // before the "server running" line, which health readiness follows).
       await new Promise((resolve) => setTimeout(resolve, 500));
-      expect(fs.existsSync(path.join(tmpHome, '.copilot', 'hooks', 'copilotpixel.json'))).toBe(
+      expect(fs.existsSync(path.join(tmpHome, '.copilot', 'hooks', 'copilotagents.json'))).toBe(
         false,
       );
       expect(output()).toContain('needs one-time approval');
@@ -288,10 +288,10 @@ describe('dist/cli.js entry-point guard', () => {
   itBuilt(
     'grants an existing Copilot hook install without changing neighboring hooks',
     async () => {
-      const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'pxl-cli-legacy-'));
-      const configPath = path.join(tmpHome, '.copilot', 'hooks', 'copilotpixel.json');
+      const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'cplt-cli-'));
+      const configPath = path.join(tmpHome, '.copilot', 'hooks', 'copilotagents.json');
       fs.mkdirSync(path.dirname(configPath), { recursive: true });
-      const hookPath = path.join(tmpHome, '.pixel-agents', 'hooks', 'copilot-hook.js');
+      const hookPath = path.join(tmpHome, '.copilot-agents', 'hooks', 'copilot-hook.js');
       const ourEntry = { type: 'command', exec: 'node', args: [hookPath], timeoutSec: 5 };
       const thirdPartyEntry = {
         type: 'command',
@@ -304,7 +304,7 @@ describe('dist/cli.js entry-point guard', () => {
       fs.writeFileSync(configPath, JSON.stringify({ version: 1, hooks }, null, 2));
 
       await runCliServer(tmpHome, async ({ output }) => {
-        await waitForCondition(() => output().includes('[CopilotPixel] Hooks installed'));
+        await waitForCondition(() => output().includes('[CopilotAgents] Hooks installed'));
         const after = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as {
           version: number;
           hooks: Record<string, Array<{ type: string; exec: string; args: string[] }>>;
@@ -317,7 +317,7 @@ describe('dist/cli.js entry-point guard', () => {
         expect(after.version).toBe(1);
         expect(after.hooks['PreToolUse']).toContainEqual(thirdPartyEntry);
 
-        const persistenceConfigPath = path.join(tmpHome, '.copilotpixel', 'config.json');
+        const persistenceConfigPath = path.join(tmpHome, '.copilot-agents', 'config.json');
         const consent = (
           JSON.parse(fs.readFileSync(persistenceConfigPath, 'utf-8')) as {
             hooksConsent?: Record<string, string>;
@@ -343,22 +343,22 @@ describe('dist/cli.js entry-point guard', () => {
   // (ENOTDIR) without touching the repo's real dist/.
   itBuilt('writes no hook entries when the hook script cannot be copied', async () => {
     const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'pxl-cli-nocopy-'));
-    fs.mkdirSync(path.join(tmpHome, '.copilotpixel'), { recursive: true });
-    fs.mkdirSync(path.join(tmpHome, '.pixel-agents'), { recursive: true });
+    fs.mkdirSync(path.join(tmpHome, '.copilot-agents'), { recursive: true });
+    fs.mkdirSync(path.join(tmpHome, '.copilot-agents'), { recursive: true });
     fs.writeFileSync(
-      path.join(tmpHome, '.copilotpixel', 'config.json'),
+      path.join(tmpHome, '.copilot-agents', 'config.json'),
       JSON.stringify({ hooksConsent: { copilot: 'granted' } }),
     );
     // hooks/ is a FILE, so copying into hooks/copilot-hook.js fails.
-    fs.writeFileSync(path.join(tmpHome, '.pixel-agents', 'hooks'), 'not a directory');
+    fs.writeFileSync(path.join(tmpHome, '.copilot-agents', 'hooks'), 'not a directory');
 
     await runCliServer(tmpHome, async ({ output }) => {
       await new Promise((resolve) => setTimeout(resolve, 500));
-      expect(fs.existsSync(path.join(tmpHome, '.copilot', 'hooks', 'copilotpixel.json'))).toBe(
+      expect(fs.existsSync(path.join(tmpHome, '.copilot', 'hooks', 'copilotagents.json'))).toBe(
         false,
       );
       expect(output()).toContain('Hooks NOT installed');
-      expect(output()).not.toContain('[CopilotPixel] Hooks installed');
+      expect(output()).not.toContain('[CopilotAgents] Hooks installed');
     });
   });
 
@@ -368,10 +368,10 @@ describe('dist/cli.js entry-point guard', () => {
     // The spawned CLI has no TTY, and without prior consent the first-run gate
     // (rightly) skips hook installation there — seed consent so this test can
     // exercise the actual install path.
-    fs.mkdirSync(path.join(tmpHome, '.copilotpixel'), { recursive: true });
-    fs.mkdirSync(path.join(tmpHome, '.pixel-agents'), { recursive: true });
+    fs.mkdirSync(path.join(tmpHome, '.copilot-agents'), { recursive: true });
+    fs.mkdirSync(path.join(tmpHome, '.copilot-agents'), { recursive: true });
     fs.writeFileSync(
-      path.join(tmpHome, '.copilotpixel', 'config.json'),
+      path.join(tmpHome, '.copilot-agents', 'config.json'),
       JSON.stringify({ hooksConsent: { copilot: 'granted' } }),
     );
     const port = await getFreePort();
@@ -400,14 +400,14 @@ describe('dist/cli.js entry-point guard', () => {
         }
       });
 
-      const installedHook = path.join(tmpHome, '.pixel-agents', 'hooks', 'copilot-hook.js');
+      const installedHook = path.join(tmpHome, '.copilot-agents', 'hooks', 'copilot-hook.js');
       await waitForCondition(() => fs.existsSync(installedHook));
       expect(fs.readFileSync(installedHook, 'utf-8')).toContain('#!/usr/bin/env node');
       if (process.platform !== 'win32') {
         expect(fs.statSync(installedHook).mode & 0o100).toBeTruthy();
       }
 
-      const configPath = path.join(tmpHome, '.copilot', 'hooks', 'copilotpixel.json');
+      const configPath = path.join(tmpHome, '.copilot', 'hooks', 'copilotagents.json');
       const settings = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
       expect(JSON.stringify(settings)).toContain(installedHook);
     } finally {

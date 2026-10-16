@@ -23,13 +23,13 @@ function validFiles() {
 }
 
 test('normalizes npm pack array and keyed-object output', () => {
-  const metadata = { filename: 'copilot-pixe-1.4.0.tgz', files: validFiles() };
+  const metadata = { filename: 'copilot-agents-1.4.0.tgz', files: validFiles() };
   assert.equal(normalizePackMetadata([metadata]), metadata);
-  assert.equal(normalizePackMetadata({ 'copilot-pixe@1.4.0': metadata }), metadata);
+  assert.equal(normalizePackMetadata({ 'copilot-agents@1.4.0': metadata }), metadata);
 });
 
 test('extracts pack JSON after lifecycle build output', () => {
-  const metadata = [{ filename: 'copilot-pixe-1.4.0.tgz', files: validFiles() }];
+  const metadata = [{ filename: 'copilot-agents-1.4.0.tgz', files: validFiles() }];
   const output = `[generate-messages] built protocol\nHUSKY=0 skip install${JSON.stringify(metadata)}`;
   assert.deepEqual(parsePackJsonOutput(output), metadata);
 });
@@ -55,7 +55,7 @@ test('rejects source and preview files even when required files exist', () => {
 
 test('validates release tag, ref, repository, and monotonic version', () => {
   const manifest = {
-    name: 'copilot-pixe',
+    name: 'copilot-agents',
     version: '1.4.0',
     repository: { url: 'https://github.com/Chuucommie/CopilotPixel' },
   };
@@ -105,8 +105,8 @@ test('publishes only absent versions and treats integrity safely', () => {
 });
 
 test('rejects a tarball changed after its metadata was created', () => {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-pixe-integrity-test-'));
-  const tarballPath = path.join(tmpDir, 'copilot-pixe.tgz');
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-agents-integrity-test-'));
+  const tarballPath = path.join(tmpDir, 'copilot-agents.tgz');
   const verifiedIntegrity =
     'sha512-RkN76vtkA1+8p/GSGfbyKAGc1SvEWGcyy0e6CVFdcQKBmX1sAD93WjE7XaXvLvWCO8Q8zHEugymaUbvwb3dBXg==';
   try {

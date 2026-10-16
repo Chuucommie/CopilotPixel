@@ -74,27 +74,27 @@ describe('migrateVsCodeState', () => {
 
   it('migrates every legacy globalState setting — and DISCARDS the hooks preference', () => {
     const { context, globalStore } = makeContext({
-      'pixel-agents.soundEnabled': false,
-      'pixel-agents.lastSeenVersion': '1.2.0',
-      'pixel-agents.alwaysShowLabels': true,
-      'pixel-agents.watchAllSessions': true,
-      'pixel-agents.hooksEnabled': false,
-      'pixel-agents.hooksInfoShown': true,
+      'copilot-agents.soundEnabled': false,
+      'copilot-agents.lastSeenVersion': '1.2.0',
+      'copilot-agents.alwaysShowLabels': true,
+      'copilot-agents.watchAllSessions': true,
+      'copilot-agents.hooksEnabled': false,
+      'copilot-agents.hooksInfoShown': true,
     });
     const adapter = new FileStateAdapter({ namespace: 'vscode' });
 
     migrateVsCodeState(context, adapter);
 
-    expect(adapter.getSetting('pixel-agents.soundEnabled', true)).toBe(false);
-    expect(adapter.getSetting('pixel-agents.lastSeenVersion', '')).toBe('1.2.0');
-    expect(adapter.getSetting('pixel-agents.alwaysShowLabels', false)).toBe(true);
-    expect(adapter.getSetting('pixel-agents.watchAllSessions', false)).toBe(true);
+    expect(adapter.getSetting('copilot-agents.soundEnabled', true)).toBe(false);
+    expect(adapter.getSetting('copilot-agents.lastSeenVersion', '')).toBe('1.2.0');
+    expect(adapter.getSetting('copilot-agents.alwaysShowLabels', false)).toBe(true);
+    expect(adapter.getSetting('copilot-agents.watchAllSessions', false)).toBe(true);
     // The legacy hooksEnabled is DISCARDED, not migrated: hooks were on by
     // default back then, so a stored value means the user turned them OFF
     // without ever being told what they add — they get the Intro instead. The
     // provider map keeps its default...
-    expect(getHooksEnabled('claude')).toBe(true);
-    expect(adapter.getSetting('pixel-agents.hooksInfoShown', false)).toBe(true);
+    expect(getHooksEnabled('copilot')).toBe(true);
+    expect(adapter.getSetting('copilot-agents.hooksInfoShown', false)).toBe(true);
     // ...while the stale key is still cleared — left behind it would count as
     // unmigrated forever and warn on every launch.
     expect(globalStore).toEqual({});
@@ -106,7 +106,7 @@ describe('migrateVsCodeState', () => {
       {
         id: 1,
         sessionId: 'sess-1',
-        terminalName: 'Claude Code #1',
+        terminalName: 'Copilot CLI #1',
         jsonlFile: '/tmp/sess-1.jsonl',
         projectDir: '/tmp/proj',
       },
@@ -115,8 +115,8 @@ describe('migrateVsCodeState', () => {
     const { context, workspaceStore } = makeContext(
       {},
       {
-        'pixel-agents.agents': legacyAgents,
-        'pixel-agents.agentSeats': legacySeats,
+        'copilot-agents.agents': legacyAgents,
+        'copilot-agents.agentSeats': legacySeats,
       },
     );
     const adapter = new FileStateAdapter({ namespace: 'vscode' });
@@ -138,16 +138,16 @@ describe('migrateVsCodeState', () => {
   });
 
   it('idempotent: running twice with pre-cleared legacy state does nothing', () => {
-    const { context } = makeContext({ 'pixel-agents.soundEnabled': false }, {});
+    const { context } = makeContext({ 'copilot-agents.soundEnabled': false }, {});
     const adapter = new FileStateAdapter({ namespace: 'vscode' });
 
     migrateVsCodeState(context, adapter);
     migrateVsCodeState(context, adapter);
-    expect(adapter.getSetting('pixel-agents.soundEnabled', true)).toBe(false);
+    expect(adapter.getSetting('copilot-agents.soundEnabled', true)).toBe(false);
     expect(showWarningMessage).not.toHaveBeenCalled();
   });
 
-  it('migrates legacy layout from workspaceState to ~/.pixel-agents/layout.json', () => {
+  it('migrates legacy layout from workspaceState to ~/.copilot-agents/layout.json', () => {
     const legacyLayout = {
       version: 1,
       cols: 20,
@@ -155,7 +155,7 @@ describe('migrateVsCodeState', () => {
       tiles: [0, 1, 2],
       furniture: [{ type: 'desk', uid: 'd1', col: 0, row: 0 }],
     };
-    const { context, workspaceStore } = makeContext({}, { 'pixel-agents.layout': legacyLayout });
+    const { context, workspaceStore } = makeContext({}, { 'copilot-agents.layout': legacyLayout });
     const adapter = new FileStateAdapter({ namespace: 'vscode' });
 
     migrateVsCodeState(context, adapter);
@@ -169,7 +169,7 @@ describe('migrateVsCodeState', () => {
     const legacyLayout = { version: 1, cols: 20, rows: 11, tiles: [0], furniture: [] };
     const existingLayout = { version: 1, cols: 30, rows: 15, tiles: [9], furniture: [] };
     writeLayoutToFile(existingLayout);
-    const { context, workspaceStore } = makeContext({}, { 'pixel-agents.layout': legacyLayout });
+    const { context, workspaceStore } = makeContext({}, { 'copilot-agents.layout': legacyLayout });
     const adapter = new FileStateAdapter({ namespace: 'vscode' });
 
     migrateVsCodeState(context, adapter);
@@ -180,20 +180,20 @@ describe('migrateVsCodeState', () => {
   });
 
   it('warns + keeps legacy keys if file write fails (simulated via read-only HOME)', () => {
-    // Make ~/.pixel-agents/ unwritable by pointing HOME at a non-writable path.
+    // Make ~/.copilot-agents/ unwritable by pointing HOME at a non-writable path.
     // Simulate by replacing with a file (so mkdirSync fails on subpath).
     const blocker = path.join(tempHome, 'blocker');
     fs.writeFileSync(blocker, 'x');
     homeOverride = blocker; // home is now a file; can't mkdir inside
 
     const { context, globalStore } = makeContext({
-      'pixel-agents.soundEnabled': false,
+      'copilot-agents.soundEnabled': false,
     });
     const adapter = new FileStateAdapter({ namespace: 'vscode' });
     migrateVsCodeState(context, adapter);
 
     // Legacy key remains because the write silently failed -> verify !== legacy
-    expect(globalStore['pixel-agents.soundEnabled']).toBe(false);
+    expect(globalStore['copilot-agents.soundEnabled']).toBe(false);
     expect(showWarningMessage).toHaveBeenCalledOnce();
   });
 });

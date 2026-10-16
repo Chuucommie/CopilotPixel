@@ -95,7 +95,7 @@ function applyContextTokens(
  * Fold one freshly-read transcript record into the agent's context gauge.
  *
  * Sidechain records are another agent's turn, but WHOSE depends on the file:
- * in a lead's transcript they're its sub-agents (older Claude formats inline
+ * in a lead's transcript they're its sub-agents (some CLI formats inline
  * them) and must not move the lead's gauge; a teammate's own transcript is
  * sidechain top to bottom and would otherwise never report anything. So the
  * rule is positional — once this file has produced a main-chain turn, later

@@ -5,12 +5,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { AgentRuntime } from '../src/agentRuntime.js';
 import { AgentStateStore } from '../src/agentStateStore.js';
-import { claudeProvider } from '../src/providers/hook/claude/claude.js';
+import { copilotProvider } from '../src/providers/index.js';
 
 /**
  * D5 gate (tier-3 multi-server hook fan-out plan): the hook script now
  * broadcasts every event to every live server (server/src/providers/hook/
- * claude/hooks/claude-hook.ts), so a server must never adopt a session it
+ * copilot/hooks/copilot-hook.ts), so a server must never adopt a session it
  * doesn't own just because it received the event. HookEventHandler's own
  * isTrackedSession only gates debug logging (hookEventHandler.ts:173-174);
  * the actual gate is one hop downstream, in AgentRuntime's
@@ -37,13 +37,13 @@ describe('AgentRuntime -- D5 foreign-session gate', () => {
   }
 
   function fireSessionStartThenStop(sessionId: string, cwd: string): void {
-    runtime.handleHookEvent('claude', {
+    runtime.handleHookEvent('copilot', {
       hook_event_name: 'SessionStart',
       session_id: sessionId,
       source: 'startup',
       cwd,
     });
-    runtime.handleHookEvent('claude', {
+    runtime.handleHookEvent('copilot', {
       hook_event_name: 'Stop',
       session_id: sessionId,
     });
@@ -51,7 +51,7 @@ describe('AgentRuntime -- D5 foreign-session gate', () => {
 
   it('drops a foreign session (unowned dir, watchAllSessions off): no agent created', () => {
     store = new AgentStateStore();
-    runtime = new AgentRuntime(store, claudeProvider);
+    runtime = new AgentRuntime(store, copilotProvider);
     // watchAllSessions defaults to false; this dir was never scanned/owned
     // by this instance -- exactly the "other server's session" scenario
     // fan-out introduces.
@@ -61,7 +61,7 @@ describe('AgentRuntime -- D5 foreign-session gate', () => {
 
   it('adopts a foreign session when watchAllSessions is on', () => {
     store = new AgentStateStore();
-    runtime = new AgentRuntime(store, claudeProvider);
+    runtime = new AgentRuntime(store, copilotProvider);
     runtime.watchAllSessions.current = true;
     fireSessionStartThenStop('d5-foreign-on', untrackedDir());
     expect(store.size).toBe(1);
@@ -69,7 +69,7 @@ describe('AgentRuntime -- D5 foreign-session gate', () => {
 
   it('adopts a session under a project dir this instance has scanned, even with watchAllSessions off', () => {
     store = new AgentStateStore();
-    runtime = new AgentRuntime(store, claudeProvider);
+    runtime = new AgentRuntime(store, copilotProvider);
     const dir = untrackedDir();
     runtime.startProjectScan(dir); // marks `dir` as owned/tracked
     fireSessionStartThenStop('d5-tracked-dir', dir);

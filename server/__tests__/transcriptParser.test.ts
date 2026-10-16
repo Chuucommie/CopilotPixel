@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AgentStateStore } from '../src/agentStateStore.js';
-import { claudeProvider } from '../src/providers/hook/claude/claude.js';
+import { copilotProvider } from '../src/providers/index.js';
 import {
   processTranscriptLine,
   setHookProvider,
@@ -63,7 +63,7 @@ describe('transcriptParser: teammate spawn results (new-harness implicit teams)'
   const permissionTimers = new Map<number, ReturnType<typeof setTimeout>>();
 
   beforeEach(() => {
-    setHookProvider(claudeProvider);
+    setHookProvider(copilotProvider);
     agents = new AgentStateStore();
     agent = createTestAgent();
     agents.set(1, agent);
@@ -210,7 +210,7 @@ describe('transcriptParser: teammate spawn results (new-harness implicit teams)'
 
   it('does not re-latch a teammate that spawns its own named Agent', () => {
     // A teammate session runs through the same processTranscriptLine as its
-    // lead. Claude 5 teammates can use the Agent tool, so the teammate's own
+    // lead. teammates can use the Agent tool, so the teammate's own
     // transcript carries a spawn tool_result naming a NESTED team. Without the
     // leadAgentId guard the teammate re-latches onto that nested team, sets
     // isTeamLead, and linkTeammates detaches it from its real lead.

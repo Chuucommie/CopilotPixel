@@ -1,6 +1,6 @@
 import type { Frame, Page } from '@playwright/test';
 
-import { expect, test } from '../../../fixtures/pixel-agents';
+import { expect, test } from '../../../fixtures/copilot-agents';
 import {
   addArea,
   enterEditMode,
@@ -16,7 +16,7 @@ import {
 } from '../../../helpers/editor';
 import { addAgentForFolder } from '../../../helpers/internal-agent';
 import { buildSeedConfig } from '../../../helpers/layout-seed';
-import { getPixelAgentsFrame, openPixelAgentsPanel } from '../../../helpers/webview';
+import { getCopilotAgentsFrame, openCopilotAgentsPanel } from '../../../helpers/webview';
 
 /**
  * Multi-root e2e coverage for Areas — the lane where the Areas editor + the
@@ -46,8 +46,8 @@ async function startArea(frame: Frame, label: string): Promise<void> {
 test.describe('Areas (multi-root)', () => {
   test.use({ workspaceFolders: [ALPHA, BETA] });
 
-  test('painting an area labels tiles in the layout @area:areas', async ({ pixelAgents }) => {
-    const { frame, narrator } = pixelAgents;
+  test('painting an area labels tiles in the layout @area:areas', async ({ copilotAgents }) => {
+    const { frame, narrator } = copilotAgents;
     narrator.step('opening the Areas editor and adding an "Engineering" area');
     await startArea(frame, 'Engineering');
 
@@ -63,7 +63,7 @@ test.describe('Areas (multi-root)', () => {
 
     await frame.waitForFunction(
       (n) =>
-        ((window as TestHooksWindow).__pixelAgentsTestHooks?.getAreaTiles?.() ?? []).length >= n,
+        ((window as TestHooksWindow).__copilotAgentsTestHooks?.getAreaTiles?.() ?? []).length >= n,
       targets.length,
       { timeout: 10_000 },
     );
@@ -74,8 +74,8 @@ test.describe('Areas (multi-root)', () => {
     narrator.check('both painted tiles are labeled "Engineering"');
   });
 
-  test('areas can be added and removed @area:areas', async ({ pixelAgents }) => {
-    const { frame, narrator } = pixelAgents;
+  test('areas can be added and removed @area:areas', async ({ copilotAgents }) => {
+    const { frame, narrator } = copilotAgents;
     narrator.step('opening the layout editor → Areas tool');
     await enterEditMode(frame);
     await selectAreaTool(frame);
@@ -84,7 +84,7 @@ test.describe('Areas (multi-root)', () => {
     await addArea(frame, 'Design');
     await frame.waitForFunction(
       () =>
-        ((window as TestHooksWindow).__pixelAgentsTestHooks?.getAreas?.() ?? []).some(
+        ((window as TestHooksWindow).__copilotAgentsTestHooks?.getAreas?.() ?? []).some(
           (a) => a.label === 'Design',
         ),
       undefined,
@@ -98,7 +98,7 @@ test.describe('Areas (multi-root)', () => {
     await frame.locator('button[title="Remove area"]').first().click();
     await frame.waitForFunction(
       () =>
-        !((window as TestHooksWindow).__pixelAgentsTestHooks?.getAreas?.() ?? []).some(
+        !((window as TestHooksWindow).__copilotAgentsTestHooks?.getAreas?.() ?? []).some(
           (a) => a.label === 'Design',
         ),
       undefined,
@@ -108,9 +108,9 @@ test.describe('Areas (multi-root)', () => {
   });
 
   test('a folder can be mapped to an area and the mapping persists @area:areas', async ({
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, narrator } = pixelAgents;
+    const { frame, narrator } = copilotAgents;
     narrator.step('opening the layout editor → Areas tool');
     await enterEditMode(frame);
     await selectAreaTool(frame);
@@ -124,7 +124,7 @@ test.describe('Areas (multi-root)', () => {
 
     await frame.waitForFunction(
       (folder) => {
-        const m = (window as TestHooksWindow).__pixelAgentsTestHooks?.getAreaMappings?.() ?? {};
+        const m = (window as TestHooksWindow).__copilotAgentsTestHooks?.getAreaMappings?.() ?? {};
         return (m[folder] ?? []).includes('Engineering');
       },
       ALPHA,
@@ -153,7 +153,8 @@ test.describe('Areas (multi-root)', () => {
       }
       await frame.waitForFunction(
         (n) =>
-          ((window as TestHooksWindow).__pixelAgentsTestHooks?.getAreaTiles?.() ?? []).length >= n,
+          ((window as TestHooksWindow).__copilotAgentsTestHooks?.getAreaTiles?.() ?? []).length >=
+          n,
         targetSeats.length,
         { timeout: 10_000 },
       );
@@ -162,14 +163,14 @@ test.describe('Areas (multi-root)', () => {
 
     /** Re-open the panel (disposed by the spawned terminal) + return a fresh frame. */
     async function reacquireFrame(window: Page): Promise<Frame> {
-      await openPixelAgentsPanel(window);
-      return getPixelAgentsFrame(window);
+      await openCopilotAgentsPanel(window);
+      return getCopilotAgentsFrame(window);
     }
 
     test('an agent for the MAPPED folder takes a seat inside its area @area:areas', async ({
-      pixelAgents,
+      copilotAgents,
     }) => {
-      const { frame, window, tmpHome, mockLogFile, narrator } = pixelAgents;
+      const { frame, window, tmpHome, mockLogFile, narrator } = copilotAgents;
       narrator.step('painting Engineering over free seats and saving the layout');
       await paintAndSaveEngineering(frame);
 
@@ -183,7 +184,7 @@ test.describe('Areas (multi-root)', () => {
       narrator.step('expecting the restored alpha agent to re-seat inside Engineering');
       await fresh.waitForFunction(
         (folder) =>
-          ((window as TestHooksWindow).__pixelAgentsTestHooks?.getAgentSeats?.() ?? []).some(
+          ((window as TestHooksWindow).__copilotAgentsTestHooks?.getAgentSeats?.() ?? []).some(
             (a) => a.folderName === folder && a.seatId !== null,
           ),
         ALPHA,
@@ -198,9 +199,9 @@ test.describe('Areas (multi-root)', () => {
     });
 
     test('an agent for an UNMAPPED folder is not forced into the area @area:areas', async ({
-      pixelAgents,
+      copilotAgents,
     }) => {
-      const { frame, window, tmpHome, mockLogFile, narrator } = pixelAgents;
+      const { frame, window, tmpHome, mockLogFile, narrator } = copilotAgents;
       narrator.step('painting Engineering over free seats and saving the layout');
       await paintAndSaveEngineering(frame);
 
@@ -213,7 +214,7 @@ test.describe('Areas (multi-root)', () => {
       narrator.step('expecting the unmapped beta agent to land on an unzoned seat');
       await fresh.waitForFunction(
         (folder) =>
-          ((window as TestHooksWindow).__pixelAgentsTestHooks?.getAgentSeats?.() ?? []).some(
+          ((window as TestHooksWindow).__copilotAgentsTestHooks?.getAgentSeats?.() ?? []).some(
             (a) => a.folderName === folder && a.seatId !== null,
           ),
         BETA,

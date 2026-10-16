@@ -1,5 +1,5 @@
 name: "Feature request"
-description: "Suggest a new feature, idea, or improvement for CopilotPixel."
+description: "Suggest a new feature, idea, or improvement for CopilotAgents."
 title: "[Feature]: "
 labels: ["type: feature"]
 body:

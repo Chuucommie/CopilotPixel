@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AgentStateStore } from '../src/agentStateStore.js';
 import { HookEventHandler } from '../src/hookEventHandler.js';
-import { claudeProvider } from '../src/providers/hook/claude/claude.js';
+import { copilotProvider } from '../src/providers/index.js';
+import { mockTeamProvider } from './helpers/mockTeamProvider.js';
+
+const testProvider = { ...copilotProvider, team: mockTeamProvider };
+
 import { SessionRouter } from '../src/sessionRouter.js';
 import type { AgentState } from '../src/types.js';
 
@@ -65,7 +69,7 @@ describe('HookEventHandler', () => {
       agents,
       waitingTimers,
       permissionTimers,
-      claudeProvider,
+      testProvider,
       new SessionRouter(),
     );
   });
@@ -77,7 +81,7 @@ describe('HookEventHandler', () => {
     agents.set(1, agent);
     handler.registerAgent('sess-1', 1);
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'PermissionRequest',
       session_id: 'sess-1',
     });
@@ -95,7 +99,7 @@ describe('HookEventHandler', () => {
     const timer = setTimeout(() => {}, 10000);
     permissionTimers.set(1, timer);
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'PermissionRequest',
       session_id: 'sess-1',
     });
@@ -109,7 +113,7 @@ describe('HookEventHandler', () => {
     agents.set(1, agent);
     handler.registerAgent('sess-1', 1);
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'PermissionRequest',
       session_id: 'sess-1',
     });
@@ -126,7 +130,7 @@ describe('HookEventHandler', () => {
     agents.set(1, agent);
     handler.registerAgent('sess-1', 1);
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'Notification',
       session_id: 'sess-1',
       notification_type: 'permission_prompt',
@@ -142,7 +146,7 @@ describe('HookEventHandler', () => {
     agents.set(1, agent);
     handler.registerAgent('sess-1', 1);
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'Notification',
       session_id: 'sess-1',
       notification_type: 'idle_prompt',
@@ -164,7 +168,7 @@ describe('HookEventHandler', () => {
     agents.set(1, agent);
     handler.registerAgent('sess-1', 1);
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'Stop',
       session_id: 'sess-1',
     });
@@ -190,7 +194,7 @@ describe('HookEventHandler', () => {
     agents.set(1, agent);
     handler.registerAgent('sess-1', 1);
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'Stop',
       session_id: 'sess-1',
     });
@@ -212,7 +216,7 @@ describe('HookEventHandler', () => {
     agents.set(1, agent);
     handler.registerAgent('sess-1', 1);
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'Stop',
       session_id: 'sess-1',
     });
@@ -224,7 +228,7 @@ describe('HookEventHandler', () => {
 
   it('silently drops events for untracked sessions', () => {
     // No agents, no pending sessions, no prior buffered events
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'Stop',
       session_id: 'unknown-sess',
     });
@@ -239,7 +243,7 @@ describe('HookEventHandler', () => {
     agents.set(1, agent);
     // Don't call registerAgent yet (simulates race)
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'Stop',
       session_id: 'sess-1',
     });
@@ -254,7 +258,7 @@ describe('HookEventHandler', () => {
     agents.set(1, agent);
 
     // Send event (auto-discovery will find it immediately in this case)
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'Stop',
       session_id: 'sess-1',
     });
@@ -271,7 +275,7 @@ describe('HookEventHandler', () => {
     const agent = createTestAgent({ id: 1, sessionId: 'other-sess' } as Partial<AgentState>);
     agents.set(1, agent);
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'Stop',
       session_id: 'expired-sess',
     });
@@ -288,7 +292,7 @@ describe('HookEventHandler', () => {
     expect(mockWebview.messages).toHaveLength(0);
 
     handler.dispose();
-  });
+  }, 10_000);
 
   // ── Auto-discovery ──────────────────────────────────────────
 
@@ -296,7 +300,7 @@ describe('HookEventHandler', () => {
     const agent = createTestAgent({ id: 1, sessionId: 'auto-sess' } as Partial<AgentState>);
     agents.set(1, agent);
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'Stop',
       session_id: 'auto-sess',
     });
@@ -319,7 +323,7 @@ describe('HookEventHandler', () => {
     agents.set(1, agent);
     handler.registerAgent('sess-1', 1);
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'SessionStart',
       session_id: 'sess-1',
       source: 'startup',
@@ -336,7 +340,7 @@ describe('HookEventHandler', () => {
     } as Partial<AgentState>);
     agents.set(1, agent);
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'SessionStart',
       session_id: 'auto-sess',
       source: 'startup',
@@ -357,7 +361,7 @@ describe('HookEventHandler', () => {
     const onSessionClear = vi.fn();
     handler.setLifecycleCallbacks({ onSessionClear });
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'SessionStart',
       session_id: 'new-sess',
       source: 'clear',
@@ -369,7 +373,7 @@ describe('HookEventHandler', () => {
   });
 
   it('SessionStart for unknown session stores as pending', () => {
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'SessionStart',
       session_id: 'ext-sess',
       source: 'startup',
@@ -388,7 +392,7 @@ describe('HookEventHandler', () => {
     agents.set(1, agent);
     handler.registerAgent('sess-1', 1);
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'SessionEnd',
       session_id: 'sess-1',
       reason: 'clear',
@@ -406,7 +410,7 @@ describe('HookEventHandler', () => {
     const onSessionEnd = vi.fn();
     handler.setLifecycleCallbacks({ onSessionEnd });
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'SessionEnd',
       session_id: 'sess-1',
       reason: 'exit',
@@ -425,7 +429,7 @@ describe('HookEventHandler', () => {
     const onSessionEnd = vi.fn();
     handler.setLifecycleCallbacks({ onSessionEnd });
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'SessionEnd',
       session_id: 'sess-1',
       reason: 'resume',
@@ -444,7 +448,7 @@ describe('HookEventHandler', () => {
 
   it('SessionEnd discards pending external session (transient filtering)', () => {
     // Store pending session via SessionStart
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'SessionStart',
       session_id: 'transient-sess',
       source: 'startup',
@@ -453,7 +457,7 @@ describe('HookEventHandler', () => {
     });
 
     // SessionEnd arrives before confirmation -> discard
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'SessionEnd',
       session_id: 'transient-sess',
       reason: 'other',
@@ -470,7 +474,7 @@ describe('HookEventHandler', () => {
     agents.set(1, agent);
     handler.registerAgent('sess-1', 1);
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'PreToolUse',
       session_id: 'sess-1',
       tool_name: 'Read',
@@ -489,7 +493,7 @@ describe('HookEventHandler', () => {
     agents.set(1, agent);
     handler.registerAgent('sess-1', 1);
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'PreToolUse',
       session_id: 'sess-1',
       tool_name: 'Bash',
@@ -510,7 +514,7 @@ describe('HookEventHandler', () => {
     agents.set(1, agent);
     handler.registerAgent('sess-1', 1);
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'PostToolUse',
       session_id: 'sess-1',
     });
@@ -527,7 +531,7 @@ describe('HookEventHandler', () => {
     agents.set(1, agent);
     handler.registerAgent('sess-1', 1);
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'PostToolUseFailure',
       session_id: 'sess-1',
     });
@@ -545,7 +549,7 @@ describe('HookEventHandler', () => {
     handler.setLifecycleCallbacks({ onExternalSessionDetected });
 
     // SessionStart stores as pending
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'SessionStart',
       session_id: 'ext-sess',
       source: 'startup',
@@ -567,7 +571,7 @@ describe('HookEventHandler', () => {
     });
 
     // Stop confirms the session -> creates agent -> re-processes Stop
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'Stop',
       session_id: 'ext-sess',
     });
@@ -588,7 +592,7 @@ describe('HookEventHandler', () => {
     const onSessionResume = vi.fn();
     handler.setLifecycleCallbacks({ onSessionResume });
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'SessionStart',
       session_id: 'resume-sess',
       source: 'resume',
@@ -613,7 +617,7 @@ describe('HookEventHandler', () => {
     handler.setLifecycleCallbacks({ onSessionClear, onSessionEnd });
 
     // SessionEnd(reason=resume) sets pendingClear, starts grace timer
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'SessionEnd',
       session_id: 'old-sess',
       reason: 'resume',
@@ -621,7 +625,7 @@ describe('HookEventHandler', () => {
     expect(agent.pendingClear).toBe(true);
 
     // SessionStart(source=resume) arrives within grace period -> reassigns
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'SessionStart',
       session_id: 'new-resume-sess',
       source: 'resume',
@@ -665,7 +669,7 @@ describe('HookEventHandler', () => {
     handler.registerAgent('ext-sess-2', 2);
 
     // SessionStart(source=resume) should reassign Agent 1 (pendingClear), NOT Agent 2
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'SessionStart',
       session_id: 'new-resume-sess',
       source: 'resume',
@@ -690,7 +694,7 @@ describe('HookEventHandler', () => {
     const onExternalSessionDetected = vi.fn();
     handler.setLifecycleCallbacks({ onExternalSessionDetected });
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'SessionStart',
       session_id: 'no-transcript-sess',
       source: 'startup',
@@ -712,7 +716,7 @@ describe('HookEventHandler', () => {
     });
 
     // Confirmation event creates agent
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'Stop',
       session_id: 'no-transcript-sess',
     });
@@ -737,7 +741,7 @@ describe('HookEventHandler', () => {
     agents.set(1, agent);
     handler.registerAgent('old-sess', 1);
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'SessionStart',
       session_id: 'resumed-sess',
       source: 'resume',
@@ -752,7 +756,7 @@ describe('HookEventHandler', () => {
     const onSessionResume = vi.fn();
     handler.setLifecycleCallbacks({ onSessionResume });
 
-    handler.handleEvent('claude', {
+    handler.handleEvent('copilot', {
       hook_event_name: 'SessionStart',
       session_id: 'resume-no-path',
       source: 'resume',
@@ -777,7 +781,7 @@ describe('HookEventHandler', () => {
       agents.set(1, agent);
       handler.registerAgent('sess-1', 1);
 
-      handler.handleEvent('claude', {
+      handler.handleEvent('copilot', {
         hook_event_name: 'PreToolUse',
         session_id: 'sess-1',
         tool_name: 'Agent',
@@ -833,7 +837,7 @@ describe('HookEventHandler', () => {
       const onTeammateDetected = vi.fn();
       handler.setLifecycleCallbacks({ onTeammateDetected });
 
-      handler.handleEvent('claude', {
+      handler.handleEvent('copilot', {
         hook_event_name: 'SubagentStart',
         session_id: 'sess-1',
         agent_type: expectTeammateDetected ? 'web-researcher' : 'general-purpose',

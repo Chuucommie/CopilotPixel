@@ -53,9 +53,9 @@ export interface ClientMessageContext {
   /** Reload assets after an external-asset-directory change. Needs the dist root, known only to cli.ts. */
   onReloadAssets?: ReloadAssetsSideEffect;
   /**
-   * Whether this client may send messages that reach OUTSIDE `~/.pixel-agents/`
+   * Whether this client may send messages that reach OUTSIDE `~/.copilot-agents/`
    * — today only `setHooksEnabled`, which grants machine-wide consent to modify
-   * `~/.claude/settings.json`. Decided per-connection by the transport
+   * user hook configurations. Decided per-connection by the transport
    * (httpServer's standaloneTokenValid, or the embedded Bearer token); defaults
    * to false so a caller that forgets to pass it gets the safe answer.
    */
@@ -63,13 +63,13 @@ export interface ClientMessageContext {
 }
 
 // ── Setting key constants (mirror adapters/vscode/constants.ts) ──
-const KEY_SOUND_ENABLED = 'pixel-agents.soundEnabled';
-const KEY_LAST_SEEN_VERSION = 'pixel-agents.lastSeenVersion';
-const KEY_ALWAYS_SHOW_LABELS = 'pixel-agents.alwaysShowLabels';
-const KEY_GHOST_HEADLESS_AGENTS = 'pixel-agents.ghostHeadlessAgents';
-const KEY_WATCH_ALL_SESSIONS = 'pixel-agents.watchAllSessions';
-const KEY_HOOKS_INFO_SHOWN = 'pixel-agents.hooksInfoShown';
-const KEY_SHOW_AREAS = 'pixel-agents.showAreas';
+const KEY_SOUND_ENABLED = 'copilot-agents.soundEnabled';
+const KEY_LAST_SEEN_VERSION = 'copilot-agents.lastSeenVersion';
+const KEY_ALWAYS_SHOW_LABELS = 'copilot-agents.alwaysShowLabels';
+const KEY_GHOST_HEADLESS_AGENTS = 'copilot-agents.ghostHeadlessAgents';
+const KEY_WATCH_ALL_SESSIONS = 'copilot-agents.watchAllSessions';
+const KEY_HOOKS_INFO_SHOWN = 'copilot-agents.hooksInfoShown';
+const KEY_SHOW_AREAS = 'copilot-agents.showAreas';
 
 /**
  * Handle incoming ClientMessage from a WebSocket client.
@@ -192,7 +192,7 @@ export function handleClientMessage(
         // Answer with the truth so the checkbox still shows reality instead of
         // silently appearing to have worked.
         console.warn(
-          '[CopilotPixel] Ignoring setHooksEnabled from an untokened client — installing hooks needs approval from this machine (open the tokened URL the CLI printed).',
+          '[CopilotAgents] Ignoring setHooksEnabled from an untokened client — installing hooks needs approval from this machine (open the tokened URL the CLI printed).',
         );
         void provider
           .areHooksInstalled()
@@ -209,7 +209,7 @@ export function handleClientMessage(
       // reasoning as setHooksEnabled above.
       if (!ctx.privileged) {
         console.warn(
-          '[CopilotPixel] Ignoring hooksConsentResponse from an untokened client — installing hooks needs approval from this machine (open the tokened URL the CLI printed).',
+          '[CopilotAgents] Ignoring hooksConsentResponse from an untokened client — installing hooks needs approval from this machine (open the tokened URL the CLI printed).',
         );
         break;
       }
@@ -295,8 +295,8 @@ async function applyHooksPreference(
     const installed = await provider.areHooksInstalled();
     if (installed === enabled) {
       setHooksEnabled(provider.id, enabled);
-      // The runtime's single hooksEnabled ref gates the CLAUDE scanners; it
-      // follows only the Claude provider until the scanners grow per-provider
+      // The runtime's single hooksEnabled ref gates the scanners; it
+      // follows the active provider
       // awareness alongside the Settings UI.
       if (ctx.runtime && provider.id === copilotProvider.id) {
         ctx.runtime.hooksEnabled.current = enabled;
@@ -306,7 +306,7 @@ async function applyHooksPreference(
     // not outcome (the installer refuses to touch an unparseable file).
     send({ type: 'hooksStatus', providerId: provider.id, installed });
   } catch (err) {
-    console.error('[CopilotPixel] Applying the hooks preference failed:', err);
+    console.error('[CopilotAgents] Applying the hooks preference failed:', err);
   }
 }
 
@@ -329,14 +329,14 @@ function standaloneConsentEffects(
       try {
         await ctx.onSetHooksEnabled?.(provider.id, false);
       } catch (err) {
-        console.error('[CopilotPixel] Hook uninstall failed:', err);
+        console.error('[CopilotAgents] Hook uninstall failed:', err);
       }
     },
     areHooksInstalled: () => provider.areHooksInstalled(),
     syncHooksPreferenceOff: () => {
       // Durable writes are the executor's own atomic recordHooksDecline; this
-      // only mirrors the live runtime ref the CLAUDE scanners read, so another
-      // provider's answer can never flip Claude's fallback behavior.
+      // mirrors the live runtime ref the scanners read, so another
+      // provider's answer cannot flip fallback behavior.
       if (ctx.runtime && provider.id === copilotProvider.id) {
         ctx.runtime.hooksEnabled.current = false;
       }
@@ -360,10 +360,16 @@ function handleWebviewReady(send: WsSend, ctx: ClientMessageContext): void {
   const adapter = store.getAdapter();
 
   // 1. Provider capabilities (must arrive before any agent messages)
+  const readingTools = new Set<string>();
+  const subagentToolNames = new Set<string>();
+  for (const p of hookProviders) {
+    p.readingTools.forEach((t) => readingTools.add(t));
+    p.subagentToolNames.forEach((t) => subagentToolNames.add(t));
+  }
   send({
     type: 'providerCapabilities',
-    readingTools: [...copilotProvider.readingTools],
-    subagentToolNames: [...copilotProvider.subagentToolNames],
+    readingTools: [...readingTools],
+    subagentToolNames: [...subagentToolNames],
   });
 
   // 2. Assets (from server cache, loaded at startup via pngjs)
@@ -414,7 +420,7 @@ function handleWebviewReady(send: WsSend, ctx: ClientMessageContext): void {
     type: 'settingsLoaded',
     soundEnabled: adapter?.getSetting(KEY_SOUND_ENABLED, true) ?? true,
     lastSeenVersion: adapter?.getSetting(KEY_LAST_SEEN_VERSION, '') ?? '',
-    extensionVersion: process.env.PIXEL_AGENTS_VERSION ?? '',
+    extensionVersion: process.env.COPILOT_AGENTS_VERSION ?? '',
     watchAllSessions,
     alwaysShowLabels: adapter?.getSetting(KEY_ALWAYS_SHOW_LABELS, false) ?? false,
     ghostHeadlessAgents: adapter?.getSetting(KEY_GHOST_HEADLESS_AGENTS, false) ?? false,
@@ -438,7 +444,10 @@ function handleWebviewReady(send: WsSend, ctx: ClientMessageContext): void {
     void provider
       .areHooksInstalled()
       .catch((err: unknown) => {
-        console.error(`[CopilotPixel] hooks status check failed for provider ${provider.id}:`, err);
+        console.error(
+          `[CopilotAgents] hooks status check failed for provider ${provider.id}:`,
+          err,
+        );
         return false;
       })
       .then((installed) => {

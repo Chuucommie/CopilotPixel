@@ -1,4 +1,5 @@
-const debug = process.env.PIXEL_AGENTS_DEBUG !== '0';
+import { formatAntigravityToolStatus } from './providers/hook/antigravity/antigravity.js';
+const debug = process.env.COPILOT_AGENTS_DEBUG !== '0';
 
 import type { HookProvider } from '../../core/src/provider.js';
 import type { AgentStateStore } from './agentStateStore.js';
@@ -105,7 +106,7 @@ export function processTranscriptLine(
     const record = JSON.parse(line);
 
     // -- Agent Teams: extract team metadata via the active provider --
-    // The provider reads its CLI's own field names (Claude: record.teamName + record.agentName).
+    // The provider reads its CLI's own field names (e.g. record.teamName + record.agentName).
     // Other CLIs would implement this differently or not at all.
     const teamMeta = hookProvider?.team?.extractTeamMetadataFromRecord(record);
     if (teamMeta?.teamName && teamMeta.teamName !== agent.teamName) {
@@ -116,7 +117,7 @@ export function processTranscriptLine(
       agent.leadAgentId = undefined;
       if (debug) {
         console.log(
-          `[CopilotPixel] Agent ${agentId} team metadata: team=${agent.teamName}, role=${agent.agentName ?? 'lead'}`,
+          `[CopilotAgents] Agent ${agentId} team metadata: team=${agent.teamName}, role=${agent.agentName ?? 'lead'}`,
         );
       }
       // Link teammates to leads within the same team
@@ -136,7 +137,20 @@ export function processTranscriptLine(
     updateContextUsage(agentId, agent, agents, record, hookProvider);
 
     // Resilient content extraction: support both record.message.content and record.content
-    // Claude Code may change the JSONL structure across versions
+    // The CLI may change structure across versions
+    // -- Antigravity (Gemini) transcripts --
+    if (record.source && typeof record.type === 'string') {
+      processAntigravityRecord(
+        agentId,
+        agent,
+        record as Record<string, unknown>,
+        agents,
+        waitingTimers,
+        permissionTimers,
+      );
+      return;
+    }
+
     const assistantContent = record.message?.content ?? record.content;
 
     if (record.type === 'assistant' && Array.isArray(assistantContent)) {
@@ -159,7 +173,7 @@ export function processTranscriptLine(
             const toolName = block.name || '';
             const status = formatToolStatus(toolName, block.input || {});
             console.log(
-              `[CopilotPixel] JSONL: Agent ${agentId} - tool start: ${block.id} ${status}`,
+              `[CopilotAgents] JSONL: Agent ${agentId} - tool start: ${block.id} ${status}`,
             );
             agent.activeToolIds.add(block.id);
             agent.activeToolStatuses.set(block.id, status);
@@ -255,7 +269,7 @@ export function processTranscriptLine(
     } else if (record.type === 'assistant' && assistantContent === undefined) {
       // Assistant record with no recognizable content structure
       console.warn(
-        `[CopilotPixel] Agent ${agentId}: assistant record has no content. Keys: ${Object.keys(record).join(', ')}`,
+        `[CopilotAgents] Agent ${agentId}: assistant record has no content. Keys: ${Object.keys(record).join(', ')}`,
       );
     } else if (record.type === 'progress') {
       processProgressRecord(agentId, record, agents, waitingTimers, permissionTimers);
@@ -307,7 +321,7 @@ export function processTranscriptLine(
                 agent.isTeamLead = true;
                 if (debug) {
                   console.log(
-                    `[CopilotPixel] Agent ${agentId} spawned teammate "${teammateSpawn.teammateName}" -> lead of team ${teammateSpawn.teamName}`,
+                    `[CopilotAgents] Agent ${agentId} spawned teammate "${teammateSpawn.teammateName}" -> lead of team ${teammateSpawn.teamName}`,
                   );
                 }
                 linkTeammates(agentId, agent, agents);
@@ -328,7 +342,7 @@ export function processTranscriptLine(
                 isAsyncAgentResult(block)
               ) {
                 console.log(
-                  `[CopilotPixel] Agent ${agentId} background agent launched: ${completedToolId}`,
+                  `[CopilotAgents] Agent ${agentId} background agent launched: ${completedToolId}`,
                 );
                 agent.backgroundAgentToolIds.add(completedToolId);
                 // Current harnesses OMIT run_in_background from the tool_use
@@ -356,7 +370,7 @@ export function processTranscriptLine(
               }
 
               console.log(
-                `[CopilotPixel] JSONL: Agent ${agentId} - tool done: ${block.tool_use_id}`,
+                `[CopilotAgents] JSONL: Agent ${agentId} - tool done: ${block.tool_use_id}`,
               );
               // If the completed tool spawned a subagent, clear its subagent tools
               if (isSubagentTool(completedToolName)) {
@@ -416,7 +430,7 @@ export function processTranscriptLine(
           const completedToolId = toolIdMatch[1];
           if (agent.backgroundAgentToolIds.has(completedToolId)) {
             console.log(
-              `[CopilotPixel] Agent ${agentId} background agent done: ${completedToolId}`,
+              `[CopilotAgents] Agent ${agentId} background agent done: ${completedToolId}`,
             );
             agent.backgroundAgentToolIds.delete(completedToolId);
             agent.activeSubagentToolIds.delete(completedToolId);
@@ -517,14 +531,14 @@ export function processTranscriptLine(
       }
     } else if (record.type && !agent.seenUnknownRecordTypes.has(record.type)) {
       // Log first occurrence of unrecognized record types to help diagnose issues
-      // where Claude Code changes JSONL format. Known types we intentionally skip:
+      // where the CLI changes format. Known types we intentionally skip:
       // file-history-snapshot, queue-operation (non-enqueue), etc.
       const knownSkippableTypes = new Set(['file-history-snapshot', 'system', 'queue-operation']);
       if (!knownSkippableTypes.has(record.type)) {
         agent.seenUnknownRecordTypes.add(record.type);
         if (debug) {
           console.log(
-            `[CopilotPixel] JSONL: Agent ${agentId} - unrecognized record type '${record.type}'. ` +
+            `[CopilotAgents] JSONL: Agent ${agentId} - unrecognized record type '${record.type}'. ` +
               `Keys: ${Object.keys(record).join(', ')}`,
           );
         }
@@ -581,7 +595,7 @@ function processProgressRecord(
         const toolName = block.name || '';
         const status = formatToolStatus(toolName, block.input || {});
         console.log(
-          `[CopilotPixel] Agent ${agentId} subagent tool start: ${block.id} ${status} (parent: ${parentToolId})`,
+          `[CopilotAgents] Agent ${agentId} subagent tool start: ${block.id} ${status} (parent: ${parentToolId})`,
         );
 
         // Track sub-tool IDs
@@ -620,7 +634,7 @@ function processProgressRecord(
     for (const block of content) {
       if (block.type === 'tool_result' && block.tool_use_id) {
         console.log(
-          `[CopilotPixel] Agent ${agentId} subagent tool done: ${block.tool_use_id} (parent: ${parentToolId})`,
+          `[CopilotAgents] Agent ${agentId} subagent tool done: ${block.tool_use_id} (parent: ${parentToolId})`,
         );
 
         // Remove from tracking
@@ -738,4 +752,154 @@ function isAsyncAgentResult(block: Record<string, unknown>): boolean {
     return content.startsWith('Async agent launched successfully.');
   }
   return false;
+}
+
+function processAntigravityRecord(
+  agentId: number,
+  agent: AgentState,
+  record: Record<string, unknown>,
+  agents: AgentStateStore,
+  waitingTimers: Map<number, ReturnType<typeof setTimeout>>,
+  permissionTimers: Map<number, ReturnType<typeof setTimeout>>,
+): void {
+  agent.providerId = 'antigravity';
+  if (!agent.agentName) {
+    agent.agentName = 'Gemini';
+    agent.teamName = 'Antigravity';
+    agents.broadcast({
+      type: 'agentTeamInfo',
+      id: agentId,
+      agentName: 'Gemini',
+      teamName: 'Antigravity',
+    });
+  }
+
+  // 1. User message (turn start)
+  if (record.source === 'USER_EXPLICIT' && record.type === 'USER_INPUT') {
+    cancelWaitingTimer(agentId, waitingTimers);
+    cancelPermissionTimer(agentId, permissionTimers);
+    agent.isWaiting = false;
+    agent.hadToolsInTurn = false;
+    agents.broadcast({ type: 'agentStatus', id: agentId, status: 'active' });
+    return;
+  }
+
+  // 2. Planner response (tool calls OR final assistant text)
+  if (record.source === 'MODEL' && record.type === 'PLANNER_RESPONSE') {
+    const toolCalls = Array.isArray(record.tool_calls) ? record.tool_calls : [];
+
+    if (toolCalls.length > 0) {
+      cancelWaitingTimer(agentId, waitingTimers);
+      cancelPermissionTimer(agentId, permissionTimers);
+      agent.isWaiting = false;
+      agent.hadToolsInTurn = true;
+      agents.broadcast({ type: 'agentStatus', id: agentId, status: 'active' });
+
+      for (let i = 0; i < toolCalls.length; i++) {
+        const call = toolCalls[i] as { name?: string; args?: Record<string, unknown> };
+        const toolName = call.name || 'unknown';
+        const rawArgs = call.args || {};
+        const parsedArgs: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(rawArgs)) {
+          if (typeof v === 'string') {
+            const trimmed = v.trim();
+            if (
+              (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+              (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+              (trimmed.startsWith('[') && trimmed.endsWith(']'))
+            ) {
+              try {
+                parsedArgs[k] = JSON.parse(trimmed);
+              } catch {
+                parsedArgs[k] = v;
+              }
+            } else {
+              parsedArgs[k] = v;
+            }
+          } else {
+            parsedArgs[k] = v;
+          }
+        }
+
+        const toolId = `tool_${record.step_index ?? Date.now()}_${i}_${toolName}`;
+        const status = formatAntigravityToolStatus(toolName, parsedArgs);
+        if (debug) {
+          console.log(
+            `[CopilotAgents] Antigravity: Agent ${agentId} - tool start: ${toolId} ${status}`,
+          );
+        }
+
+        agent.activeToolIds.add(toolId);
+        agent.activeToolStatuses.set(toolId, status);
+        agent.activeToolNames.set(toolId, toolName);
+
+        const isSubagent = toolName === 'browser_subagent' || toolName === 'invoke_subagent';
+
+        agents.broadcast({
+          type: 'agentToolStart',
+          id: agentId,
+          toolId,
+          status,
+          toolName,
+          permissionActive: false,
+          runInBackground: isSubagent,
+        });
+      }
+    } else if (typeof record.content === 'string' && record.content.length > 0) {
+      // Final response text -> turn finished!
+      for (const toolId of agent.activeToolIds) {
+        agents.broadcast({ type: 'agentToolDone', id: agentId, toolId });
+      }
+      agent.activeToolIds.clear();
+      agent.activeToolStatuses.clear();
+      agent.activeToolNames.clear();
+
+      startWaitingTimer(agentId, TEXT_IDLE_DELAY_MS, agents, waitingTimers);
+    }
+    return;
+  }
+
+  // 3. Tool results (RUN_COMMAND, SEARCH_WEB, BROWSER_SUBAGENT, etc.)
+  if (
+    record.source === 'MODEL' &&
+    (record.type === 'RUN_COMMAND' ||
+      record.type === 'SEARCH_WEB' ||
+      record.type === 'BROWSER_SUBAGENT' ||
+      record.type === 'READ_URL_CONTENT' ||
+      record.type === 'ASK_QUESTION' ||
+      record.type === 'GENERIC')
+  ) {
+    const typeToTool: Record<string, string> = {
+      RUN_COMMAND: 'run_command',
+      SEARCH_WEB: 'search_web',
+      BROWSER_SUBAGENT: 'browser_subagent',
+      READ_URL_CONTENT: 'read_url_content',
+      ASK_QUESTION: 'ask_question',
+    };
+    const targetTool = typeToTool[record.type as string];
+
+    let foundToolId: string | null = null;
+    if (targetTool) {
+      for (const [id, name] of agent.activeToolNames) {
+        if (name === targetTool) {
+          foundToolId = id;
+          break;
+        }
+      }
+    }
+    if (!foundToolId && agent.activeToolIds.size > 0) {
+      foundToolId = agent.activeToolIds.values().next().value ?? null;
+    }
+
+    if (foundToolId) {
+      if (debug) {
+        console.log(`[CopilotAgents] Antigravity: Agent ${agentId} - tool done: ${foundToolId}`);
+      }
+      agents.broadcast({ type: 'agentToolDone', id: agentId, toolId: foundToolId });
+      agent.activeToolIds.delete(foundToolId);
+      agent.activeToolStatuses.delete(foundToolId);
+      agent.activeToolNames.delete(foundToolId);
+    }
+    return;
+  }
 }

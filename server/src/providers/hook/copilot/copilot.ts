@@ -7,6 +7,7 @@ import {
 } from '../../../constants.js';
 import { COPILOT_TERMINAL_NAME_PREFIX } from './constants.js';
 import { areHooksInstalled, installHooks, uninstallHooks } from './copilotHookInstaller.js';
+import { copilotTeamProvider } from './copilotTeamProvider.js';
 
 function normalizeHookEvent(
   raw: Record<string, unknown>,
@@ -23,6 +24,7 @@ function normalizeHookEvent(
           kind: 'sessionStart',
           source: typeof raw.source === 'string' ? raw.source : undefined,
           cwd: typeof raw.cwd === 'string' ? raw.cwd : undefined,
+          transcriptPath: typeof raw.transcript_path === 'string' ? raw.transcript_path : undefined,
         },
       };
     case 'SessionEnd':
@@ -38,6 +40,8 @@ function normalizeHookEvent(
         typeof raw.tool_input === 'object' && raw.tool_input !== null
           ? (raw.tool_input as Record<string, unknown>)
           : {};
+      const runInBackground =
+        typeof input.run_in_background === 'boolean' ? input.run_in_background : undefined;
       return {
         sessionId,
         event: {
@@ -45,6 +49,7 @@ function normalizeHookEvent(
           toolId: `copilot-${Date.now()}`,
           toolName: typeof raw.tool_name === 'string' ? raw.tool_name : 'unknown',
           input,
+          runInBackground,
         },
       };
     }
@@ -53,6 +58,29 @@ function normalizeHookEvent(
       return { sessionId, event: { kind: 'toolEnd', toolId: 'current' } };
     case 'Stop':
       return { sessionId, event: { kind: 'turnEnd' } };
+    case 'Notification':
+      if (raw.notification_type === 'permission_prompt') {
+        return { sessionId, event: { kind: 'permissionRequest' } };
+      }
+      return {
+        sessionId,
+        event: {
+          kind: 'turnEnd',
+          awaitingInput: raw.notification_type === 'idle_prompt',
+        },
+      };
+    case 'SubagentStart':
+      return {
+        sessionId,
+        event: {
+          kind: 'subagentStart',
+          parentToolId: typeof raw.parent_tool_id === 'string' ? raw.parent_tool_id : '',
+          toolId: typeof raw.tool_id === 'string' ? raw.tool_id : `sub-${Date.now()}`,
+          toolName: typeof raw.agent_type === 'string' ? raw.agent_type : 'subagent',
+          input: raw.tool_input,
+          runInBackground: true,
+        },
+      };
     case 'PermissionRequest':
       return { sessionId, event: { kind: 'permissionRequest' } };
     default:
@@ -109,13 +137,14 @@ export const copilotProvider: HookProvider = {
   consentDisclosure: () => ({
     headline: 'Enable Copilot CLI hooks?',
     disclosure:
-      'CopilotPixel adds a dedicated hook file to ~/.copilot/hooks/ to receive session, tool, and permission events. Existing Copilot settings and hook files are left untouched.\n\n' +
-      'Copilot CLI sends event names and tool inputs to the local CopilotPixel server. The server listens on 127.0.0.1.\n\n' +
+      'CopilotAgents adds a dedicated hook file to ~/.copilot/hooks/ to receive session, tool, and permission events. Existing Copilot settings and hook files are left untouched.\n\n' +
+      'Copilot CLI sends event names and tool inputs to the local CopilotAgents server. The server listens on 127.0.0.1.\n\n' +
       'You can remove this hook file at any time from Settings → Instant Detection (Hooks).',
   }),
   formatToolStatus,
+  team: copilotTeamProvider,
   permissionExemptTools: new Set(['Agent', 'Task', 'AskUserQuestion']),
-  subagentToolNames: new Set(),
+  subagentToolNames: new Set(['Agent', 'Task']),
   readingTools: new Set(['Read', 'Grep', 'Glob', 'WebFetch', 'WebSearch']),
   terminalNamePrefix: COPILOT_TERMINAL_NAME_PREFIX,
   buildLaunchCommand(sessionId, _cwd, opts) {

@@ -46,7 +46,7 @@ async function attachText(
 export const test = base.extend<{
   standalone: StandaloneContext;
   _allureLabels: void;
-  /** Seed a granted Claude hooksConsent entry in the isolated HOME (default). The
+  /** Seed a granted Copilot hooksConsent entry in the isolated HOME (default). The
    *  consent specs opt out via `test.use({ seedHooksConsent: false })` so the
    *  first-run dialog shows — they are the only ones that want it. */
   seedHooksConsent: boolean;
@@ -71,7 +71,7 @@ export const test = base.extend<{
       await attachTextFileIfExists(
         testInfo,
         'server-json',
-        path.join(standalone.tmpHome, '.pixel-agents', 'server.json'),
+        path.join(standalone.tmpHome, '.copilot-agents', 'server.json'),
         'application/json',
       );
 

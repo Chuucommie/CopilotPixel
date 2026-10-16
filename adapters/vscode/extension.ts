@@ -7,22 +7,24 @@ import {
   CONFIG_KEY_AUTO_SHOW_PANEL,
   VIEW_ID,
 } from './constants.js';
+import { CopilotAgentsViewProvider } from './CopilotAgentsViewProvider.js';
 import { migrateVsCodeState } from './migrateVsCodeState.js';
-import { PixelAgentsViewProvider } from './PixelAgentsViewProvider.js';
 
-let providerInstance: PixelAgentsViewProvider | undefined;
+let providerInstance: CopilotAgentsViewProvider | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log(`[CopilotPixel] PIXEL_AGENTS_DEBUG=${process.env.PIXEL_AGENTS_DEBUG ?? 'not set'}`);
+  console.log(
+    `[CopilotAgents] COPILOT_AGENTS_DEBUG=${process.env.COPILOT_AGENTS_DEBUG ?? 'not set'}`,
+  );
 
-  // Shared file-backed state adapter (VS Code namespace in ~/.pixel-agents/config.json).
+  // Shared file-backed state adapter (VS Code namespace in ~/.copilot-agents/config.json).
   const adapter = new FileStateAdapter({ namespace: 'vscode' });
 
   // One-time migration from legacy workspaceState/globalState. Idempotent; runs every
   // activate. Warns until all keys are cleared (e.g. if a disk error blocks writes).
   migrateVsCodeState(context, adapter);
 
-  const provider = new PixelAgentsViewProvider(context, adapter);
+  const provider = new CopilotAgentsViewProvider(context, adapter);
   providerInstance = provider;
 
   context.subscriptions.push(vscode.window.registerWebviewViewProvider(VIEW_ID, provider));
@@ -39,8 +41,8 @@ export function activate(context: vscode.ExtensionContext) {
     }),
   );
 
-  // Auto-show panel: focus the CopilotPixel panel on startup if the user has
-  // opted in via the pixel-agents.autoShowPanel setting.
+  // Auto-show panel: focus the CopilotAgents panel on startup if the user has
+  // opted in via the copilot-agents.autoShowPanel setting.
   const config = vscode.workspace.getConfiguration();
   if (config.get<boolean>(CONFIG_KEY_AUTO_SHOW_PANEL, false)) {
     vscode.commands.executeCommand(`${VIEW_ID}.focus`);

@@ -1,6 +1,6 @@
-# Contributing to CopilotPixel
+# Contributing to CopilotAgents
 
-Thanks for your interest in contributing to CopilotPixel! All contributions are welcome — features, bug fixes, documentation improvements, refactors, and more.
+Thanks for your interest in contributing to CopilotAgents! All contributions are welcome — features, bug fixes, documentation improvements, refactors, and more.
 
 This project is licensed under the [MIT License](LICENSE), so your contributions will be too. No CLA or DCO is required.
 
@@ -14,8 +14,8 @@ This project is licensed under the [MIT License](LICENSE), so your contributions
 ### Setup
 
 ```bash
-git clone https://github.com/Chuucommie/CopilotPixel.git
-cd CopilotPixel
+git clone https://github.com/Chuucommie/CopilotAgents.git
+cd CopilotAgents
 npm install
 npm run build
 ```
@@ -27,8 +27,8 @@ Then press **F5** in VS Code to launch the Extension Development Host.
 If you want to test the extension the same way end users install it, build a `.vsix` package and install it through the VS Code CLI:
 
 ```bash
-npx @vscode/vsce package --allow-star-activation --out copilotpixel-local.vsix
-code --install-extension ./copilotpixel-local.vsix --force
+npx @vscode/vsce package --allow-star-activation --out copilotagents-local.vsix
+code --install-extension ./copilotagents-local.vsix --force
 ```
 
 `--force` updates the existing local install with your freshly built package.
@@ -52,7 +52,7 @@ The verifier runs the production `prepack` build, creates a tarball outside the 
 
 A published GitHub Release coordinates publishing to the VS Code Marketplace, Open VSX, and npm through [`.github/workflows/publish-extension.yml`](.github/workflows/publish-extension.yml). Publishing is release-driven, not triggered by a push to `main` alone.
 
-One-time npm setup: configure the `copilot-pixe` package's GitHub Actions [trusted publisher](https://docs.npmjs.com/trusted-publishers/) for `Chuucommie/CopilotPixel`, workflow `publish-extension.yml`, no environment, and allow `npm publish`.
+One-time npm setup: configure the `copilot-pixe` package's GitHub Actions [trusted publisher](https://docs.npmjs.com/trusted-publishers/) for `Chuucommie/CopilotAgents`, workflow `publish-extension.yml`, no environment, and allow `npm publish`.
 The GitHub-hosted workflow enforces Node >=22.14.0 and npm >=11.5.1 and uses OIDC (`id-token: write`); do not configure a long-lived publish token, and revoke any unused one.
 
 For each release:
@@ -75,9 +75,9 @@ This starts parallel watchers for both the extension backend (esbuild) and TypeS
 
 > **Note:** The webview (Vite) is not included in `watch` — after changing webview code, run `npm run build:webview` or the full `npm run build`.
 
-## Running the Mocked Pixel Agent
+## Running the Mocked Copilot Agent
 
-You can run the mocked Pixel Agent web app either from the CLI or from VS Code tasks.
+You can run the mocked Copilot Agent web app either from the CLI or from VS Code tasks.
 
 ### Option 1: CLI
 
@@ -92,12 +92,12 @@ Vite will print a local URL (typically `http://localhost:5173`) where the mocked
 ### Option 2: VS Code Run Task
 
 1. Open the command palette and run **Tasks: Run Task**.
-2. Select **Mocked Pixel Agent Dev Server**.
+2. Select **Mocked Copilot Agent Dev Server**.
 3. Open the local URL shown in the task terminal output (typically `http://localhost:5173`).
 
 ### Project Structure
 
-CopilotPixel uses a layered codebase. `core/` depends on nothing; `server/` and `webview-ui/` depend only on `core/`; `adapters/vscode/` depends on `core/` and `server/`.
+CopilotAgents uses a layered codebase. `core/` depends on nothing; `server/` and `webview-ui/` depend only on `core/`; `adapters/vscode/` depends on `core/` and `server/`.
 
 | Directory                   | Description                                                                                                                                                                                                                                           |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -107,7 +107,7 @@ CopilotPixel uses a layered codebase. `core/` depends on nothing; `server/` and 
 | `webview-ui/`               | React 19 + Canvas UI. Transport abstraction (`PostMessageTransport` + `WebSocketTransport`). Depends only on `core/`.                                                                                                                                 |
 | `webview-ui/public/assets/` | Bundled sprites, furniture catalog, default layout, fonts.                                                                                                                                                                                            |
 | `scripts/`                  | Build/CI tooling: `generate-messages.ts` (AsyncAPI → TS), `run-e2e.mjs`, `build-allure-report.mjs`, `assemble-vercel-output.mjs`, and the asset extraction pipeline.                                                                                  |
-| `e2e/`                      | Playwright suite — fixtures, helpers, specs for `claude/hooks-on/`, `claude/hooks-off/`, and `standalone/`.                                                                                                                                           |
+| `e2e/`                      | Playwright suite — fixtures, helpers, specs for `copilot/hooks-on/`, `copilot/hooks-off/`, and `standalone/`.                                                                                                                                         |
 | `eslint-rules/`             | Custom rules (`no-inline-colors`, `pixel-shadow`, `pixel-font`) enforced project-wide.                                                                                                                                                                |
 
 The repo uses **npm workspaces** (`server`, `webview-ui` declared in the root `package.json`). A single `npm install` at the root installs dependencies for all workspaces; no nested `cd ... && npm install` is needed.
@@ -123,7 +123,7 @@ It covers the basic external-session lifecycle:
 - `PermissionRequest`, `Notification`, and `Stop` to drive permission/waiting states
 - `SessionEnd` to despawn the agent
 
-Before using it, copy `port` and `token` from `~/.pixel-agents/server.json` into the file variables and set `cwd` to a workspace folder opened in the Extension Development Host. If `cwd` is outside the current workspace, enable **Watch All Sessions** in CopilotPixel first.
+Before using it, copy `port` and `token` from `~/.copilot-agents/server.json` into the file variables and set `cwd` to a workspace folder opened in the Extension Development Host. If `cwd` is outside the current workspace, enable **Watch All Sessions** in CopilotAgents first.
 
 ## Code Guidelines
 
@@ -146,7 +146,7 @@ The project uses a pixel art aesthetic. All overlays should use:
 - Hard offset shadows (`2px 2px 0px`, no blur) — use `var(--pixel-shadow)`
 - The FS Pixel Sans font (loaded in `index.css`)
 
-These conventions are enforced by custom ESLint rules (`eslint-rules/pixel-agents-rules.mjs`):
+These conventions are enforced by custom ESLint rules (`eslint-rules/copilot-agents-rules.mjs`):
 
 | Rule               | Scope               | What it checks                                              |
 | ------------------ | ------------------- | ----------------------------------------------------------- |
@@ -169,9 +169,7 @@ npm run test:server
 npm run test:webview
 ```
 
-Server tests cover `AgentStateStore` (typed mutations + events), `HookEventHandler` (routing, buffering, team gating), `SessionRouter` and `DismissalTracker`, `FileStateAdapter` (namespaced persistence), `migrateVsCodeState` (verify-before-clear), `teamUtils`, the Claude provider and its team extension, the hook installer, the HTTP server (lifecycle, auth, `/ws`, broadcast), and the hook script via a spawned-process integration test.
-
-`claude-hook.test.ts` requires the bundled hook at `dist/hooks/claude-hook.js`, so build before running it (or use `npm test` which builds first).
+Server tests cover `AgentStateStore` (typed mutations + events), `HookEventHandler` (routing, buffering, team gating), `SessionRouter` and `DismissalTracker`, `FileStateAdapter` (namespaced persistence), `migrateVsCodeState` (verify-before-clear), `teamUtils`, the Copilot provider and its team extension, the hook installer, the HTTP server (lifecycle, auth, `/ws`, broadcast), and the hook script via a spawned-process integration test.
 
 ## End-to-End Tests
 
@@ -210,14 +208,14 @@ All test artifacts are written to `test-results/e2e/`:
 
 By default, successful tests discard their videos after teardown. Pass `--attach-videos-on-success` when you need success-case recordings attached to the report for debugging.
 
-### Mock claude
+### Mock copilot
 
-Tests never invoke the real `claude` CLI. A wrapper script (`e2e/fixtures/mock-claude` on POSIX, `mock-claude.cmd` on Windows) is copied into an isolated `bin/` directory and prepended to `PATH` before VS Code starts. The wrapper delegates to `e2e/fixtures/mock-claude-runner.cjs`, which honors a scenario blob set by the test via the `MOCK_CLAUDE_SCENARIO` env var.
+Tests never invoke the real `copilot` CLI. A wrapper script (`e2e/fixtures/mock-copilot` on POSIX, `mock-copilot.cmd` on Windows) is copied into an isolated `bin/` directory and prepended to `PATH` before VS Code starts. The wrapper delegates to `e2e/fixtures/mock-copilot-runner.cjs`, which honors a scenario blob set by the test via the `MOCK_COPILOT_SCENARIO` env var.
 
-Tests build scenarios with the fluent `claudeScenario(...)` helper in `e2e/helpers/mock-claude.ts`:
+Tests build scenarios with the fluent `copilotScenario(...)` helper in `e2e/helpers/mock-copilot.ts`:
 
 ```typescript
-claudeScenario('my-scenario')
+copilotScenario('my-scenario')
   .at(2_000)
   .appendJsonl(buildAssistantToolUseRecord('toolu-1', 'Read', { file_path: '/x' }))
   .at(3_000)
@@ -226,7 +224,7 @@ claudeScenario('my-scenario')
   .build();
 ```
 
-`appendJsonl` writes a record to `$HOME/.claude/projects/<project-hash>/<session-id>.jsonl` at the given offset. `emitHook` POSTs a hook event to the running server's `/api/hooks/:providerId`. `holdOpenFor` keeps the wrapper process alive (and the terminal "busy") for that many ms after the last action, then exits.
+`appendJsonl` writes a record to `$HOME/.copilot/sessions/<session-id>.jsonl` at the given offset. `emitHook` POSTs a hook event to the running server's `/api/hooks/:providerId`. `holdOpenFor` keeps the wrapper process alive (and the terminal "busy") for that many ms after the last action, then exits.
 
 Each test runs with an isolated `HOME`, workspace directory, VS Code `--user-data-dir`, and mock log file — no state leaks between runs or into your real VS Code profile.
 
@@ -268,11 +266,11 @@ The auto-generated test inventory in `e2e/README.md` groups tests by `@area:` ta
 
 ## Reporting Bugs
 
-[Open a bug report](https://github.com/Chuucommie/CopilotPixel/issues/new?template=bug_report.yml) — the form will guide you through providing the details we need.
+[Open a bug report](https://github.com/Chuucommie/CopilotAgents/issues/new?template=bug_report.yml) — the form will guide you through providing the details we need.
 
 ## Feature Requests
 
-Have an idea? [Open a feature request](https://github.com/Chuucommie/CopilotPixel/issues/new?template=feature_request.yml) — the form will guide you through describing the problem and your proposed solution. You can also browse and join ongoing conversations in [Discussions](https://github.com/Chuucommie/CopilotPixel/discussions).
+Have an idea? [Open a feature request](https://github.com/Chuucommie/CopilotAgents/issues/new?template=feature_request.yml) — the form will guide you through describing the problem and your proposed solution. You can also browse and join ongoing conversations in [Discussions](https://github.com/Chuucommie/CopilotAgents/discussions).
 
 ## Security Issues
 

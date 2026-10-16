@@ -12,7 +12,7 @@ const REQUIRED_FILES = [
   'extension/package.json',
   'extension/dist/extension.js',
   'extension/dist/cli.js',
-  'extension/dist/hooks/claude-hook.js',
+  'extension/dist/hooks/copilot-hook.js',
   'extension/dist/webview/index.html',
 ];
 const FORBIDDEN_PREFIXES = [
@@ -63,9 +63,9 @@ exports.run = async () => {
   if (!extension) throw new Error('Packaged extension was not discoverable: ${extensionId}');
   await extension.activate();
   if (!extension.isActive) throw new Error('Packaged extension did not activate');
-  await vscode.commands.executeCommand('pixel-agents.showPanel');
+  await vscode.commands.executeCommand('copilot-agents.showPanel');
 
-  const registryDir = path.join(os.homedir(), '.pixel-agents', 'servers');
+  const registryDir = path.join(os.homedir(), '.copilot-agents', 'servers');
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
     try {
@@ -117,7 +117,7 @@ async function main() {
   const inventory = stdout.split(/\r?\n/).filter(Boolean);
   validateInventory(inventory);
 
-  const smokeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pixel-agents-vsix-smoke-'));
+  const smokeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-agents-vsix-smoke-'));
   try {
     await execFileAsync('unzip', ['-q', vsixPath, '-d', smokeRoot]);
     await verifyExtensionHost(path.join(smokeRoot, 'extension'), smokeRoot);

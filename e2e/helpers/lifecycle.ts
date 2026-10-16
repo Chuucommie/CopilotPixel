@@ -1,4 +1,4 @@
-import { type ClaudeMockScenarioBuilder } from './mock-claude';
+import { type CopilotMockScenarioBuilder } from './mock-copilot';
 
 export const INLINE_TEAMMATE_ROLE = 'web-researcher';
 export const INLINE_TEAMMATE_ALIAS = 'teammate';
@@ -14,10 +14,10 @@ export function inlineTeammateSlug(role: string): string {
 }
 
 export function withNamedInlineTeammateSession(
-  builder: ClaudeMockScenarioBuilder,
+  builder: CopilotMockScenarioBuilder,
   alias: string,
   role: string,
-): ClaudeMockScenarioBuilder {
+): CopilotMockScenarioBuilder {
   const slug = inlineTeammateSlug(role);
   return builder.defineSession(alias, slug, {
     transcriptPathTemplate: `{{projectDir}}/{{sessionId}}/subagents/${slug}.jsonl`,
@@ -29,9 +29,9 @@ export function withNamedInlineTeammateSession(
 }
 
 export function withInlineTeammateSessions(
-  builder: ClaudeMockScenarioBuilder,
+  builder: CopilotMockScenarioBuilder,
   teammates: Array<{ alias: string; role: string }>,
-): ClaudeMockScenarioBuilder {
+): CopilotMockScenarioBuilder {
   let scenario = builder;
   for (const teammate of teammates) {
     scenario = withNamedInlineTeammateSession(scenario, teammate.alias, teammate.role);
@@ -40,13 +40,13 @@ export function withInlineTeammateSessions(
 }
 
 export function withInlineTeammateSession(
-  builder: ClaudeMockScenarioBuilder,
-): ClaudeMockScenarioBuilder {
+  builder: CopilotMockScenarioBuilder,
+): CopilotMockScenarioBuilder {
   return withNamedInlineTeammateSession(builder, INLINE_TEAMMATE_ALIAS, INLINE_TEAMMATE_ROLE);
 }
 
 export function withTmuxTeammateSession(
-  builder: ClaudeMockScenarioBuilder,
-): ClaudeMockScenarioBuilder {
+  builder: CopilotMockScenarioBuilder,
+): CopilotMockScenarioBuilder {
   return builder.defineSession(TMUX_TEAMMATE_ALIAS, '{{sessionId}}-tmux');
 }

@@ -141,7 +141,7 @@ export function startPermissionTimer(
 
     if (hasNonExempt) {
       agent.permissionSent = true;
-      console.log(`[CopilotPixel] Timer: Agent ${agentId} - possible permission wait detected`);
+      console.log(`[CopilotAgents] Timer: Agent ${agentId} - possible permission wait detected`);
       agents.broadcast({
         type: 'agentToolPermission',
         id: agentId,

@@ -22,7 +22,7 @@ export function extractToolName(status: string): string | null {
 // ── Provider capabilities (tool taxonomy for rendering decisions) ────────────
 // Populated once by the `providerCapabilities` postMessage after `webviewReady`.
 // Modules classifying tools (character animation, subagent creation gate) read
-// from here instead of hardcoding Claude-specific tool names.
+// from here instead of hardcoding tool names.
 
 const providerCaps: {
   readingTools: Set<string>;

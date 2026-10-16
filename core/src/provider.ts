@@ -1,9 +1,8 @@
 /**
  * Provider abstraction for AI agent tools.
  *
- * The active shipped HookProvider is GitHub Copilot CLI. The legacy Claude
- * implementation remains available for compatibility but is not registered
- * by the product. Other provider types should be derived from real integrations.
+ * The active shipped providers include GitHub Copilot CLI and Google Antigravity (Gemini).
+ * Other provider types should be derived from real integrations.
  */
 
 import type { TeamProvider } from './teamProvider.js';
@@ -16,7 +15,7 @@ export type AgentEvent =
       toolId: string;
       toolName: string;
       input?: unknown;
-      /** True when the tool was spawned to run in the background (e.g. Claude's
+      /** True when the tool was spawned to run in the background (e.g.
        *  `run_in_background` on Agent/Task). Handlers use this to suppress ghost
        *  sub-agent characters for teammate spawns. */
       runInBackground?: boolean;
@@ -25,9 +24,8 @@ export type AgentEvent =
   | {
       kind: 'turnEnd';
       /** True when the turn ended because the agent went idle waiting on the
-       *  user (Claude's Notification(idle_prompt)) rather than simply finishing
-       *  its response (Stop). Drives the "Waiting for input" vs "Done" label.
-       *  Absent/false = the agent finished its turn (Done). */
+       *  user rather than simply finishing its response. Drives the "Waiting for input"
+       *  vs "Done" label. Absent/false = the agent finished its turn (Done). */
       awaitingInput?: boolean;
     }
   | {
@@ -73,7 +71,6 @@ export interface HookProvider {
   readonly protocolVersion: number;
 
   /** Normalize a raw hook event payload into an AgentEvent.
-   *  Each CLI sends different JSON (Claude: snake_case, Copilot: camelCase, etc.)
    *  The provider translates to the common AgentEvent format.
    *  Return null for events we should ignore. */
   normalizeHookEvent(raw: Record<string, unknown>): {
@@ -139,12 +136,9 @@ export interface HookProvider {
     env?: Record<string, string>;
   };
 
-  // ── Optional team/subagent extension (Agent Teams on Claude; empty for single-agent CLIs) ──
+  // ── Optional team/subagent extension ──
 
   /** Optional reference to a TeamProvider. When set, the hook handler registers team-aware
    *  branches (subagent routing, teammate discovery, permission forwarding, etc.). */
   readonly team?: TeamProvider;
 }
-
-// TODO(provider type taxonomy): FileProvider (polling-only CLIs) and StreamProvider
-// (push-based external services) will be added alongside the first real second provider

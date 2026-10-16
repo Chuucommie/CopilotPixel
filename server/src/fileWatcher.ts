@@ -1,21 +1,38 @@
+function findJsonlFilesInDir(dirPath: string): string[] {
+  const files: string[] = [];
+  try {
+    const direct = fs
+      .readdirSync(dirPath)
+      .filter((f) => f.endsWith('.jsonl'))
+      .map((f) => path.join(dirPath, f));
+    files.push(...direct);
+    const antigravityLog = path.join(dirPath, '.system_generated', 'logs', 'transcript.jsonl');
+    if (fs.existsSync(antigravityLog)) {
+      files.push(antigravityLog);
+    }
+  } catch {
+    /* dir may not exist or be readable */
+  }
+  return files;
+}
 /**
  * Session Detection: Dual-Mode Architecture
  *
- * HOOKS MODE (preferred): Claude Code Hooks API delivers instant, reliable events
+ * HOOKS MODE (preferred): CLI Hooks API delivers instant, reliable events
  * for session lifecycle (SessionStart, SessionEnd, Stop, PermissionRequest, etc.).
  * When hooks work, per-agent heuristic timers and terminal adoption scans are
  * suppressed. The hookDelivered flag per agent and hooksEnabledRef globally
  * control the switch.
  *
  * HEURISTIC MODE (fallback): For environments without hooks (other providers,
- * hooks disabled, older Claude versions). Uses:
+ * hooks disabled, older CLI versions). Uses:
  * - Per-agent 500ms JSONL polling for tool activity and /clear detection
  * - 1s main scanner for terminal adoption
  * - 30s stale check for orphaned external agents
  * - Multiple dismissal systems to prevent re-adoption races
  *
  * EXTERNAL SESSION DISCOVERY: The 3s external scanner runs in both hooks and
- * heuristic modes because not every JSONL producer emits Claude Code hooks.
+ * heuristic modes because not every JSONL producer emits CLI hooks.
  *
  * JSONL POLLING (always active): readNewLines + processTranscriptLine run in both
  * modes. They provide tool content (status text, animations) that hooks don't carry.
@@ -25,7 +42,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type * as vscode from 'vscode';
 
-const debug = process.env.PIXEL_AGENTS_DEBUG !== '0';
+const debug = process.env.COPILOT_AGENTS_DEBUG !== '0';
 
 import type { HookProvider } from '../../core/src/provider.js';
 import type { TeamProvider } from '../../core/src/teamProvider.js';
@@ -46,6 +63,7 @@ import { seedContextUsage } from './contextUsage.js';
 import type { DismissalTracker } from './dismissalTracker.js';
 import { assignPaletteIfNeeded } from './paletteAssigner.js';
 import { pathsMatch } from './pathKey.js';
+import { hookProviders } from './providers/index.js';
 import type { SubagentWatch } from './subagentWatch.js';
 import { cancelPermissionTimer, cancelWaitingTimer, clearAgentActivity } from './timerManager.js';
 import { getHookProvider, processTranscriptLine } from './transcriptParser.js';
@@ -56,12 +74,12 @@ import type { AgentState } from './types.js';
  *  seededMtimes, and pendingClearFiles Maps/Sets. */
 let dismissalTracker: DismissalTracker | null = null;
 
-/** Register the DismissalTracker instance. Called from PixelAgentsViewProvider at startup. */
+/** Register the DismissalTracker instance. Called from CopilotAgentsViewProvider at startup. */
 export function setDismissalTracker(tracker: DismissalTracker): void {
   dismissalTracker = tracker;
 }
 
-/** Get the active DismissalTracker (for PixelAgentsViewProvider direct access).
+/** Get the active DismissalTracker (for CopilotAgentsViewProvider direct access).
  *
  * @public
  */
@@ -77,12 +95,12 @@ export function setTerminalAdapter(adapter: ITerminalAdapter): void {
   terminalAdapter = adapter;
 }
 
-/** Agent removal callback. Injected by PixelAgentsViewProvider to avoid a
+/** Agent removal callback. Injected by CopilotAgentsViewProvider to avoid a
  *  server/src/ → src/ back-import on agentManager.ts. The ViewProvider closure
  *  captures the store and timer Maps, so only the agent ID is needed. */
 let agentRemovalCallback: ((id: number) => void) | null = null;
 
-/** Register the agent removal callback. Called by PixelAgentsViewProvider. */
+/** Register the agent removal callback. Called by CopilotAgentsViewProvider. */
 export function setAgentRemovalCallback(cb: typeof agentRemovalCallback): void {
   agentRemovalCallback = cb;
 }
@@ -178,7 +196,7 @@ export function startFileWatching(
           // Found a /clear file (has last-prompt) → claim it
           deps.knownJsonlFiles.add(file);
           console.log(
-            `[CopilotPixel] Watcher: Agent ${agentId} - /clear detected, reassigning to ${path.basename(file)}`,
+            `[CopilotAgents] Watcher: Agent ${agentId} - /clear detected, reassigning to ${path.basename(file)}`,
           );
           reassignAgentToFile(
             agentId,
@@ -247,7 +265,7 @@ export function readNewLines(
   } catch (e) {
     // ENOENT is expected for hook-detected agents where the JSONL file hasn't been created yet
     if (e instanceof Error && 'code' in e && (e as NodeJS.ErrnoException).code === 'ENOENT') return;
-    console.log(`[CopilotPixel] Watcher: Agent ${agentId} - read error: ${e}`);
+    console.log(`[CopilotAgents] Watcher: Agent ${agentId} - read error: ${e}`);
   }
 }
 
@@ -301,10 +319,7 @@ export function ensureProjectScan(
 
   // Always seed this directory's files (supports multi-root workspaces).
   try {
-    const files = fs
-      .readdirSync(projectDir)
-      .filter((f) => f.endsWith('.jsonl'))
-      .map((f) => path.join(projectDir, f));
+    const files = findJsonlFilesInDir(projectDir);
     for (const f of files) {
       // Seed all files and track mtime. External scanner detects --resume
       // by comparing current mtime to seeded mtime (changed = new writes).
@@ -380,15 +395,8 @@ export function scanForNewJsonlFiles(
   persistAgents: () => void,
   onAgentCreated?: (agent: AgentState) => void,
 ): void {
-  let files: string[];
-  try {
-    files = fs
-      .readdirSync(projectDir)
-      .filter((f) => f.endsWith('.jsonl'))
-      .map((f) => path.join(projectDir, f));
-  } catch {
-    return;
-  }
+  const files = findJsonlFilesInDir(projectDir);
+  if (files.length === 0) return;
 
   for (const file of files) {
     if (knownJsonlFiles.has(file)) continue;
@@ -399,7 +407,7 @@ export function scanForNewJsonlFiles(
     // Non-adopted files stay OUT of knownJsonlFiles so the per-agent /clear
     // check can find them when the idle check passes (up to 5s later).
 
-    // Try to adopt the focused terminal (only if it's a Claude-named terminal).
+    // Try to adopt the focused terminal (only if it matches the CLI terminal prefix).
     // Cast to vscode.Terminal because the adapter returns the real object at runtime;
     // the TerminalHandle type is the minimal interface for the adapter contract.
     const activeTerminal = terminalAdapter?.activeTerminal() as vscode.Terminal | undefined;
@@ -431,7 +439,7 @@ export function scanForNewJsonlFiles(
           persistAgents,
         );
       } else {
-        // Active terminal is owned -- scan for untracked Claude-named terminals.
+        // Active terminal is owned -- scan for untracked CLI-named terminals.
         // Only adopt terminals with TERMINAL_NAME_PREFIX to avoid grabbing
         // pre-existing shells ("zsh", "bash") for /clear files.
         for (const terminal of (terminalAdapter?.allTerminals() ?? []) as vscode.Terminal[]) {
@@ -474,7 +482,7 @@ export function scanForNewJsonlFiles(
   for (const [id, agent] of agents) {
     if (agent.isExternal) continue;
     if (agent.terminalRef && agent.terminalRef.exitStatus !== undefined) {
-      console.log(`[CopilotPixel] Watcher: Agent ${id} - terminal closed, cleaning up orphan`);
+      console.log(`[CopilotAgents] Watcher: Agent ${id} - terminal closed, cleaning up orphan`);
       agentRemovalCallback?.(id);
     }
   }
@@ -538,7 +546,7 @@ function adoptTerminalForFile(
   onAgentCreated?.(agent);
 
   console.log(
-    `[CopilotPixel] Watcher: Agent ${id} - adopted terminal "${terminal.name}" for ${path.basename(jsonlFile)}`,
+    `[CopilotAgents] Watcher: Agent ${id} - adopted terminal "${terminal.name}" for ${path.basename(jsonlFile)}`,
   );
 
   startFileWatching(
@@ -672,7 +680,7 @@ export function scanForTeammateFiles(
 
     // Deduplicate by teammate name per parent: if we already have a live agent
     // with the same name for this parent, reassign it to the new JSONL file
-    // (Claude may restart a teammate, creating a new .jsonl for the same role).
+    // (a teammate may restart, creating a new .jsonl for the same role).
     let existingTeammate: AgentState | undefined;
     for (const a of agents.values()) {
       if (a.leadAgentId === parentAgentId && a.agentName === teammateName) {
@@ -683,7 +691,7 @@ export function scanForTeammateFiles(
     if (existingTeammate) {
       if (debug)
         console.log(
-          `[CopilotPixel] Teammate "${teammateName}" already exists (Agent ${existingTeammate.id}), reassigning to ${path.basename(file)}`,
+          `[CopilotAgents] Teammate "${teammateName}" already exists (Agent ${existingTeammate.id}), reassigning to ${path.basename(file)}`,
         );
       // Reassign to new JSONL file -- stop old polling, start new
       const oldTimer = pollingTimers.get(existingTeammate.id);
@@ -760,7 +768,7 @@ export function scanForTeammateFiles(
     persistAgents();
 
     console.log(
-      `[CopilotPixel] Teammate detected: "${teammateName}" (Agent ${id}) for parent Agent ${parentAgentId} (${path.basename(file)})`,
+      `[CopilotAgents] Teammate detected: "${teammateName}" (Agent ${id}) for parent Agent ${parentAgentId} (${path.basename(file)})`,
     );
 
     // Own-session teammates get registered so their hook events route directly
@@ -931,7 +939,7 @@ export function scanForBackgroundAgentFiles(
     persistAgents();
 
     console.log(
-      `[CopilotPixel] Background teammate detected: "${agent.agentName}" (Agent ${id}) for lead Agent ${leadId} (${path.basename(entry.jsonlPath)})`,
+      `[CopilotAgents] Background teammate detected: "${agent.agentName}" (Agent ${id}) for lead Agent ${leadId} (${path.basename(entry.jsonlPath)})`,
     );
 
     // The transient Subtask sub-character is superseded by this real character.
@@ -1072,7 +1080,7 @@ export function adoptExternalSessionFromHook(
   onAgentCreated?: (agent: AgentState) => void,
 ): void {
   if (transcriptPath) {
-    // File-based provider (Claude, Codex): adopt with JSONL file watching
+    // File-based provider : adopt with JSONL file watching
     // Guard: don't adopt if file is already tracked by an agent
     for (const agent of agents.values()) {
       if (pathsMatch(agent.jsonlFile, transcriptPath)) return;
@@ -1104,7 +1112,7 @@ export function adoptExternalSessionFromHook(
     const adoptedAgent = [...agents.values()].find((a) => pathsMatch(a.jsonlFile, transcriptPath));
     if (adoptedAgent && debug) {
       console.log(
-        `[CopilotPixel] Hook: Agent ${adoptedAgent.id} - detected external session ${path.basename(transcriptPath)}${adoptedAgent.folderName ? ` (${adoptedAgent.folderName})` : ''}`,
+        `[CopilotAgents] Hook: Agent ${adoptedAgent.id} - detected external session ${path.basename(transcriptPath)}${adoptedAgent.folderName ? ` (${adoptedAgent.folderName})` : ''}`,
       );
     }
     if (adoptedAgent) {
@@ -1148,7 +1156,7 @@ export function adoptExternalSessionFromHook(
     persistAgents();
     if (debug) {
       console.log(
-        `[CopilotPixel] Hook: Agent ${id} - detected hooks-only external session${folderName ? ` (${folderName})` : ''}`,
+        `[CopilotAgents] Hook: Agent ${id} - detected hooks-only external session${folderName ? ` (${folderName})` : ''}`,
       );
     }
     onAgentCreated?.(agent);
@@ -1173,7 +1181,7 @@ function adoptExternalSession(
   //
   // The external scanner runs every EXTERNAL_SCAN_INTERVAL_MS. A freshly-created
   // session writes its first records in the gap between scanner ticks (typical
-  // mock-claude scenarios: tool_use at t=1s, scanner ticks at t=3s). If we
+  // test scenarios: tool_use at t=1s, scanner ticks at t=3s). If we
   // unconditionally skip to the end of the file, those pre-adoption records
   // are silently discarded — the agent character appears but its tool history
   // and active tools never surface, producing a "stuck on Idle" UI and flaky
@@ -1198,9 +1206,13 @@ function adoptExternalSession(
   } catch {
     /* start from beginning if stat fails */
   }
+  const isAntigravity = jsonlFile.includes('.gemini') || jsonlFile.includes('antigravity');
+  const sessionId = isAntigravity
+    ? path.basename(path.resolve(path.dirname(jsonlFile), '../..'))
+    : path.basename(jsonlFile, '.jsonl');
   const agent: AgentState = {
     id,
-    sessionId: path.basename(jsonlFile, '.jsonl'),
+    sessionId,
     terminalRef: undefined,
     isExternal: true,
     projectDir,
@@ -1450,7 +1462,7 @@ export function scanExternalDir(
     }
 
     knownJsonlFiles.add(file);
-    console.log(`[CopilotPixel] Watcher: detected external session ${path.basename(file)}`);
+    console.log(`[CopilotAgents] Watcher: detected external session ${path.basename(file)}`);
     adoptExternalSession(
       file,
       projectDir,
@@ -1465,7 +1477,7 @@ export function scanExternalDir(
   }
 }
 
-/** Derive a readable folder name from the Claude project dir hash. */
+/** Derive a readable folder name from the project dir hash. */
 function folderNameFromProjectDir(dirName: string): string {
   const parts = dirName.replace(/^-+/, '').split('-');
   return parts[parts.length - 1] || dirName;
@@ -1484,7 +1496,14 @@ function scanGlobalProjectDirs(
 
   persistAgents: () => void,
 ): void {
-  const roots = hookProvider?.getAllSessionRoots?.() ?? [];
+  const roots: string[] = [];
+  if (hookProvider) {
+    roots.push(...(hookProvider.getAllSessionRoots?.() ?? []));
+  } else {
+    for (const p of hookProviders) {
+      roots.push(...(p.getAllSessionRoots?.() ?? []));
+    }
+  }
   if (roots.length === 0) return;
 
   const projectDirs: string[] = [];
@@ -1504,15 +1523,7 @@ function scanGlobalProjectDirs(
     // Skip directories already tracked by workspace scanning
     if (isTrackedProjectDir(dirPath)) continue;
 
-    let files: string[];
-    try {
-      files = fs
-        .readdirSync(dirPath)
-        .filter((f) => f.endsWith('.jsonl'))
-        .map((f) => path.join(dirPath, f));
-    } catch {
-      continue;
-    }
+    const files = findJsonlFilesInDir(dirPath);
 
     for (const file of files) {
       if (knownJsonlFiles.has(file)) continue;
@@ -1538,7 +1549,7 @@ function scanGlobalProjectDirs(
         folderNameFromProjectDir(path.basename(dirPath));
       knownJsonlFiles.add(file);
       console.log(
-        `[CopilotPixel] Watcher: detected global session ${path.basename(file)} (${folderName})`,
+        `[CopilotAgents] Watcher: detected global session ${path.basename(file)} (${folderName})`,
       );
       adoptExternalSession(
         file,
@@ -1575,7 +1586,7 @@ export function startStaleExternalAgentCheck(
 
       // Only despawn if the JSONL file has been deleted from disk.
       // Inactive external agents stay alive so they can resume when
-      // the session continues (e.g., claude --resume).
+      // the session continues (e.g., /resume).
       try {
         fs.statSync(agent.jsonlFile);
         // File still exists — keep the agent alive regardless of mtime
@@ -1591,7 +1602,7 @@ export function startStaleExternalAgentCheck(
         // Remove from knownJsonlFiles so the file can be re-adopted if it becomes active again
         knownJsonlFiles.delete(agent.jsonlFile);
       }
-      console.log(`[CopilotPixel] Watcher: Agent ${id} - removing stale external agent`);
+      console.log(`[CopilotAgents] Watcher: Agent ${id} - removing stale external agent`);
       agentRemovalCallback?.(id);
     }
   }, EXTERNAL_STALE_CHECK_INTERVAL_MS);

@@ -9,13 +9,13 @@ import { cancelPermissionTimer, cancelWaitingTimer } from './timerManager.js';
 import { notifyBackgroundAgentCompleted } from './transcriptParser.js';
 import type { AgentState } from './types.js';
 
-const debug = process.env.PIXEL_AGENTS_DEBUG !== '0';
+const debug = process.env.COPILOT_AGENTS_DEBUG !== '0';
 
 /** Normalized hook event received from any provider's hook script via the HTTP server. */
 export interface HookEvent {
   /** Hook event name (e.g., 'Stop', 'PermissionRequest', 'Notification') */
   hook_event_name: string;
-  /** Claude Code session ID, maps to JSONL filename */
+  /** CLI session ID, maps to transcript filename */
   session_id: string;
   /** Additional provider-specific fields (notification_type, tool_name, etc.) */
   [key: string]: unknown;
@@ -72,7 +72,7 @@ export class HookEventHandler {
   ) {
     if (provider.protocolVersion !== HookEventHandler.SUPPORTED_PROTOCOL_VERSION) {
       console.warn(
-        `[CopilotPixel] HookProvider "${provider.id}" reports protocolVersion=${provider.protocolVersion}, ` +
+        `[CopilotAgents] HookProvider "${provider.id}" reports protocolVersion=${provider.protocolVersion}, ` +
           `but handler understands ${HookEventHandler.SUPPORTED_PROTOCOL_VERSION}. ` +
           `Events from this provider will be dropped.`,
       );
@@ -111,7 +111,7 @@ export class HookEventHandler {
     const flushed = this.sessionRouter.register(sessionId, agentId);
     if (debug && flushed.length > 0)
       console.log(
-        `[CopilotPixel] Hook: flushing ${flushed.length} buffered event(s) for session ${sessionId.slice(0, 8)}...`,
+        `[CopilotAgents] Hook: flushing ${flushed.length} buffered event(s) for session ${sessionId.slice(0, 8)}...`,
       );
     for (const { providerId, event } of flushed) {
       this.handleEvent(providerId, event as HookEvent);
@@ -126,7 +126,7 @@ export class HookEventHandler {
   /**
    * Process an incoming hook event. Looks up the agent by session_id,
    * falls back to auto-discovery scan, or buffers if agent not yet registered.
-   * @param providerId - Provider that sent the event ('claude', 'codex', etc.)
+   * @param providerId - Provider that sent the event ('copilot', etc.)
    * @param event - The hook event payload from the CLI tool
    */
   handleEvent(providerId: string, event: HookEvent): void {
@@ -135,7 +135,7 @@ export class HookEventHandler {
       return; // version mismatch already logged in constructor
     }
     // ── Provider normalization boundary ───────────────────────────────────────
-    // All raw Claude-specific fields (tool_name, tool_input, agent_type, teammate_name,
+    // All raw CLI-specific fields (tool_name, tool_input, agent_type, teammate_name,
     // task_subject, notification_type,
     // reason, source) are extracted by provider.normalizeHookEvent. Downstream dispatch
     // uses the normalized AgentEvent.kind. Raw `event.*` reads are still allowed in a few
@@ -146,7 +146,7 @@ export class HookEventHandler {
     const normEvent = normalized.event;
     const eventName = event.hook_event_name; // retained for logs only
     // CI / e2e diagnostic: see agentStateStore.ts debugLogBroadcast comment.
-    if (process.env['PIXEL_AGENTS_DEBUG_LOG']) {
+    if (process.env['COPILOT_AGENTS_DEBUG_LOG']) {
       try {
         const fs = require('fs') as typeof import('fs');
         const sid = (event.session_id as string | undefined)?.slice(0, 8) ?? '?';
@@ -155,7 +155,7 @@ export class HookEventHandler {
             ? ` toolName=${(normEvent as { toolName?: string }).toolName}`
             : '';
         fs.appendFileSync(
-          process.env['PIXEL_AGENTS_DEBUG_LOG']!,
+          process.env['COPILOT_AGENTS_DEBUG_LOG']!,
           `${new Date().toISOString()} HOOK kind=${normEvent.kind} sid=${sid} src=${(normEvent as { source?: string }).source ?? ''}${extras}\n`,
         );
       } catch {
@@ -175,7 +175,7 @@ export class HookEventHandler {
       const cwd = normEvent.cwd;
       const tracked = this.isTrackedSession(transcriptPath, cwd);
       if (debug && tracked)
-        console.log(`[CopilotPixel] Hook: SessionStart(source=${source}, session=${sid}...)`);
+        console.log(`[CopilotAgents] Hook: SessionStart(source=${source}, session=${sid}...)`);
 
       // Check registered mapping
       const existingAgentId = this.sessionRouter.resolve(event.session_id);
@@ -186,7 +186,7 @@ export class HookEventHandler {
         }
         if (debug)
           console.log(
-            `[CopilotPixel] Hook: Agent ${existingAgentId} - SessionStart(source=${source}) known`,
+            `[CopilotAgents] Hook: Agent ${existingAgentId} - SessionStart(source=${source}) known`,
           );
         return;
       }
@@ -197,7 +197,7 @@ export class HookEventHandler {
           agent.hookDelivered = true;
           if (debug)
             console.log(
-              `[CopilotPixel] Hook: Agent ${id} - SessionStart(source=${source}) auto-discovered`,
+              `[CopilotAgents] Hook: Agent ${id} - SessionStart(source=${source}) auto-discovered`,
             );
           return;
         }
@@ -218,7 +218,7 @@ export class HookEventHandler {
             if (isMatch) {
               agent.pendingClear = false;
               console.log(
-                `[CopilotPixel] Hook: Agent ${id} - /${normEvent.source} detected, reassigning to ${event.session_id}`,
+                `[CopilotAgents] Hook: Agent ${id} - /${normEvent.source} detected, reassigning to ${event.session_id}`,
               );
               this.sessionRouter.unregister(agent.sessionId);
               this.registerAgent(event.session_id, id);
@@ -230,7 +230,7 @@ export class HookEventHandler {
       }
       // Unknown session -- store as pending, create only when a confirmation event
       // arrives (Stop, Notification, PermissionRequest). This filters transient sessions
-      // from Claude Code Extension which fire SessionStart + SessionEnd without any activity.
+      // from CLI processes which fire SessionStart + SessionEnd without any activity.
       if (transcriptPath || cwd) {
         // For --resume, clear dismissals so the file can be re-adopted
         if (normEvent.source === 'resume' && transcriptPath) {
@@ -238,7 +238,7 @@ export class HookEventHandler {
         }
         if (debug && tracked)
           console.log(
-            `[CopilotPixel] Hook: SessionStart(source=${source}) -> pending external session ${sid}..., awaiting confirmation`,
+            `[CopilotAgents] Hook: SessionStart(source=${source}) -> pending external session ${sid}..., awaiting confirmation`,
           );
         this.sessionRouter.storePending(event.session_id, {
           sessionId: event.session_id,
@@ -248,7 +248,7 @@ export class HookEventHandler {
       } else {
         if (debug && tracked)
           console.log(
-            `[CopilotPixel] Hook: SessionStart -> unknown session ${sid}..., no transcript_path`,
+            `[CopilotAgents] Hook: SessionStart -> unknown session ${sid}..., no transcript_path`,
           );
       }
       return;
@@ -260,7 +260,7 @@ export class HookEventHandler {
       this.sessionRouter.discardPending(event.session_id);
       if (debug)
         console.log(
-          `[CopilotPixel] Hook: SessionEnd discarded pending external session ${event.session_id.slice(0, 8)}...`,
+          `[CopilotAgents] Hook: SessionEnd discarded pending external session ${event.session_id.slice(0, 8)}...`,
         );
       return;
     }
@@ -270,7 +270,7 @@ export class HookEventHandler {
     if (pending) {
       if (debug)
         console.log(
-          `[CopilotPixel] Hook: ${eventName} confirmed external session ${event.session_id.slice(0, 8)}..., notifying host`,
+          `[CopilotAgents] Hook: ${eventName} confirmed external session ${event.session_id.slice(0, 8)}..., notifying host`,
         );
       this.lifecycleCallbacks.onExternalSessionDetected?.(
         pending.sessionId,
@@ -306,7 +306,7 @@ export class HookEventHandler {
       if (isPending || hasBuffered || hasUnregisteredAgents) {
         if (debug)
           console.log(
-            `[CopilotPixel] Hook: ${eventName} - unknown session ${event.session_id.slice(0, 8)}..., buffering`,
+            `[CopilotAgents] Hook: ${eventName} - unknown session ${event.session_id.slice(0, 8)}..., buffering`,
           );
         this.sessionRouter.bufferEvent(providerId, event);
       }
@@ -319,7 +319,7 @@ export class HookEventHandler {
     agent.hookDelivered = true;
     if (debug)
       console.log(
-        `[CopilotPixel] Hook: Agent ${agentId} - ${eventName} (session=${event.session_id.slice(0, 8)}...)`,
+        `[CopilotAgents] Hook: Agent ${agentId} - ${eventName} (session=${event.session_id.slice(0, 8)}...)`,
       );
 
     // Dispatch on normalized AgentEvent.kind, not raw hook event names.
@@ -375,7 +375,7 @@ export class HookEventHandler {
     const reason = normEvent.reason;
     if (debug)
       console.log(
-        `[CopilotPixel] Hook: Agent ${agentId} - SessionEnd(reason=${reason ?? 'unknown'})`,
+        `[CopilotAgents] Hook: Agent ${agentId} - SessionEnd(reason=${reason ?? 'unknown'})`,
       );
 
     // /clear and /resume send SessionEnd then SessionStart. Wait briefly for the follow-up.
@@ -387,7 +387,7 @@ export class HookEventHandler {
       this.markAgentWaiting(agent, agentId);
       if (debug)
         console.log(
-          `[CopilotPixel] Hook: Agent ${agentId} - SessionEnd(reason=${reason}), awaiting possible SessionStart`,
+          `[CopilotAgents] Hook: Agent ${agentId} - SessionEnd(reason=${reason}), awaiting possible SessionStart`,
         );
       // Safety net: if SessionStart never arrives, clean up the zombie agent
       setTimeout(() => {
@@ -507,7 +507,7 @@ export class HookEventHandler {
     if (this.provider.team && agent.currentHookIsTeammateSpawn === true && agent.teamName) {
       if (debug)
         console.log(
-          `[CopilotPixel] Hook: Agent ${agentId} - SubagentStart: teammate "${agentType}" detected, triggering discovery`,
+          `[CopilotAgents] Hook: Agent ${agentId} - SubagentStart: teammate "${agentType}" detected, triggering discovery`,
         );
       this.lifecycleCallbacks.onTeammateDetected?.(agentId, event.session_id, agentType);
       return;
@@ -574,7 +574,7 @@ export class HookEventHandler {
     if (inlineTeammates.length > 0) {
       if (debug)
         console.log(
-          `[CopilotPixel] Hook: Agent ${agentId} - SubagentStop: marking inline teammates as waiting`,
+          `[CopilotAgents] Hook: Agent ${agentId} - SubagentStop: marking inline teammates as waiting`,
         );
       for (const [id, a] of inlineTeammates) {
         this.markAgentWaiting(a, id);
@@ -635,7 +635,7 @@ export class HookEventHandler {
     }
   }
 
-  /** Handle Stop: Claude finished responding, mark agent as waiting. */
+  /** Handle Stop: agent finished responding, mark agent as waiting. */
   private handleStop(agent: AgentState, agentId: number, awaitingInput = false): void {
     this.markAgentWaiting(agent, agentId, awaitingInput);
   }
@@ -663,7 +663,7 @@ export class HookEventHandler {
         const [id, a] = match;
         if (debug)
           console.log(
-            `[CopilotPixel] Hook: TeammateIdle "${teammateName}" -> teammate Agent ${id}`,
+            `[CopilotAgents] Hook: TeammateIdle "${teammateName}" -> teammate Agent ${id}`,
           );
         this.markAgentWaiting(a, id);
         return;
@@ -673,7 +673,7 @@ export class HookEventHandler {
     // Fallback: mark all inline teammates as waiting
     if (debug)
       console.log(
-        `[CopilotPixel] Hook: TeammateIdle (no teammate_name match) -> marking ${inlineTeammates.length} teammate(s) done`,
+        `[CopilotAgents] Hook: TeammateIdle (no teammate_name match) -> marking ${inlineTeammates.length} teammate(s) done`,
       );
     for (const [id, a] of inlineTeammates) {
       this.markAgentWaiting(a, id);
@@ -694,7 +694,7 @@ export class HookEventHandler {
     const teammateName = this.provider.team?.extractTeammateNameFromEvent(event);
     if (debug)
       console.log(
-        `[CopilotPixel] Hook: Agent ${agentId} - TaskCompleted: ${taskSubject}${teammateName ? ` (teammate_name=${teammateName})` : ''}`,
+        `[CopilotAgents] Hook: Agent ${agentId} - TaskCompleted: ${taskSubject}${teammateName ? ` (teammate_name=${teammateName})` : ''}`,
       );
 
     const inlineTeammates = getInlineTeammates(agentId, this.agents);

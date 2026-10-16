@@ -1,12 +1,12 @@
 import type { Frame } from '@playwright/test';
 
-import { expect, test } from '../../../fixtures/pixel-agents';
+import { expect, test } from '../../../fixtures/copilot-agents';
 import { spawnInternalAgentAndWait } from '../../../helpers/internal-agent';
 import {
-  arrangeNextClaudeInvocation,
-  claudeScenario,
-  spawnExternalClaudeScenario,
-} from '../../../helpers/mock-claude';
+  arrangeNextCopilotInvocation,
+  copilotScenario,
+  spawnExternalCopilotScenario,
+} from '../../../helpers/mock-copilot';
 import {
   expectNoOverlayWithTexts,
   expectOverlayCount,
@@ -29,7 +29,11 @@ import {
   withInlineTeammateSession,
   withTmuxTeammateSession,
 } from '../../../helpers/lifecycle';
-import { getPixelAgentsFrame, openPixelAgentsPanel, setSettings } from '../../../helpers/webview';
+import {
+  getCopilotAgentsFrame,
+  openCopilotAgentsPanel,
+  setSettings,
+} from '../../../helpers/webview';
 
 async function expectLeadActivity(frame: Frame, text: string): Promise<void> {
   await expectOverlayVisibleWithTexts(frame, ['LEAD', text]);
@@ -46,8 +50,8 @@ async function expectExternalAgentAdoption(frame: Frame): Promise<void> {
 }
 
 test.describe('Hooks OFF / matrix', () => {
-  test('internal basic spawn adopted via JSONL polling @area:matrix', async ({ pixelAgents }) => {
-    const { frame, window, tmpHome, mockLogFile, narrator } = pixelAgents;
+  test('internal basic spawn adopted via JSONL polling @area:matrix', async ({ copilotAgents }) => {
+    const { frame, window, tmpHome, mockLogFile, narrator } = copilotAgents;
 
     narrator.step('turning hooks OFF — adoption must come purely from JSONL polling');
     await setSettings(frame, {
@@ -55,9 +59,9 @@ test.describe('Hooks OFF / matrix', () => {
     });
 
     narrator.step('scripting the mock: a Task tool_use, its result, then turn_duration');
-    await arrangeNextClaudeInvocation(
+    await arrangeNextCopilotInvocation(
       tmpHome,
-      claudeScenario('internal basic spawn hooks off')
+      copilotScenario('internal basic spawn hooks off')
         .at(4_500)
         .appendJsonl(
           buildAssistantToolUseRecord('toolu-a2-task', 'Task', {
@@ -73,11 +77,11 @@ test.describe('Hooks OFF / matrix', () => {
     );
 
     await spawnInternalAgentAndWait(frame, tmpHome, mockLogFile);
-    const terminalTab = window.getByText(/Claude Code #\d+/);
+    const terminalTab = window.getByText(/GitHub Copilot CLI #\d+/);
     await expect(terminalTab.first()).toBeVisible({ timeout: 15_000 });
-    narrator.check('the Claude Code terminal tab is visible');
-    await openPixelAgentsPanel(window);
-    const panelFrame = await getPixelAgentsFrame(window);
+    narrator.check('the GitHub Copilot CLI terminal tab is visible');
+    await openCopilotAgentsPanel(window);
+    const panelFrame = await getCopilotAgentsFrame(window);
 
     narrator.step('watching the office — the launched session should be adopted by polling');
     await expectOverlayCount(panelFrame, 1);
@@ -85,9 +89,9 @@ test.describe('Hooks OFF / matrix', () => {
   });
 
   test('internal inline teammate adopted via JSONL polling @area:matrix', async ({
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, window, tmpHome, mockLogFile, narrator } = pixelAgents;
+    const { frame, window, tmpHome, mockLogFile, narrator } = copilotAgents;
     const teamName = uniqueTeamName('hooks-off-internal-inline');
 
     narrator.step('turning hooks OFF — the team must be discovered from JSONL alone');
@@ -98,9 +102,9 @@ test.describe('Hooks OFF / matrix', () => {
     narrator.step('seeding the team config: a lead plus a web-researcher teammate');
     seedTeamConfig(tmpHome, teamName, ['lead', INLINE_TEAMMATE_ROLE]);
     narrator.step('scripting team-metadata records for the lead and teammate into JSONL');
-    await arrangeNextClaudeInvocation(
+    await arrangeNextCopilotInvocation(
       tmpHome,
-      withInlineTeammateSession(claudeScenario('internal inline teammate hooks off'))
+      withInlineTeammateSession(copilotScenario('internal inline teammate hooks off'))
         .at(500)
         .appendJsonl(buildTeamMetadataRecord(teamName))
         .at(2_000)
@@ -116,7 +120,7 @@ test.describe('Hooks OFF / matrix', () => {
         .at(4_500)
         .appendJsonl(
           buildAssistantToolUseRecord('toolu-a4-teammate-search', 'WebSearch', {
-            query: 'pixel agents',
+            query: 'copilot agents',
           }),
           { session: INLINE_TEAMMATE_ALIAS },
         )
@@ -125,8 +129,8 @@ test.describe('Hooks OFF / matrix', () => {
     );
 
     await spawnInternalAgentAndWait(frame, tmpHome, mockLogFile);
-    await openPixelAgentsPanel(window);
-    const panelFrame = await getPixelAgentsFrame(window);
+    await openCopilotAgentsPanel(window);
+    const panelFrame = await getCopilotAgentsFrame(window);
 
     await expectOverlayVisibleWithTexts(panelFrame, ['LEAD']);
     narrator.check('the LEAD character renders');
@@ -140,8 +144,10 @@ test.describe('Hooks OFF / matrix', () => {
     narrator.check('"Searching the web" on the teammate only');
   });
 
-  test('internal tmux teammate adopted via JSONL polling @area:matrix', async ({ pixelAgents }) => {
-    const { frame, window, tmpHome, mockLogFile, narrator } = pixelAgents;
+  test('internal tmux teammate adopted via JSONL polling @area:matrix', async ({
+    copilotAgents,
+  }) => {
+    const { frame, window, tmpHome, mockLogFile, narrator } = copilotAgents;
     const teamName = uniqueTeamName('hooks-off-internal-tmux');
 
     narrator.step('turning hooks OFF — the tmux teammate must be found via JSONL polling');
@@ -152,9 +158,9 @@ test.describe('Hooks OFF / matrix', () => {
     narrator.step('seeding the team config: a lead plus a web-researcher teammate');
     seedTeamConfig(tmpHome, teamName, ['lead', INLINE_TEAMMATE_ROLE]);
     narrator.step('scripting lead and separate tmux-teammate JSONL activity');
-    await arrangeNextClaudeInvocation(
+    await arrangeNextCopilotInvocation(
       tmpHome,
-      withTmuxTeammateSession(claudeScenario('internal tmux teammate hooks off'))
+      withTmuxTeammateSession(copilotScenario('internal tmux teammate hooks off'))
         .at(500)
         .appendJsonl(buildTeamMetadataRecord(teamName))
         .at(4_000)
@@ -179,7 +185,7 @@ test.describe('Hooks OFF / matrix', () => {
         .at(8_000)
         .appendJsonl(
           buildAssistantToolUseRecord('toolu-a6-teammate-search', 'WebSearch', {
-            query: 'pixel agents',
+            query: 'copilot agents',
           }),
           { session: TMUX_TEAMMATE_ALIAS },
         )
@@ -188,8 +194,8 @@ test.describe('Hooks OFF / matrix', () => {
     );
 
     await spawnInternalAgentAndWait(frame, tmpHome, mockLogFile);
-    await openPixelAgentsPanel(window);
-    const panelFrame = await getPixelAgentsFrame(window);
+    await openCopilotAgentsPanel(window);
+    const panelFrame = await getCopilotAgentsFrame(window);
 
     await expectOverlayVisibleWithTexts(panelFrame, ['LEAD']);
     narrator.check('the LEAD character renders');
@@ -205,8 +211,8 @@ test.describe('Hooks OFF / matrix', () => {
     narrator.check('the separate tmux teammate owns "Searching the web" only');
   });
 
-  test('external basic spawn adopted via JSONL polling @area:matrix', async ({ pixelAgents }) => {
-    const { frame, tmpHome, workspaceDir, mockLogFile, narrator } = pixelAgents;
+  test('external basic spawn adopted via JSONL polling @area:matrix', async ({ copilotAgents }) => {
+    const { frame, tmpHome, workspaceDir, mockLogFile, narrator } = copilotAgents;
     const sessionId = 'hooks-off-external-basic-session';
 
     narrator.step(
@@ -217,12 +223,12 @@ test.describe('Hooks OFF / matrix', () => {
       hooksEnabled: false,
     });
 
-    await spawnExternalClaudeScenario({
+    await spawnExternalCopilotScenario({
       tmpHome,
       workspaceDir,
       mockLogFile,
       sessionId,
-      scenario: claudeScenario('external basic spawn hooks off')
+      scenario: copilotScenario('external basic spawn hooks off')
         .at(6_000)
         .appendJsonl(
           buildAssistantToolUseRecord('toolu-a8-task', 'Task', {
@@ -251,9 +257,9 @@ test.describe('Hooks OFF / matrix', () => {
   });
 
   test('external inline teammate adopted via JSONL polling @area:matrix', async ({
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, tmpHome, workspaceDir, mockLogFile, narrator } = pixelAgents;
+    const { frame, tmpHome, workspaceDir, mockLogFile, narrator } = copilotAgents;
     const teamName = uniqueTeamName('hooks-off-external-inline');
     const sessionId = 'hooks-off-external-inline-session';
 
@@ -265,12 +271,12 @@ test.describe('Hooks OFF / matrix', () => {
 
     narrator.step('seeding the team config: a lead plus a web-researcher teammate');
     seedTeamConfig(tmpHome, teamName, ['lead', INLINE_TEAMMATE_ROLE]);
-    await spawnExternalClaudeScenario({
+    await spawnExternalCopilotScenario({
       tmpHome,
       workspaceDir,
       mockLogFile,
       sessionId,
-      scenario: withInlineTeammateSession(claudeScenario('external inline teammate hooks off'))
+      scenario: withInlineTeammateSession(copilotScenario('external inline teammate hooks off'))
         .at(5_000)
         .appendJsonl(buildTeamMetadataRecord(teamName))
         .at(6_500)
@@ -286,7 +292,7 @@ test.describe('Hooks OFF / matrix', () => {
         .at(9_500)
         .appendJsonl(
           buildAssistantToolUseRecord('toolu-a10-teammate-search', 'WebSearch', {
-            query: 'pixel agents',
+            query: 'copilot agents',
           }),
           { session: INLINE_TEAMMATE_ALIAS },
         )
@@ -309,8 +315,10 @@ test.describe('Hooks OFF / matrix', () => {
     narrator.check('"Searching the web" on the teammate only');
   });
 
-  test('external tmux teammate adopted via JSONL polling @area:matrix', async ({ pixelAgents }) => {
-    const { frame, tmpHome, workspaceDir, mockLogFile, narrator } = pixelAgents;
+  test('external tmux teammate adopted via JSONL polling @area:matrix', async ({
+    copilotAgents,
+  }) => {
+    const { frame, tmpHome, workspaceDir, mockLogFile, narrator } = copilotAgents;
     const teamName = uniqueTeamName('hooks-off-external-tmux');
     const sessionId = 'hooks-off-external-tmux-session';
 
@@ -322,12 +330,12 @@ test.describe('Hooks OFF / matrix', () => {
 
     narrator.step('seeding the team config: a lead plus a web-researcher teammate');
     seedTeamConfig(tmpHome, teamName, ['lead', INLINE_TEAMMATE_ROLE]);
-    await spawnExternalClaudeScenario({
+    await spawnExternalCopilotScenario({
       tmpHome,
       workspaceDir,
       mockLogFile,
       sessionId,
-      scenario: withTmuxTeammateSession(claudeScenario('external tmux teammate hooks off'))
+      scenario: withTmuxTeammateSession(copilotScenario('external tmux teammate hooks off'))
         .at(5_000)
         .appendJsonl(buildTeamMetadataRecord(teamName))
         .at(6_500)
@@ -352,7 +360,7 @@ test.describe('Hooks OFF / matrix', () => {
         .at(10_000)
         .appendJsonl(
           buildAssistantToolUseRecord('toolu-a12-teammate-search', 'WebSearch', {
-            query: 'pixel agents',
+            query: 'copilot agents',
           }),
           { session: TMUX_TEAMMATE_ALIAS },
         )

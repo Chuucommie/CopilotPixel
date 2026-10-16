@@ -106,9 +106,9 @@ test.describe('Standalone / hooks', () => {
 });
 
 /**
- * The standalone consent path end to end. The fixture normally seeds a granted Claude consent; these opt out, so the
+ * The standalone consent path end to end. The fixture normally seeds a granted Copilot consent; these opt out, so the
  * CLI starts with nothing installed and the server asks over the tokened /ws handshake — the SAME in-app dialog the
- * VS Code webview shows (pinned in claude/hooks-on/consent.spec.ts). Here the pins are the standalone-only halves:
+ * VS Code webview shows (pinned in copilot/hooks-on/consent.spec.ts). Here the pins are the standalone-only halves:
  * the token boundary and the checkbox route.
  */
 test.describe('Standalone / hooks consent', () => {
@@ -116,9 +116,9 @@ test.describe('Standalone / hooks consent', () => {
 
   function readConsentFrom(tmpHome: string): boolean {
     try {
-      const raw = fs.readFileSync(path.join(tmpHome, '.pixel-agents', 'config.json'), 'utf8');
+      const raw = fs.readFileSync(path.join(tmpHome, '.copilot-agents', 'config.json'), 'utf8');
       const consent = (JSON.parse(raw) as { hooksConsent?: Record<string, string> }).hooksConsent;
-      return consent?.claude === 'granted';
+      return consent?.copilot === 'granted';
     } catch {
       return false;
     }
@@ -140,10 +140,10 @@ test.describe('Standalone / hooks consent', () => {
     await advanceIntroToConsentStep(dialog);
     // The disclosure travels with the request — the browser renders the
     // server's exact terms.
-    await expect(dialog).toContainText('~/.claude/settings.json');
+    await expect(dialog).toContainText('~/.copilot/settings.json');
     await expect(dialog).toContainText('Instant Detection (Hooks)');
 
-    expect(fs.existsSync(path.join(standalone.tmpHome, '.claude', 'settings.json'))).toBe(false);
+    expect(fs.existsSync(path.join(standalone.tmpHome, '.copilot', 'settings.json'))).toBe(false);
 
     await dialog.getByRole('button', { name: 'Install Hooks' }).click();
 
@@ -191,7 +191,7 @@ test.describe('Standalone / hooks consent', () => {
     page,
     standalone,
   }) => {
-    const settingsPath = path.join(standalone.tmpHome, '.claude', 'settings.json');
+    const settingsPath = path.join(standalone.tmpHome, '.copilot', 'settings.json');
 
     // First-run Intro is up; decline with Not Now — which writes NOTHING —
     // and finish the tour.

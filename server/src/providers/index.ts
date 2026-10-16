@@ -3,8 +3,6 @@
  *
  * Adding a new CLI provider:
  *   1. Create `server/src/providers/hook/<cli>/<cli>.ts` implementing HookProvider.
- *      (File-based and stream-based provider types will land when the first such
- *       provider ships.)
  *   2. Add an export line below.
  *
  * The adapter (VS Code extension, standalone CLI, etc.) imports from here rather
@@ -12,18 +10,18 @@
  */
 
 import type { HookProvider } from '../../../core/src/provider.js';
-import { claudeProvider } from './hook/claude/claude.js';
+import { antigravityProvider } from './hook/antigravity/antigravity.js';
 import { copilotProvider } from './hook/copilot/copilot.js';
 import { copyHookScript as copyCopilotHookScript } from './hook/copilot/copilotHookInstaller.js';
 
-export { claudeProvider, copilotProvider };
+export { antigravityProvider, copilotProvider };
 export { copyHookScript } from './hook/copilot/copilotHookInstaller.js';
 export { copyCopilotHookScript };
 
 /** Every bundled hook provider, in registration order. The consent gate loops
  *  over this at the webviewReady handshake (one ask per provider that needs
  *  one) and `hooksConsentResponse` resolves its provider id against it. */
-export const hookProviders: readonly HookProvider[] = [copilotProvider];
+export const hookProviders: readonly HookProvider[] = [copilotProvider, antigravityProvider];
 
 /** Resolve a wire-supplied provider id, or undefined for an unknown one —
  *  the caller writes nothing on undefined (fail-closed, like a junk choice). */

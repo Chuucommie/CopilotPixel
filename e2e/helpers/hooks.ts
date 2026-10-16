@@ -15,7 +15,7 @@ export interface HookEventPayload {
 }
 
 function getServerJsonPath(tmpHome: string): string {
-  return path.join(tmpHome, '.pixel-agents', 'server.json');
+  return path.join(tmpHome, '.copilot-agents', 'server.json');
 }
 
 /** The events in a HOME's settings.json carrying one of our hook commands, sorted.
@@ -26,7 +26,7 @@ function getServerJsonPath(tmpHome: string): string {
 export function ourHookEvents(tmpHome: string): string[] {
   let settings: { hooks?: Record<string, Array<{ hooks?: Array<{ command?: string }> }>> };
   try {
-    settings = JSON.parse(fs.readFileSync(path.join(tmpHome, '.claude', 'settings.json'), 'utf8'));
+    settings = JSON.parse(fs.readFileSync(path.join(tmpHome, '.copilot', 'settings.json'), 'utf8'));
   } catch {
     return [];
   }
@@ -34,7 +34,7 @@ export function ourHookEvents(tmpHome: string): string[] {
     (command ?? '')
       .replace(/\\/g, '/')
       .toLowerCase()
-      .includes('.pixel-agents/hooks/claude-hook.js');
+      .includes('.copilot-agents/hooks/copilot-hook.js');
   return Object.entries(settings.hooks ?? {})
     .filter(([, entries]) =>
       (entries ?? []).some((e) => (e.hooks ?? []).some((h) => ours(h.command))),
@@ -94,7 +94,7 @@ export async function waitForHookServer(
 export async function sendHookEvent(
   config: HookServerConfig,
   event: HookEventPayload,
-  provider = 'claude',
+  provider = 'copilot',
 ): Promise<void> {
   const response = await fetch(`http://127.0.0.1:${config.port}/api/hooks/${provider}`, {
     method: 'POST',

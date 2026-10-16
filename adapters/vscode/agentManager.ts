@@ -16,22 +16,25 @@ import {
 import { loadLayout } from '../../server/src/layoutPersistence.js';
 import { assignPaletteIfNeeded } from '../../server/src/paletteAssigner.js';
 import { COPILOT_TERMINAL_NAME_PREFIX } from '../../server/src/providers/hook/copilot/constants.js';
-import { copilotProvider } from '../../server/src/providers/index.js';
+import { copilotProvider, hookProviders } from '../../server/src/providers/index.js';
 import { cancelPermissionTimer, cancelWaitingTimer } from '../../server/src/timerManager.js';
 import type { AgentState, PersistedAgent } from '../../server/src/types.js';
 
-export function getProjectDirPath(cwd?: string): string {
-  // Fall back to home directory when no workspace folder is open (common on Linux/macOS
-  // when VS Code is launched without a folder). The provider's getSessionDirs already
-  // implements the Windows case-insensitive fallback for drive-letter casing.
+export function getAllProjectDirPaths(cwd?: string): string[] {
   const workspacePath = cwd || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || os.homedir();
-  const dirs = copilotProvider.getSessionDirs?.(workspacePath) ?? [];
-  if (dirs.length === 0) {
-    return workspacePath;
+  const allDirs: string[] = [];
+  for (const p of hookProviders) {
+    const dirs = p.getSessionDirs?.(workspacePath) ?? [];
+    allDirs.push(...dirs);
   }
-  const projectDir = dirs[0];
-  console.log(`[CopilotPixel] Terminal: Project dir: ${workspacePath} → ${projectDir}`);
-  return projectDir;
+  return [...new Set(allDirs.filter(Boolean))];
+}
+
+export function getProjectDirPath(cwd?: string): string {
+  const all = getAllProjectDirPaths(cwd);
+  if (all.length > 0) return all[0];
+  const workspacePath = cwd || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || os.homedir();
+  return workspacePath;
 }
 
 export async function launchNewTerminal(
@@ -54,7 +57,7 @@ export async function launchNewTerminal(
   const folders = vscode.workspace.workspaceFolders;
   // Use home directory as fallback cwd when no workspace is open (common on Linux/macOS).
   // This ensures the terminal starts in a predictable location that matches the project
-  // dir hash Claude Code will use for JSONL transcript files.
+  // dir hash the CLI will use for JSONL transcript files.
   const cwd = folderPath || folders?.[0]?.uri.fsPath || os.homedir();
   const isMultiRoot = !!(folders && folders.length > 1);
   const idx = nextTerminalIndexRef.current++;
@@ -63,7 +66,7 @@ export async function launchNewTerminal(
     cwd,
   });
   // When suppressShow is set (auto-spawn + autoShowPanel), keep the panel view
-  // on CopilotPixel instead of switching to Terminal. Claude Code still runs
+  // on CopilotAgents instead of switching to Terminal. The CLI still runs
   // via sendText below; user can click the character to focus the terminal via
   // the existing focusAgent message handler.
   if (!suppressShow) {
@@ -125,7 +128,7 @@ export async function launchNewTerminal(
   agents.set(id, agent);
   activeAgentIdRef.current = id;
   persistAgents();
-  console.log(`[CopilotPixel] Terminal: Agent ${id} - created for terminal ${terminal.name}`);
+  console.log(`[CopilotAgents] Terminal: Agent ${id} - created for terminal ${terminal.name}`);
 
   ensureProjectScan(
     projectDir,
@@ -144,13 +147,13 @@ export async function launchNewTerminal(
   // Poll for the specific JSONL file to appear
   const createdAt = Date.now();
   let pollCount = 0;
-  console.log(`[CopilotPixel] Terminal: Agent ${id} - waiting for JSONL at ${agent.jsonlFile}`);
+  console.log(`[CopilotAgents] Terminal: Agent ${id} - waiting for JSONL at ${agent.jsonlFile}`);
   const pollTimer = setInterval(() => {
     pollCount++;
     try {
       if (fs.existsSync(agent.jsonlFile)) {
         console.log(
-          `[CopilotPixel] Terminal: Agent ${id} - found JSONL file ${path.basename(agent.jsonlFile)} (after ${pollCount}s)`,
+          `[CopilotAgents] Terminal: Agent ${id} - found JSONL file ${path.basename(agent.jsonlFile)} (after ${pollCount}s)`,
         );
         clearInterval(pollTimer);
         jsonlPollTimers.delete(id);
@@ -182,7 +185,7 @@ export async function launchNewTerminal(
           dirContents = 'Dir does not exist';
         }
         console.warn(
-          `[CopilotPixel] Terminal: Agent ${id} - JSONL file not found after 10s. ` +
+          `[CopilotAgents] Terminal: Agent ${id} - JSONL file not found after 10s. ` +
             `Expected: ${agent.jsonlFile}. ${dirContents}`,
         );
       } else if (pollCount > 10) {
@@ -202,7 +205,7 @@ export async function launchNewTerminal(
 
           if (candidates.length > 0) {
             console.log(
-              `[CopilotPixel] Terminal: Agent ${id} - /resume detected, reassigning to ${path.basename(candidates[0].file)}`,
+              `[CopilotAgents] Terminal: Agent ${id} - /resume detected, reassigning to ${path.basename(candidates[0].file)}`,
             );
             clearInterval(pollTimer);
             jsonlPollTimers.delete(id);
@@ -400,17 +403,17 @@ export function restoreAgents(
     knownJsonlFiles.add(p.jsonlFile);
     if (isExternal) {
       console.log(
-        `[CopilotPixel] Terminal: Agent ${p.id} - restored external → ${path.basename(p.jsonlFile)}`,
+        `[CopilotAgents] Terminal: Agent ${p.id} - restored external → ${path.basename(p.jsonlFile)}`,
       );
     } else {
       console.log(
-        `[CopilotPixel] Terminal: Agent ${p.id} - restored → terminal "${p.terminalName}"`,
+        `[CopilotAgents] Terminal: Agent ${p.id} - restored → terminal "${p.terminalName}"`,
       );
       justRestoredTerminalIds.push(p.id);
     }
 
     if (p.id > maxId) maxId = p.id;
-    // Extract terminal index from name like "Claude Code #3"
+    // Extract terminal index from name like "the CLI #3"
     const match = p.terminalName.match(/#(\d+)$/);
     if (match) {
       const idx = parseInt(match[1], 10);
@@ -438,7 +441,7 @@ export function restoreAgents(
         const pollTimer = setInterval(() => {
           try {
             if (fs.existsSync(agent.jsonlFile)) {
-              console.log(`[CopilotPixel] Terminal: Agent ${p.id} - found JSONL file`);
+              console.log(`[CopilotAgents] Terminal: Agent ${p.id} - found JSONL file`);
               clearInterval(pollTimer);
               jsonlPollTimers.delete(p.id);
               const stat = fs.statSync(agent.jsonlFile);
@@ -466,7 +469,7 @@ export function restoreAgents(
 
   // After a short delay, remove terminal agents that we JUST restored from
   // workspaceState and which never received data. These are dead terminals
-  // restored by VS Code (e.g., after a window reload) where Claude is no
+  // restored by VS Code (e.g., after a window reload) where the CLI is no
   // longer running. Only target the IDs the loop above actually added — never
   // pre-existing agents from launchNewTerminal in the same session whose
   // expected JSONL may still be on its way (heuristic /resume waits ~11s).
@@ -476,7 +479,7 @@ export function restoreAgents(
         const agent = store.get(id);
         if (agent && !agent.isExternal && agent.linesProcessed === 0) {
           console.log(
-            `[CopilotPixel] Terminal: Agent ${id} - removing restored agent, no data received`,
+            `[CopilotAgents] Terminal: Agent ${id} - removing restored agent, no data received`,
           );
           agent.terminalRef?.dispose();
           removeAgent(
@@ -549,7 +552,7 @@ export function sendExistingAgents(
     }
   }
   console.log(
-    `[CopilotPixel] sendExistingAgents: agents=${JSON.stringify(agentIds)}, meta=${JSON.stringify(agentMeta)}`,
+    `[CopilotAgents] sendExistingAgents: agents=${JSON.stringify(agentIds)}, meta=${JSON.stringify(agentMeta)}`,
   );
 
   webview.postMessage({

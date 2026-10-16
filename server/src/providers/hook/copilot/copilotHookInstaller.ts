@@ -143,7 +143,7 @@ export function copyHookScript(extensionPath: string): boolean {
     fs.chmodSync(destinationPath, 0o700);
     return true;
   } catch (error) {
-    console.error(`[CopilotPixel] Failed to copy Copilot hook script: ${error}`);
+    console.error(`[CopilotAgents] Failed to copy Copilot hook script: ${error}`);
     return false;
   }
 }

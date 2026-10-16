@@ -32,31 +32,31 @@ describe('FileStateAdapter', () => {
 
   it('returns defaults when config file does not exist', () => {
     const adapter = new FileStateAdapter({ namespace: 'standalone' });
-    expect(adapter.getSetting('pixel-agents.soundEnabled', false)).toBe(true);
-    expect(adapter.getSetting('pixel-agents.watchAllSessions', true)).toBe(false);
-    expect(adapter.getSetting('pixel-agents.lastSeenVersion', 'x')).toBe('');
+    expect(adapter.getSetting('copilot-agents.soundEnabled', false)).toBe(true);
+    expect(adapter.getSetting('copilot-agents.watchAllSessions', true)).toBe(false);
+    expect(adapter.getSetting('copilot-agents.lastSeenVersion', 'x')).toBe('');
   });
 
   it('round-trips each namespaced setting key (hooksEnabled moved to the per-provider map)', () => {
     const adapter = new FileStateAdapter({ namespace: 'standalone' });
 
-    adapter.setSetting('pixel-agents.soundEnabled', false);
-    adapter.setSetting('pixel-agents.lastSeenVersion', '1.3');
-    adapter.setSetting('pixel-agents.alwaysShowLabels', true);
-    adapter.setSetting('pixel-agents.watchAllSessions', true);
-    adapter.setSetting('pixel-agents.hooksInfoShown', true);
+    adapter.setSetting('copilot-agents.soundEnabled', false);
+    adapter.setSetting('copilot-agents.lastSeenVersion', '1.3');
+    adapter.setSetting('copilot-agents.alwaysShowLabels', true);
+    adapter.setSetting('copilot-agents.watchAllSessions', true);
+    adapter.setSetting('copilot-agents.hooksInfoShown', true);
 
-    expect(adapter.getSetting('pixel-agents.soundEnabled', true)).toBe(false);
-    expect(adapter.getSetting('pixel-agents.lastSeenVersion', '')).toBe('1.3');
-    expect(adapter.getSetting('pixel-agents.alwaysShowLabels', false)).toBe(true);
-    expect(adapter.getSetting('pixel-agents.watchAllSessions', false)).toBe(true);
-    expect(adapter.getSetting('pixel-agents.hooksInfoShown', false)).toBe(true);
+    expect(adapter.getSetting('copilot-agents.soundEnabled', true)).toBe(false);
+    expect(adapter.getSetting('copilot-agents.lastSeenVersion', '')).toBe('1.3');
+    expect(adapter.getSetting('copilot-agents.alwaysShowLabels', false)).toBe(true);
+    expect(adapter.getSetting('copilot-agents.watchAllSessions', false)).toBe(true);
+    expect(adapter.getSetting('copilot-agents.hooksInfoShown', false)).toBe(true);
 
     // hooksEnabled is deliberately NOT an adapter key any more: it is
     // per-provider and machine-global, so the adapter ignores it and the
     // per-provider accessors own it.
-    adapter.setSetting('pixel-agents.hooksEnabled', false);
-    expect(adapter.getSetting('pixel-agents.hooksEnabled', true)).toBe(true);
+    adapter.setSetting('copilot-agents.hooksEnabled', false);
+    expect(adapter.getSetting('copilot-agents.hooksEnabled', true)).toBe(true);
     setHooksEnabled('copilot', false);
     expect(getHooksEnabled('copilot')).toBe(false);
   });
@@ -65,13 +65,13 @@ describe('FileStateAdapter', () => {
     const vscode = new FileStateAdapter({ namespace: 'vscode' });
     const standalone = new FileStateAdapter({ namespace: 'standalone' });
 
-    vscode.setSetting('pixel-agents.watchAllSessions', true);
-    standalone.setSetting('pixel-agents.watchAllSessions', false);
+    vscode.setSetting('copilot-agents.watchAllSessions', true);
+    standalone.setSetting('copilot-agents.watchAllSessions', false);
 
-    expect(vscode.getSetting('pixel-agents.watchAllSessions', null)).toBe(true);
-    expect(standalone.getSetting('pixel-agents.watchAllSessions', null)).toBe(false);
+    expect(vscode.getSetting('copilot-agents.watchAllSessions', null)).toBe(true);
+    expect(standalone.getSetting('copilot-agents.watchAllSessions', null)).toBe(false);
 
-    const configPath = path.join(tempHome, '.copilotpixel', 'config.json');
+    const configPath = path.join(tempHome, '.copilot-agents', 'config.json');
     const parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as Record<
       string,
       Record<string, unknown>
@@ -82,28 +82,28 @@ describe('FileStateAdapter', () => {
 
   it('ignores unknown setting keys (returns default, does not write)', () => {
     const adapter = new FileStateAdapter({ namespace: 'standalone' });
-    expect(adapter.getSetting('pixel-agents.unknownKey', 'fallback')).toBe('fallback');
-    adapter.setSetting('pixel-agents.unknownKey', 'ignored');
-    const configPath = path.join(tempHome, '.copilotpixel', 'config.json');
+    expect(adapter.getSetting('copilot-agents.unknownKey', 'fallback')).toBe('fallback');
+    adapter.setSetting('copilot-agents.unknownKey', 'ignored');
+    const configPath = path.join(tempHome, '.copilot-agents', 'config.json');
     expect(fs.existsSync(configPath)).toBe(false);
   });
 
-  it('accepts setting keys with or without the pixel-agents. prefix', () => {
+  it('accepts setting keys with or without the copilot-agents. prefix', () => {
     const adapter = new FileStateAdapter({ namespace: 'standalone' });
-    adapter.setSetting('pixel-agents.soundEnabled', false);
+    adapter.setSetting('copilot-agents.soundEnabled', false);
     expect(adapter.getSetting('soundEnabled', true)).toBe(false);
     adapter.setSetting('lastSeenVersion', '1.0');
-    expect(adapter.getSetting('pixel-agents.lastSeenVersion', '')).toBe('1.0');
+    expect(adapter.getSetting('copilot-agents.lastSeenVersion', '')).toBe('1.0');
   });
 
   it('persists settings under namespace in config.json with clean field names', () => {
     const adapter = new FileStateAdapter({ namespace: 'standalone' });
-    adapter.setSetting('pixel-agents.soundEnabled', false);
-    const configPath = path.join(tempHome, '.copilotpixel', 'config.json');
+    adapter.setSetting('copilot-agents.soundEnabled', false);
+    const configPath = path.join(tempHome, '.copilot-agents', 'config.json');
     const raw = fs.readFileSync(configPath, 'utf-8');
     const parsed = JSON.parse(raw) as Record<string, Record<string, unknown>>;
     expect(parsed.standalone.soundEnabled).toBe(false);
-    expect(parsed.standalone['pixel-agents.soundEnabled']).toBeUndefined();
+    expect(parsed.standalone['copilot-agents.soundEnabled']).toBeUndefined();
   });
 
   // ── Per-namespace state file (agents + seats) ───────────────
@@ -120,7 +120,7 @@ describe('FileStateAdapter', () => {
       {
         id: 1,
         sessionId: 'sess-1',
-        terminalName: 'Claude Code #1',
+        terminalName: 'Copilot CLI #1',
         jsonlFile: '/tmp/sess-1.jsonl',
         projectDir: '/tmp/proj',
       },
@@ -129,10 +129,10 @@ describe('FileStateAdapter', () => {
     expect(adapter.loadAgents()).toEqual(agents);
   });
 
-  it('writes state at ~/.copilotpixel/<namespace>-state.json', () => {
+  it('writes state at ~/.copilot-agents/<namespace>-state.json', () => {
     const adapter = new FileStateAdapter({ namespace: 'vscode' });
     adapter.saveSeats({ '1': { palette: 2, hueShift: 45 } });
-    const stateFile = path.join(tempHome, '.copilotpixel', 'vscode-state.json');
+    const stateFile = path.join(tempHome, '.copilot-agents', 'vscode-state.json');
     expect(fs.existsSync(stateFile)).toBe(true);
   });
 

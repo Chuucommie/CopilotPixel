@@ -6,7 +6,7 @@ import * as path from 'path';
  * The same JSONL transcript reaches the runtime through two producers that spell it
  * differently on Windows:
  *
- *  - hooks carry `transcript_path` derived from Claude's own `process.cwd()`
+ *  - hooks carry `transcript_path` derived from the CLI's own `process.cwd()`
  *    (`...\projects\C--Users-me-project\<id>.jsonl`)
  *  - the scanners build paths from the workspace folder VS Code reports, and
  *    `Uri.fsPath` lowercases the drive letter

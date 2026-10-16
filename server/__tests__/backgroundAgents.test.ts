@@ -12,8 +12,7 @@ import {
   setSubagentWatch,
   setTeamProvider,
 } from '../src/fileWatcher.js';
-import { claudeProvider } from '../src/providers/hook/claude/claude.js';
-import { claudeTeamProvider } from '../src/providers/hook/claude/claudeTeamProvider.js';
+import { copilotProvider } from '../src/providers/index.js';
 import { SubagentWatch } from '../src/subagentWatch.js';
 import {
   processTranscriptLine,
@@ -22,6 +21,7 @@ import {
   setHookProvider,
 } from '../src/transcriptParser.js';
 import type { AgentState } from '../src/types.js';
+import { mockTeamProvider } from './helpers/mockTeamProvider.js';
 
 const LEAD_SESSION = 'lead-session-1';
 const SPAWN_TOOL_ID = 'toolu_01LMvN98KN4sn1fmvftm7vhk';
@@ -55,7 +55,7 @@ function createLeadAgent(projectDir: string): AgentState {
   } as AgentState;
 }
 
-/** Records shaped like the background-agent flow (Claude 2.1.x, teams OFF):
+/** Records shaped like the background-agent flow (CLI, teams OFF):
  *  unflagged Agent tool_use, "Async agent launched" result, queue-operation
  *  completion. */
 function agentSpawnRecord(): string {
@@ -209,10 +209,10 @@ describe('background spawns (teams OFF) classified by sidecar name', () => {
   }
 
   beforeEach(() => {
-    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pixel-agents-bg-'));
-    setHookProvider(claudeProvider);
-    setFileWatcherHookProvider(claudeProvider);
-    setTeamProvider(claudeTeamProvider);
+    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-agents-bg-'));
+    setHookProvider(copilotProvider);
+    setFileWatcherHookProvider(copilotProvider);
+    setTeamProvider(mockTeamProvider);
     agents = new AgentStateStore();
     watch = new SubagentWatch(agents);
     setSubagentWatch(watch);
@@ -519,7 +519,7 @@ describe('background spawns (teams OFF) classified by sidecar name', () => {
 
   it('does not create a second teammate when the sidecar path is spelled differently', () => {
     // Windows only: the same transcript reaches the runtime spelled two ways
-    // (hooks carry Claude's `process.cwd()` casing, scanners build from
+    // (hooks carry the CLI's `process.cwd()` casing, scanners build from
     // Uri.fsPath's lowercased drive letter). An exact-string already-tracked
     // check missed and adopted the same background agent twice.
     const platformSpy = vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
@@ -665,7 +665,7 @@ describe('background spawn persistence & derived team lifecycle', () => {
 
   it('drops the LEAD badge when the last teammate leaves', () => {
     const store = new AgentStateStore();
-    const runtime = new AgentRuntime(store, claudeProvider);
+    const runtime = new AgentRuntime(store, copilotProvider);
     try {
       const lead = createLeadAgent('/tmp/proj');
       lead.isTeamLead = true;
@@ -693,7 +693,7 @@ describe('background spawn persistence & derived team lifecycle', () => {
 
   it('keeps the LEAD badge while other teammates remain', () => {
     const store = new AgentStateStore();
-    const runtime = new AgentRuntime(store, claudeProvider);
+    const runtime = new AgentRuntime(store, copilotProvider);
     try {
       const lead = createLeadAgent('/tmp/proj');
       lead.isTeamLead = true;
@@ -719,7 +719,7 @@ describe('background spawn persistence & derived team lifecycle', () => {
   });
 
   it('restores the lead set and skips stale child entries (leadAgentId, no teamName)', () => {
-    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pixel-agents-bg-restore-'));
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-agents-bg-restore-'));
     const leadJsonl = path.join(tmpRoot, `${LEAD_SESSION}.jsonl`);
     const childJsonl = path.join(tmpRoot, 'child.jsonl');
     fs.writeFileSync(leadJsonl, '');
@@ -751,7 +751,7 @@ describe('background spawn persistence & derived team lifecycle', () => {
 
     const store = new AgentStateStore();
     store.setAdapter(adapter);
-    const runtime = new AgentRuntime(store, claudeProvider);
+    const runtime = new AgentRuntime(store, copilotProvider);
     try {
       runtime.restoreExternalAgents();
 

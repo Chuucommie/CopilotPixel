@@ -103,7 +103,7 @@ async function ensurePanelIsLarge(window: Page): Promise<void> {
 
   await expect
     .poll(() => getPanelHeight(window), {
-      message: 'Expected the bottom panel to be resized for the CopilotPixel webview',
+      message: 'Expected the bottom panel to be resized for the CopilotAgents webview',
       timeout: PANEL_OPEN_TIMEOUT_MS,
       intervals: [250, 500, 1000],
     })
@@ -111,12 +111,12 @@ async function ensurePanelIsLarge(window: Page): Promise<void> {
 }
 
 /**
- * Open the CopilotPixel panel via the Command Palette and wait for the
- * "CopilotPixel: Show Panel" command to execute.
+ * Open the CopilotAgents panel via the Command Palette and wait for the
+ * "CopilotAgents: Show Panel" command to execute.
  */
 /**
  * Close the bottom panel. Triggers onDidChangeVisibility(false) on every
- * WebviewView hosted there; since PixelAgentsViewProvider does NOT set
+ * WebviewView hosted there; since CopilotAgentsViewProvider does NOT set
  * retainContextWhenHidden, the webview is disposed and resolveWebviewView
  * is called fresh when the panel reopens. Used by the restored-agents test to exercise
  * the existingAgents restore path without a destructive iframe reload.
@@ -124,7 +124,7 @@ async function ensurePanelIsLarge(window: Page): Promise<void> {
  * Toggle (rather than Close) is used because the literal command name varies
  * by VS Code locale/version; "View: Toggle Panel" is stable. Caller must
  * ensure the panel is currently open before calling (it will be after a
- * preceding openPixelAgentsPanel + spawn flow).
+ * preceding openCopilotAgentsPanel + spawn flow).
  */
 export async function closeBottomPanel(window: Page): Promise<void> {
   // Use the default Toggle Panel chord (⌘J / Ctrl+J) instead of the command
@@ -141,7 +141,7 @@ export async function closeBottomPanel(window: Page): Promise<void> {
     await window.mouse.click(statusBox.x + statusBox.width / 2, statusBox.y + statusBox.height / 2);
   }
   await window.keyboard.press(process.platform === 'darwin' ? 'Meta+J' : 'Control+J');
-  // Wait until the CopilotPixel webview is actually DESTROYED, not merely
+  // Wait until the CopilotAgents webview is actually DESTROYED, not merely
   // hidden. VS Code disposes a hidden WebviewView lazily; returning on a
   // fixed sleep lets a quick reopen re-show the SAME webview context, which
   // breaks tests whose premise is a fresh webview (e.g. restored-agents reads
@@ -161,7 +161,7 @@ export async function closeBottomPanel(window: Page): Promise<void> {
         return false;
       },
       {
-        message: 'Expected the CopilotPixel webview to be disposed after closing the panel',
+        message: 'Expected the CopilotAgents webview to be disposed after closing the panel',
         timeout: 15_000,
       },
     )
@@ -170,11 +170,11 @@ export async function closeBottomPanel(window: Page): Promise<void> {
 
 /**
  * Reopen the bottom panel with the same ⌘J/Ctrl+J toggle closeBottomPanel
- * used. Compared to openPixelAgentsPanel (palette "Show Panel" plus a
+ * used. Compared to openCopilotAgentsPanel (palette "Show Panel" plus a
  * possible "Toggle Maximized Panel" resize), the chord restores the panel
  * exactly as it was — no command-palette overlays in the run video. Caller
  * must have closed the panel with closeBottomPanel first, and should follow
- * with getPixelAgentsFrame(window) to wait for the fresh webview.
+ * with getCopilotAgentsFrame(window) to wait for the fresh webview.
  */
 export async function reopenBottomPanel(window: Page): Promise<void> {
   const statusBox = await window
@@ -188,7 +188,7 @@ export async function reopenBottomPanel(window: Page): Promise<void> {
 }
 
 /**
- * Single-shot (non-waiting) check for the CopilotPixel webview frame.
+ * Single-shot (non-waiting) check for the CopilotAgents webview frame.
  *
  * The iframe must be VISIBLE, not merely attached: after the panel is hidden
  * (View: Toggle Panel), VS Code keeps the dying webview's iframe in the DOM
@@ -196,12 +196,12 @@ export async function reopenBottomPanel(window: Page): Promise<void> {
  * addAgentLog) belongs to the previous webview lifetime — the restored-agents
  * test reads a fresh webview's log and MUST NOT see the old one.
  */
-async function findPixelAgentsFrameOnce(window: Page): Promise<Frame | null> {
+async function findCopilotAgentsFrameOnce(window: Page): Promise<Frame | null> {
   for (const frame of window.frames()) {
     if (!frame.url().startsWith('vscode-webview://')) continue;
     try {
       // count() resolves immediately (no waiting); a non-zero count means
-      // this is the CopilotPixel frame.
+      // this is the CopilotAgents frame.
       const buttonCount = await frame.locator('button', { hasText: '+ Agent' }).count();
       if (buttonCount === 0) continue;
       const frameElement = await frame.frameElement();
@@ -217,7 +217,7 @@ async function findPixelAgentsFrameOnce(window: Page): Promise<Frame | null> {
   return null;
 }
 
-export async function openPixelAgentsPanel(
+export async function openCopilotAgentsPanel(
   window: Page,
   opts: { autoShown?: boolean } = {},
 ): Promise<void> {
@@ -225,17 +225,17 @@ export async function openPixelAgentsPanel(
   // nothing to open — mid-test callers hit this when the view never got
   // hidden (terminals open as editor tabs now; see launch.ts).
   //
-  // autoShown: the seeded pixel-agents.autoShowPanel setting (see
+  // autoShown: the seeded copilot-agents.autoShowPanel setting (see
   // e2e/helpers/launch.ts) focuses the view on activation, so at fixture
   // setup the webview surfaces without any command-palette interaction. Poll
   // for it and fall back to the palette only if it never appears. Mid-test
   // callers reopening a deliberately closed panel skip the poll (the view
   // won't auto-show again) and go straight to the palette.
-  let shown = (await findPixelAgentsFrameOnce(window)) !== null;
+  let shown = (await findCopilotAgentsFrameOnce(window)) !== null;
   if (!shown && opts.autoShown) {
     const deadline = Date.now() + PANEL_OPEN_TIMEOUT_MS;
     while (Date.now() < deadline) {
-      if (await findPixelAgentsFrameOnce(window)) {
+      if (await findCopilotAgentsFrameOnce(window)) {
         shown = true;
         break;
       }
@@ -248,7 +248,7 @@ export async function openPixelAgentsPanel(
     }
   }
   if (!shown) {
-    await runCommand(window, 'CopilotPixel: Show Panel');
+    await runCommand(window, 'CopilotAgents: Show Panel');
   }
 
   // Wait for the panel container to appear
@@ -286,10 +286,10 @@ async function getPanelRect(window: Page): Promise<PanelRect | null> {
 }
 
 /**
- * Arrange the workbench into the run-video layout: CopilotPixel panel (docked
+ * Arrange the workbench into the run-video layout: CopilotAgents panel (docked
  * left via workbench.panel.defaultLocation, see launch.ts) at ~2/3 window
  * width, editor area (terminal tabs) in the remaining third, primary and
- * secondary side bars hidden. Called once per test by the pixelAgents fixture
+ * secondary side bars hidden. Called once per test by the copilotAgents fixture
  * right after the panel is shown.
  *
  * Side-bar visibility has no settings key, so hide-by-toggle with the default
@@ -355,7 +355,7 @@ export async function arrangeReviewLayout(window: Page): Promise<void> {
     let touched = false;
     // The hide chords need workbench (not webview) focus: webviews forward
     // only a whitelist of keybindings, and autoShowPanel leaves focus inside
-    // the CopilotPixel webview. Clicking the empty middle of the status bar
+    // the CopilotAgents webview. Clicking the empty middle of the status bar
     // moves focus to workbench chrome without triggering any action.
     const statusBox = await window
       .locator('.part.statusbar')
@@ -385,24 +385,24 @@ export async function arrangeReviewLayout(window: Page): Promise<void> {
 }
 
 /**
- * Find and return the CopilotPixel webview frame.
+ * Find and return the CopilotAgents webview frame.
  *
  * VS Code renders WebviewViewProvider content in an <iframe> whose URL
  * starts with "vscode-webview://". Because VS Code can have multiple
  * webviews, we wait until one frame exposes the "+ Agent" button before
  * returning it.
  */
-export async function getPixelAgentsFrame(window: Page): Promise<Frame> {
+export async function getCopilotAgentsFrame(window: Page): Promise<Frame> {
   let foundFrame: Frame | null = null;
 
   await expect
     .poll(
       async () => {
-        foundFrame = await findPixelAgentsFrameOnce(window);
+        foundFrame = await findCopilotAgentsFrameOnce(window);
         return foundFrame !== null;
       },
       {
-        message: 'CopilotPixel webview frame with "+ Agent" button not found',
+        message: 'CopilotAgents webview frame with "+ Agent" button not found',
         timeout: WEBVIEW_TIMEOUT_MS,
         intervals: [250, 500, 1000],
       },

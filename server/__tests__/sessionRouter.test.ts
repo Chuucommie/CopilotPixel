@@ -69,14 +69,14 @@ describe('SessionRouter', () => {
 
   describe('event buffering', () => {
     it('bufferEvent stores events for later', () => {
-      router.bufferEvent('claude', { session_id: 'sess-1', hook_event_name: 'Stop' });
+      router.bufferEvent('copilot', { session_id: 'sess-1', hook_event_name: 'Stop' });
       expect(router.hasBuffered('sess-1')).toBe(true);
       expect(router.hasBuffered('sess-2')).toBe(false);
     });
 
     it('register flushes buffered events for that session', () => {
-      router.bufferEvent('claude', { session_id: 'sess-1', hook_event_name: 'Stop' });
-      router.bufferEvent('claude', { session_id: 'sess-1', hook_event_name: 'PermissionRequest' });
+      router.bufferEvent('copilot', { session_id: 'sess-1', hook_event_name: 'Stop' });
+      router.bufferEvent('copilot', { session_id: 'sess-1', hook_event_name: 'PermissionRequest' });
 
       const flushed = router.register('sess-1', 1);
 
@@ -87,8 +87,8 @@ describe('SessionRouter', () => {
     });
 
     it('register does not flush events for other sessions', () => {
-      router.bufferEvent('claude', { session_id: 'sess-1', hook_event_name: 'Stop' });
-      router.bufferEvent('claude', { session_id: 'sess-2', hook_event_name: 'Stop' });
+      router.bufferEvent('copilot', { session_id: 'sess-1', hook_event_name: 'Stop' });
+      router.bufferEvent('copilot', { session_id: 'sess-2', hook_event_name: 'Stop' });
 
       const flushed = router.register('sess-1', 1);
 
@@ -97,14 +97,14 @@ describe('SessionRouter', () => {
     });
 
     it('pruneExpired removes old events', () => {
-      router.bufferEvent('claude', { session_id: 'sess-old', hook_event_name: 'Stop' });
+      router.bufferEvent('copilot', { session_id: 'sess-old', hook_event_name: 'Stop' });
       vi.advanceTimersByTime(6_000); // > HOOK_EVENT_BUFFER_MS (5s)
       router.pruneExpired();
       expect(router.hasBuffered('sess-old')).toBe(false);
     });
 
     it('preserves recent events during prune', () => {
-      router.bufferEvent('claude', { session_id: 'sess-new', hook_event_name: 'Stop' });
+      router.bufferEvent('copilot', { session_id: 'sess-new', hook_event_name: 'Stop' });
       vi.advanceTimersByTime(1_000); // < HOOK_EVENT_BUFFER_MS
       router.pruneExpired();
       expect(router.hasBuffered('sess-new')).toBe(true);
@@ -121,7 +121,7 @@ describe('SessionRouter', () => {
         transcriptPath: undefined,
         cwd: '/',
       });
-      router.bufferEvent('claude', { session_id: 'sess-2', hook_event_name: 'Stop' });
+      router.bufferEvent('copilot', { session_id: 'sess-2', hook_event_name: 'Stop' });
 
       router.dispose();
 

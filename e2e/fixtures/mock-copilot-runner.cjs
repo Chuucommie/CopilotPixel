@@ -23,12 +23,12 @@ function parseSessionId(argv) {
   return '';
 }
 
-function claudeProjectDirName(workspacePath) {
+function copilotProjectDirName(workspacePath) {
   return workspacePath.replace(/[^a-zA-Z0-9-]/g, '-');
 }
 
 function getMockRoot(homeDir) {
-  return path.join(homeDir, '.claude-mock');
+  return path.join(homeDir, '.copilot-mock');
 }
 
 function getScenarioQueuePath(homeDir) {
@@ -86,12 +86,12 @@ const ANSI_YELLOW = '\u001b[33m';
 const ANSI_MAGENTA = '\u001b[35m';
 const ANSI_RESET = '\u001b[0m';
 
-// External sessions (spawned detached by the e2e harness so CopilotPixel
+// External sessions (spawned detached by the e2e harness so CopilotAgents
 // ADOPTS them instead of launching them) narrate into a shared per-test log
 // that a monitor terminal tails. The magenta prefix keeps their lines
 // visually distinct from internal-terminal narration, and the short
 // per-session tag keeps interleaved external sessions tellable apart.
-const IS_EXTERNAL = process.env.PIXEL_AGENTS_MOCK_EXTERNAL === '1';
+const IS_EXTERNAL = process.env.COPILOT_AGENTS_MOCK_EXTERNAL === '1';
 let externalTag = '';
 
 function tinySessionTag(value) {
@@ -106,16 +106,16 @@ function shortId(value) {
 }
 
 /**
- * Human-readable narration to stdout. CopilotPixel never reads the terminal
+ * Human-readable narration to stdout. CopilotAgents never reads the terminal
  * (its inputs are JSONL transcripts and hook POSTs), so this changes nothing
  * about what tests exercise — it exists purely so run recordings show WHAT
- * the mock is simulating and WHEN, where real claude would render its TUI.
+ * the mock is simulating and WHEN, where real copilot would render its TUI.
  */
 function echo(atMs, message) {
   const stamp = typeof atMs === 'number' ? `t+${(atMs / 1000).toFixed(1)}s`.padStart(7) : '       ';
   const prefix = IS_EXTERNAL
     ? `${ANSI_MAGENTA}[external·${externalTag}]${ANSI_DIM}${stamp}${ANSI_RESET}`
-    : `${ANSI_DIM}[mock-claude]${stamp}${ANSI_RESET}`;
+    : `${ANSI_DIM}[mock-copilot]${stamp}${ANSI_RESET}`;
   process.stdout.write(`${prefix} ${message}\n`);
 }
 
@@ -150,7 +150,7 @@ function describeHookPayload(payload) {
 }
 
 function ensureSessionContext(homeDir, sessionId, cwd) {
-  const projectDir = path.join(homeDir, '.claude', 'projects', claudeProjectDirName(cwd));
+  const projectDir = path.join(homeDir, '.copilot', 'projects', copilotProjectDirName(cwd));
   fs.mkdirSync(projectDir, { recursive: true });
   return {
     sessionId,
@@ -194,7 +194,7 @@ function deletePathTarget(filePath) {
 
 function readSettings(homeDir) {
   try {
-    const raw = fs.readFileSync(path.join(homeDir, '.claude', 'settings.json'), 'utf8');
+    const raw = fs.readFileSync(path.join(homeDir, '.copilot', 'settings.json'), 'utf8');
     return JSON.parse(raw);
   } catch {
     return {};
@@ -205,14 +205,14 @@ function normalizePathForMatch(value) {
   return String(value).replace(/\\/g, '/');
 }
 
-function isPixelAgentsHookCommand(homeDir, command) {
+function isCopilotAgentsHookCommand(homeDir, command) {
   if (typeof command !== 'string' || command.length === 0) {
     return false;
   }
 
   const normalizedCommand = normalizePathForMatch(command);
   const currentHookPath = normalizePathForMatch(
-    path.join(homeDir, '.pixel-agents', 'hooks', 'claude-hook.js'),
+    path.join(homeDir, '.copilot-agents', 'hooks', 'copilot-hook.js'),
   );
 
   return (
@@ -325,9 +325,9 @@ function runHookCommand(command, payload, env, cwd) {
   // (mockBin:/usr/local/bin:/usr/bin:/bin) with inheritEnv:false, which on CI
   // runners does NOT include the toolcache node dir — so bare `node` exits 127
   // and the hook never POSTs. The mock itself survives because its wrapper uses
-  // the absolute PIXEL_AGENTS_NODE_BIN, but the spawned hook uses bare `node`.
+  // the absolute COPILOT_AGENTS_NODE_BIN, but the spawned hook uses bare `node`.
   // Prepend the running node's bin dir to PATH so the hook resolves it, on any
-  // spawn path. (Real Claude Code spawns hooks with the user's real PATH, so
+  // spawn path. (Real GitHub Copilot CLI spawns hooks with the user's real PATH, so
   // this is purely a test-harness fix.)
   const nodeDir = path.dirname(process.execPath);
   const sep = process.platform === 'win32' ? ';' : ':';
@@ -368,7 +368,7 @@ async function emitHook(homeDir, context, payload) {
       if (hook?.type !== 'command' || typeof hook.command !== 'string' || hook.command.length === 0) {
         continue;
       }
-      if (!isPixelAgentsHookCommand(homeDir, hook.command)) {
+      if (!isCopilotAgentsHookCommand(homeDir, hook.command)) {
         continue;
       }
       matched += 1;
@@ -380,7 +380,7 @@ async function emitHook(homeDir, context, payload) {
       );
     }
   }
-  // Diagnostic: if no registered command matched the pixel-agents hook, the
+  // Diagnostic: if no registered command matched the copilot-agents hook, the
   // hook script was never spawned — log the computed path + the commands we
   // saw so a CI failure shows the mismatch instead of failing silently.
   if (matched === 0) {
@@ -411,7 +411,7 @@ async function playScenario(homeDir, scenario, context) {
     appendJsonl(context.transcriptPath, {
       type: 'system',
       subtype: 'init',
-      content: 'mock-claude-ready',
+      content: 'mock-copilot-ready',
     });
     logAction(homeDir, `appendJsonl self init ${path.basename(context.transcriptPath)}`);
     echo(0, `session ready, transcript ${path.basename(context.transcriptPath)}`);
@@ -508,12 +508,12 @@ async function main() {
   if (IS_EXTERNAL) {
     externalTag = tinySessionTag(sessionId);
     process.stdout.write(
-      `${ANSI_MAGENTA}══ EXTERNAL session ·${externalTag} — adopted by CopilotPixel, not launched ══${ANSI_RESET}\n`,
+      `${ANSI_MAGENTA}══ EXTERNAL session ·${externalTag} — adopted by CopilotAgents, not launched ══${ANSI_RESET}\n`,
     );
   }
   echo(
     null,
-    `mock claude session ${shortId(sessionId)}${scenario.name ? ` — scenario: ${scenario.name}` : ''}`,
+    `mock copilot session ${shortId(sessionId)}${scenario.name ? ` — scenario: ${scenario.name}` : ''}`,
   );
 
   const context = buildContext(homeDir, scenario, sessionId, cwd);

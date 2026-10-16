@@ -31,8 +31,8 @@ import {
   startExternalSessionScanning,
 } from '../src/fileWatcher.js';
 import { PathSet } from '../src/pathKey.js';
-import { claudeTeamProvider } from '../src/providers/hook/claude/claudeTeamProvider.js';
 import type { AgentState } from '../src/types.js';
+import { mockTeamProvider } from './helpers/mockTeamProvider.js';
 
 /**
  * Tests for the DismissalTracker integration with fileWatcher's scanner functions.
@@ -301,7 +301,7 @@ describe('fileWatcher dismissal state', () => {
       // would strip the teammate identity (no leadAgentId, and a seat picked by
       // findFreeSeat rather than the seat closest to its lead), and since
       // workspace polling runs under hooks it can beat the hook-driven attach.
-      setTeamProvider(claudeTeamProvider);
+      setTeamProvider(mockTeamProvider);
       try {
         const teamName = 'session-abc12345';
         const leadFile = writeJsonlFile('lead.jsonl', '{"type":"assistant"}\n');
@@ -337,7 +337,7 @@ describe('fileWatcher dismissal state', () => {
       // Hooks off = no fast-attach, so this scan is the ONLY discovery path for
       // tmux teammates. Guarding on team tags without checking hooks state broke
       // the hooks-off matrix specs: the teammate was never adopted at all.
-      setTeamProvider(claudeTeamProvider);
+      setTeamProvider(mockTeamProvider);
       try {
         const teamName = 'session-abc12345';
         const leadFile = writeJsonlFile('lead.jsonl', '{"type":"assistant"}\n');
@@ -366,7 +366,7 @@ describe('fileWatcher dismissal state', () => {
     });
 
     it('still adopts an orphan team session whose lead is not tracked', () => {
-      setTeamProvider(claudeTeamProvider);
+      setTeamProvider(mockTeamProvider);
       try {
         writeJsonlFile(
           'bbbbbbbb-2222-4222-8222-e2e000000002.jsonl',
@@ -458,7 +458,7 @@ describe('fileWatcher dismissal state', () => {
     });
 
     it('honors a dismissal recorded under a different path spelling', () => {
-      // Windows only: the user closes a hook-adopted agent (Claude's spelling of the
+      // Windows only: the user closes a hook-adopted agent (CLI spelling of the
       // transcript path) and the scanner then rediscovers the same file under VS Code's
       // spelling. An exact-string dismissal key missed and the file was re-adopted
       // seconds later, mid-cooldown.

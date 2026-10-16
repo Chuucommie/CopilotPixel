@@ -23,7 +23,7 @@ import { isBrowserRuntime, isE2E } from '../runtime.js';
 import { transport } from '../transport/index.js';
 
 /**
- * A Headless agent is one the office adopted from outside (`claude -p`, a session
+ * A Headless agent is one the office adopted from outside (a CLI session, a session
  * picked up by Watch All Sessions) and therefore has no terminal to focus. Its
  * character renders translucent so it reads as untouchable at a glance.
  *
@@ -93,7 +93,7 @@ interface ExtensionMessageState {
   setHooksEnabled: (v: boolean) => void;
   /** Actual install state per provider (hooksStatus messages) — absent/false
    *  while first-run consent is pending, unlike hooksEnabled which defaults
-   *  true. Keyed by providerId; today's Settings checkbox reads 'claude'. */
+   *  true. Keyed by providerId; today's Settings checkbox reads 'copilot'. */
   hooksInstalled: Record<string, boolean>;
   /** Bumped per provider on every hooksStatus message. `hooksInstalled` alone cannot say "the server answered": a
    *  failed install re-reports the `false` already held, so no effect runs. The Intro needs the ARRIVAL to tell a
@@ -187,16 +187,16 @@ export function useExtensionMessages(
     const handler = (msg: any) => {
       const os = getOfficeState();
       // CI / e2e diagnostic: record every received transport message on the
-      // window-side log. The fixture reads window.__pixelAgentsTestHooks.
+      // window-side log. The fixture reads window.__copilotAgentsTestHooks.
       // messageLog and attaches as JSON so CI failures can see the exact
       // sequence of messages the webview actually processed. Gated on the e2e
       // harness flag so this unbounded log never grows in a real session.
       if (isE2E && typeof window !== 'undefined') {
-        if (!window.__pixelAgentsTestHooks) window.__pixelAgentsTestHooks = {};
-        if (!window.__pixelAgentsTestHooks.messageLog) {
-          window.__pixelAgentsTestHooks.messageLog = [];
+        if (!window.__copilotAgentsTestHooks) window.__copilotAgentsTestHooks = {};
+        if (!window.__copilotAgentsTestHooks.messageLog) {
+          window.__copilotAgentsTestHooks.messageLog = [];
         }
-        window.__pixelAgentsTestHooks.messageLog.push({
+        window.__copilotAgentsTestHooks.messageLog.push({
           at: Date.now(),
           type: msg.type,
           id: msg.id,

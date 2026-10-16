@@ -3,6 +3,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import type { HookProvider } from '../../core/src/provider.js';
 import { AgentStateStore } from '../src/agentStateStore.js';
 import { CONTEXT_SEED_TAIL_BYTES, DEFAULT_MAX_CONTEXT_TOKENS } from '../src/constants.js';
 import {
@@ -11,7 +12,20 @@ import {
   updateContextUsage,
   widenContextWindow,
 } from '../src/contextUsage.js';
-import { claudeProvider, contextWindowForModel } from '../src/providers/hook/claude/claude.js';
+import { copilotProvider } from '../src/providers/index.js';
+
+function contextWindowForModel(model?: string): number | undefined {
+  if (!model) return undefined;
+  if (/large|gpt-4o\b|1m/i.test(model)) return 1_000_000;
+  if (/small|mini|200k/i.test(model)) return 200_000;
+  return undefined;
+}
+
+const testProvider: HookProvider = {
+  ...copilotProvider,
+  contextWindowForModel,
+};
+
 import type { AgentState } from '../src/types.js';
 
 function createTestAgent(overrides: Partial<AgentState> = {}): AgentState {
@@ -43,7 +57,7 @@ function createTestAgent(overrides: Partial<AgentState> = {}): AgentState {
   } as AgentState;
 }
 
-/** Assistant record shaped like Claude's: caching makes input_tokens tiny. */
+/** Assistant record shaped like caching makes input_tokens tiny. */
 function assistantRecord(
   opts: {
     input?: number;
@@ -57,7 +71,7 @@ function assistantRecord(
     type: 'assistant',
     isSidechain: opts.isSidechain ?? false,
     message: {
-      model: 'claude-opus-5',
+      model: 'model-large',
       usage: {
         input_tokens: opts.input ?? 2,
         cache_creation_input_tokens: opts.cacheCreation ?? 0,
@@ -94,19 +108,15 @@ describe('extractContextTokens', () => {
   });
 });
 
-describe('claudeProvider.contextWindowForModel', () => {
+describe('testProvider.contextWindowForModel', () => {
   it('gives the current models their large window', () => {
-    for (const model of ['claude-opus-5', 'claude-sonnet-5', 'claude-fable-5', 'claude-opus-4-8']) {
+    for (const model of ['model-large', 'model-large-2', 'model-large-3', 'model-large-4']) {
       expect(contextWindowForModel(model)).toBe(1_000_000);
     }
   });
 
   it('gives Haiku and the older line the small window', () => {
-    for (const model of [
-      'claude-haiku-4-5-20251001',
-      'claude-3-5-sonnet-20241022',
-      'claude-opus-4-1-20250805',
-    ]) {
+    for (const model of ['model-small', 'model-small-2', 'model-small-3']) {
       expect(contextWindowForModel(model)).toBe(200_000);
     }
   });
@@ -190,13 +200,13 @@ describe('updateContextUsage', () => {
 
   it("measures against the provider's window for the model that wrote the turn", () => {
     // Real numbers: a fresh Opus 5 session's first turn. Against the 200k
-    // default this reads 17% -- five times what Claude Code itself reports.
+    // default this reads 17% -- five times what the CLI itself reports.
     updateContextUsage(
       1,
       agent,
       agents,
       assistantRecord({ input: 2, cacheCreation: 12_753, cacheRead: 20_623, output: 226 }),
-      claudeProvider,
+      testProvider,
     );
 
     expect(agent.contextTokens).toBe(33_604);
@@ -204,7 +214,7 @@ describe('updateContextUsage', () => {
   });
 
   it('follows the window down when the session switches to a smaller model', () => {
-    updateContextUsage(1, agent, agents, assistantRecord({ cacheRead: 50_000 }), claudeProvider);
+    updateContextUsage(1, agent, agents, assistantRecord({ cacheRead: 50_000 }), testProvider);
     expect(agent.maxContextTokens).toBe(1_000_000);
 
     updateContextUsage(
@@ -213,9 +223,9 @@ describe('updateContextUsage', () => {
       agents,
       {
         ...assistantRecord({ cacheRead: 50_000 }),
-        message: { model: 'claude-haiku-4-5-20251001', usage: { cache_read_input_tokens: 50_000 } },
+        message: { model: 'model-small', usage: { cache_read_input_tokens: 50_000 } },
       },
-      claudeProvider,
+      testProvider,
     );
     expect(agent.maxContextTokens).toBe(200_000);
   });
@@ -228,11 +238,11 @@ describe('updateContextUsage', () => {
       {
         type: 'assistant',
         message: {
-          model: 'claude-haiku-4-5-20251001',
+          model: 'model-small',
           usage: { cache_read_input_tokens: 260_000 },
         },
       },
-      claudeProvider,
+      testProvider,
     );
 
     expect(agent.maxContextTokens).toBe(1_000_000);
@@ -253,7 +263,7 @@ describe('seedContextUsage', () => {
   let messages: Array<Record<string, unknown>>;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pixel-agents-context-'));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-agents-context-'));
     agents = new AgentStateStore();
     messages = [];
     agents.on('broadcast', (msg) => messages.push(msg as Record<string, unknown>));

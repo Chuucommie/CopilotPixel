@@ -108,9 +108,9 @@ async function verifyInstalledTarball(tarballPath) {
   // gate's own behavior is pinned by server/__tests__/cli.test.ts,
   // consentFlow.test.ts, and the consent e2e specs). Same shape as
   // server/__tests__/cli.test.ts.
-  fs.mkdirSync(path.join(smokeHome, '.copilotpixel'), { recursive: true });
+  fs.mkdirSync(path.join(smokeHome, '.copilot-agents'), { recursive: true });
   fs.writeFileSync(
-    path.join(smokeHome, '.copilotpixel', 'config.json'),
+    path.join(smokeHome, '.copilot-agents', 'config.json'),
     JSON.stringify({ hooksConsent: { copilot: 'granted' } }),
   );
   fs.writeFileSync(
@@ -201,8 +201,8 @@ async function verifyInstalledTarball(tarballPath) {
       throw new Error(`Installed package did not load non-empty bundled assets:\n${output}`);
     }
 
-    const installedHook = path.join(smokeHome, '.pixel-agents', 'hooks', 'copilot-hook.js');
-    const settingsPath = path.join(smokeHome, '.copilot', 'hooks', 'copilotpixel.json');
+    const installedHook = path.join(smokeHome, '.copilot-agents', 'hooks', 'copilot-hook.js');
+    const settingsPath = path.join(smokeHome, '.copilot', 'hooks', 'copilotagents.json');
     await waitFor(
       () => fs.existsSync(installedHook) && fs.existsSync(settingsPath),
       'consented Copilot hook installation',

@@ -102,7 +102,7 @@ export async function createHttpServer(options: HttpServerOptions): Promise<Http
         throw error;
       }
       console.warn(
-        `[CopilotPixel] Port ${requestedPort} is busy; retrying with an available ephemeral port.`,
+        `[CopilotAgents] Port ${requestedPort} is busy; retrying with an available ephemeral port.`,
       );
       portCandidate = 0;
     }
@@ -219,7 +219,7 @@ function registerWebSocketRoute(app: FastifyInstance, options: HttpServerOptions
       try {
         const msg = JSON.parse(data.toString()) as Record<string, unknown>;
         if (!options.embedded && msg.type) {
-          console.log('[CopilotPixel] WS client message:', msg.type);
+          console.log('[CopilotAgents] WS client message:', msg.type);
         }
         handleClientMessage(msg, (m) => safeSend(socket, m), {
           store,
@@ -276,9 +276,8 @@ export function isAllowedWebSocketOrigin(
 
 /**
  * Whether this socket may send PRIVILEGED messages — the ones that reach
- * outside `~/.pixel-agents/`. Today that is `setHooksEnabled`, which grants
- * durable, machine-wide consent to modify `~/.claude/settings.json` and
- * installs (or removes) a 12-event hook set.
+ * outside `~/.copilot-agents/`. Today that is `setHooksEnabled`, which grants
+ * durable, machine-wide consent to modify user CLI hook configurations.
  *
  * The handshake must carry the server token in its `?token=` query. That token
  * is minted at startup (server.ts), printed by the CLI inside the LOCAL url it
@@ -297,7 +296,7 @@ export function isAllowedWebSocketOrigin(
  * gate must ride something the channel never carries — an out-of-band secret
  * the operator's own URL delivers and the forwarded attacker never sees.
  *
- * A tokenless client is not locked out of CopilotPixel — it connects and
+ * A tokenless client is not locked out of CopilotAgents — it connects and
  * watches the office exactly as before (the connection gate,
  * isAllowedWebSocketOrigin, is separate and unchanged). It simply cannot
  * approve a change to a file in someone's home directory.

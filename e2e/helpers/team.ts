@@ -1,20 +1,20 @@
 import fs from 'fs';
 import path from 'path';
 
-function claudeProjectDirName(workspaceDir: string): string {
+function copilotProjectDirName(workspaceDir: string): string {
   return workspaceDir.replace(/[^a-zA-Z0-9-]/g, '-');
 }
 
-export function getClaudeProjectDir(tmpHome: string, workspaceDir: string): string {
-  return path.join(tmpHome, '.claude', 'projects', claudeProjectDirName(workspaceDir));
+export function getCopilotProjectDir(tmpHome: string, workspaceDir: string): string {
+  return path.join(tmpHome, '.copilot', 'projects', copilotProjectDirName(workspaceDir));
 }
 
-export function createClaudeTranscript(
+export function createCopilotTranscript(
   tmpHome: string,
   workspaceDir: string,
   sessionId: string,
 ): { projectDir: string; transcriptPath: string } {
-  const projectDir = getClaudeProjectDir(tmpHome, workspaceDir);
+  const projectDir = getCopilotProjectDir(tmpHome, workspaceDir);
   fs.mkdirSync(projectDir, { recursive: true });
 
   const transcriptPath = path.join(projectDir, `${sessionId}.jsonl`);
@@ -160,7 +160,7 @@ export function buildAssistantUsageRecord(cacheReadTokens: number): Record<strin
   return {
     type: 'assistant',
     message: {
-      model: 'claude-opus-5',
+      model: 'copilot-opus-5',
       content: [{ type: 'text', text: 'still working' }],
       usage: {
         input_tokens: 0,
@@ -193,7 +193,7 @@ export function buildTeamConfig(members: string[]): { members: Array<{ name: str
 }
 
 export function seedTeamConfig(tmpHome: string, teamName: string, members: string[]): string {
-  const teamDir = path.join(tmpHome, '.claude', 'teams', teamName);
+  const teamDir = path.join(tmpHome, '.copilot', 'teams', teamName);
   fs.mkdirSync(teamDir, { recursive: true });
 
   const configPath = path.join(teamDir, 'config.json');

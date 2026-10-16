@@ -6,8 +6,8 @@ import { WebSocket } from 'ws';
 
 import { WS_CLOSE_FORBIDDEN_ORIGIN, WS_CLOSE_UNAUTHORIZED } from '../src/constants.js';
 
-// Isolated temp HOME: the server writes ~/.pixel-agents/{server.json,servers/}
-// and the consent assertions below read ~/.copilotpixel/config.json.
+// Isolated temp HOME: the server writes ~/.copilot-agents/{server.json,servers/}
+// and the consent assertions below read ~/.copilot-agents/config.json.
 let tmpBase: string;
 
 vi.mock('os', async () => {
@@ -15,7 +15,7 @@ vi.mock('os', async () => {
   return { ...actual, homedir: () => tmpBase };
 });
 
-const { PixelAgentsServer } = await import('../src/server.js');
+const { CopilotAgentsServer } = await import('../src/server.js');
 const { AgentStateStore } = await import('../src/agentStateStore.js');
 const { grantHooksConsent } = await import('../src/configPersistence.js');
 
@@ -91,7 +91,7 @@ function waitForMessage(socket: WebSocket, type: string, ms = 2_000): Promise<un
 
 function readHooksConsent(): boolean {
   try {
-    const raw = fs.readFileSync(path.join(tmpBase, '.copilotpixel', 'config.json'), 'utf-8');
+    const raw = fs.readFileSync(path.join(tmpBase, '.copilot-agents', 'config.json'), 'utf-8');
     const consent = (JSON.parse(raw) as { hooksConsent?: Record<string, string> }).hooksConsent;
     return consent?.copilot === 'granted';
   } catch {
@@ -100,13 +100,13 @@ function readHooksConsent(): boolean {
 }
 
 describe('/ws connection gate', () => {
-  let server: InstanceType<typeof PixelAgentsServer>;
+  let server: InstanceType<typeof CopilotAgentsServer>;
   const sockets: WebSocket[] = [];
 
   beforeEach(() => {
     tmpBase = fs.mkdtempSync(path.join(os.tmpdir(), 'pxl-ws-test-'));
-    fs.mkdirSync(path.join(tmpBase, '.pixel-agents'), { recursive: true });
-    server = new PixelAgentsServer();
+    fs.mkdirSync(path.join(tmpBase, '.copilot-agents'), { recursive: true });
+    server = new CopilotAgentsServer();
   });
 
   afterEach(() => {
@@ -136,7 +136,7 @@ describe('/ws connection gate', () => {
 
   // 1. THE finding: a WebSocket connect is not blocked by CORS, so a page the
   //    user happens to be visiting could open /ws and grant durable consent to
-  //    modify ~/.claude/settings.json. A forged Origin must be refused, and no
+  //    modify hook settings. A forged Origin must be refused, and no
   //    message it sends may take effect.
   it('rejects a cross-origin standalone connection and its setHooksEnabled', async () => {
     const { port } = await startStandalone();
@@ -231,7 +231,7 @@ describe('/ws connection gate', () => {
 /**
  * The CONNECTION gate above is necessary but not sufficient: what it admits can
  * still reach `grantHooksConsent()` — durable, machine-wide approval to modify
- * ~/.claude/settings.json plus a 12-event hook install.
+ * hook settings plus a 12-event hook install.
  *
  * Privilege is therefore decided by the server token carried in the handshake's
  * `?token=` query (httpServer's standaloneTokenValid), never by a network
@@ -250,16 +250,16 @@ describe('/ws connection gate', () => {
  * in someone's home directory.
  */
 describe('/ws privileged-message gate', () => {
-  let server: InstanceType<typeof PixelAgentsServer>;
+  let server: InstanceType<typeof CopilotAgentsServer>;
   const sockets: WebSocket[] = [];
   /** Values `onSetHooksEnabled` was invoked with — the install/uninstall seam. */
   let sideEffects: boolean[];
 
   beforeEach(() => {
     tmpBase = fs.mkdtempSync(path.join(os.tmpdir(), 'pxl-ws-priv-'));
-    fs.mkdirSync(path.join(tmpBase, '.pixel-agents'), { recursive: true });
+    fs.mkdirSync(path.join(tmpBase, '.copilot-agents'), { recursive: true });
     sideEffects = [];
-    server = new PixelAgentsServer();
+    server = new CopilotAgentsServer();
   });
 
   afterEach(() => {

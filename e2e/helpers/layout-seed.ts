@@ -1,6 +1,6 @@
 /**
- * Builders for seeded `~/.pixel-agents/{layout,config}.json`, passed to the
- * pixelAgents fixture via `test.use({ seedLayout, seedConfig })`. The fixture
+ * Builders for seeded `~/.copilot-agents/{layout,config}.json`, passed to the
+ * copilotAgents fixture via `test.use({ seedLayout, seedConfig })`. The fixture
  * writes them under the isolated HOME BEFORE VS Code launches (see
  * e2e/helpers/launch.ts), so the server reads them on startup.
  *
@@ -104,7 +104,7 @@ export interface SeedConfigOptions {
 }
 
 /**
- * Build a full PixelAgentsConfig for `test.use({ seedConfig })`, setting the
+ * Build a full CopilotAgentsConfig for `test.use({ seedConfig })`, setting the
  * vscode namespace's areaMappings / showAreas. The standalone namespace keeps
  * defaults so there is no cross-namespace leak.
  */
@@ -119,6 +119,6 @@ export function buildSeedConfig(opts: SeedConfigOptions = {}): Record<string, un
     externalAssetDirectories: [],
     // Same baseline as the launch-level seed: skip the first-run consent prompt
     // so hook installation proceeds at startup (see e2e/helpers/launch.ts).
-    hooksConsent: { claude: 'granted' },
+    hooksConsent: { copilot: 'granted' },
   };
 }

@@ -5,7 +5,7 @@ import path from 'path';
 
 import { applyAllureLabels } from '../helpers/allure-labels';
 import { launchVSCode, type VSCodeSession, waitForWorkbench } from '../helpers/launch';
-import { killTrackedExternalProcesses } from '../helpers/mock-claude';
+import { killTrackedExternalProcesses } from '../helpers/mock-copilot';
 import {
   clearNarrationContext,
   finishNarration,
@@ -13,11 +13,15 @@ import {
   setNarrationContext,
   type TestNarrator,
 } from '../helpers/test-narration';
-import { arrangeReviewLayout, getPixelAgentsFrame, openPixelAgentsPanel } from '../helpers/webview';
+import {
+  arrangeReviewLayout,
+  getCopilotAgentsFrame,
+  openCopilotAgentsPanel,
+} from '../helpers/webview';
 
-const ATTACH_VIDEOS_ON_SUCCESS = process.env['PIXEL_AGENTS_E2E_ATTACH_VIDEOS_ON_SUCCESS'] === '1';
+const ATTACH_VIDEOS_ON_SUCCESS = process.env['COPILOT_AGENTS_E2E_ATTACH_VIDEOS_ON_SUCCESS'] === '1';
 
-export interface PixelAgentsContext {
+export interface CopilotAgentsContext {
   session: VSCodeSession;
   window: Page;
   frame: Frame;
@@ -64,23 +68,23 @@ function removeDirIfExists(dirPath: string | undefined): void {
 }
 
 export const test = base.extend<{
-  pixelAgents: PixelAgentsContext;
+  copilotAgents: CopilotAgentsContext;
   _allureLabels: void;
-  /** Pre-seed `~/.pixel-agents/config.json` (e.g. areaMappings, showAreas). */
+  /** Pre-seed `~/.copilot-agents/config.json` (e.g. areaMappings, showAreas). */
   seedConfig: unknown;
-  /** Pre-seed `~/.pixel-agents/layout.json` (must carry a high layoutRevision). */
+  /** Pre-seed `~/.copilot-agents/layout.json` (must carry a high layoutRevision). */
   seedLayout: unknown;
-  /** Pre-seed `~/.claude/settings.json` (e.g. an existing hook install). */
-  seedClaudeSettings: unknown;
+  /** Pre-seed `~/.copilot/settings.json` (e.g. an existing hook install). */
+  seedCopilotSettings: unknown;
   /** Folder basenames for a multi-root workspace (>1 → multi-root). */
   workspaceFolders: string[];
 }>({
   seedConfig: [undefined, { option: true }],
   seedLayout: [undefined, { option: true }],
-  seedClaudeSettings: [undefined, { option: true }],
+  seedCopilotSettings: [undefined, { option: true }],
   workspaceFolders: [[], { option: true }],
   // Auto-fixture: tag every test with Allure epic + feature derived from its
-  // @area: annotation and enclosing describe path. Runs before pixelAgents.
+  // @area: annotation and enclosing describe path. Runs before copilotAgents.
   _allureLabels: [
     async ({}, use, testInfo) => {
       await applyAllureLabels(testInfo);
@@ -88,15 +92,15 @@ export const test = base.extend<{
     },
     { auto: true },
   ],
-  pixelAgents: async (
-    { seedConfig, seedLayout, seedClaudeSettings, workspaceFolders },
+  copilotAgents: async (
+    { seedConfig, seedLayout, seedCopilotSettings, workspaceFolders },
     use,
     testInfo,
   ) => {
     const session = await launchVSCode(testInfo.title, {
       seedConfig,
       seedLayout,
-      seedClaudeSettings,
+      seedCopilotSettings,
       workspaceFolders,
     });
     const { window, tmpHome, workspaceDir, mockLogFile } = session;
@@ -104,12 +108,12 @@ export const test = base.extend<{
 
     try {
       await waitForWorkbench(window);
-      // autoShown: the seeded pixel-agents.autoShowPanel setting surfaces the
+      // autoShown: the seeded copilot-agents.autoShowPanel setting surfaces the
       // view on activation — no command-palette interaction at setup.
-      await openPixelAgentsPanel(window, { autoShown: true });
+      await openCopilotAgentsPanel(window, { autoShown: true });
       // Run-video layout: office 2/3 left, terminal editor tabs 1/3 right.
       await arrangeReviewLayout(window);
-      const frame = await getPixelAgentsFrame(window);
+      const frame = await getCopilotAgentsFrame(window);
 
       // Terminal services are reliably ready only after VS Code finishes its
       // startup layout restoration. Open the monitor at that lifecycle boundary
@@ -142,35 +146,35 @@ export const test = base.extend<{
       if (keepArtifacts) {
         await attachTextFileIfExists(
           testInfo,
-          'mock-claude-invocations',
+          'mock-copilot-invocations',
           mockLogFile,
           'text/plain',
         );
         await attachTextFileIfExists(
           testInfo,
-          'mock-claude-actions',
-          path.join(tmpHome, '.claude-mock', 'actions.log'),
+          'mock-copilot-actions',
+          path.join(tmpHome, '.copilot-mock', 'actions.log'),
           'text/plain',
         );
         await attachTextFileIfExists(
           testInfo,
           'launch-log',
-          path.join(tmpHome, '.claude-mock', 'launch.log'),
+          path.join(tmpHome, '.copilot-mock', 'launch.log'),
           'text/plain',
         );
         await attachTextFileIfExists(
           testInfo,
           'server-json',
-          path.join(tmpHome, '.pixel-agents', 'server.json'),
+          path.join(tmpHome, '.copilot-agents', 'server.json'),
           'application/json',
         );
-        // Diagnostic: server-side hook/broadcast log (gated by PIXEL_AGENTS_DEBUG_LOG
+        // Diagnostic: server-side hook/broadcast log (gated by COPILOT_AGENTS_DEBUG_LOG
         // env var set in launchVSCode). Lets CI failure analysis see the exact
         // server-side event timeline without local repro.
         await attachTextFileIfExists(
           testInfo,
-          'pixel-agents-debug-log',
-          path.join(tmpHome, '.pixel-agents', 'debug.log'),
+          'copilot-agents-debug-log',
+          path.join(tmpHome, '.copilot-agents', 'debug.log'),
           'text/plain',
         );
         // Webview-side counterpart: every transport message the webview's
@@ -181,7 +185,7 @@ export const test = base.extend<{
           const wvFrames = window.frames();
           for (const f of wvFrames) {
             if (!f.url().startsWith('vscode-webview://')) continue;
-            const log = await f.evaluate(() => window.__pixelAgentsTestHooks?.messageLog ?? null);
+            const log = await f.evaluate(() => window.__copilotAgentsTestHooks?.messageLog ?? null);
             if (log) {
               await testInfo.attach('webview-message-log', {
                 body: JSON.stringify(log, null, 2),
@@ -208,7 +212,7 @@ export const test = base.extend<{
 
       const attachRunVideo = runVideo !== null && shouldAttachRunVideo(testInfo);
       clearNarrationContext();
-      // Kill any leaked mock-claude processes spawned via spawnExternalClaudeScenario
+      // Kill any leaked mock-copilot processes spawned via spawnExternalCopilotScenario
       // BEFORE tearing down the session (and deleting tmpHome). Otherwise leaked
       // processes accumulate across the suite and add real environmental pressure.
       await killTrackedExternalProcesses();

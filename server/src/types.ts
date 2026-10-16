@@ -32,7 +32,7 @@ export interface AgentState {
   hookDelivered: boolean;
   /** True when agent has no transcript file (provider doesn't use JSONL). All state from hooks. */
   hooksOnly?: boolean;
-  /** Provider that created this agent (defaults to 'claude') */
+  /** Provider that created this agent (defaults to 'copilot') */
   providerId?: string;
   /** Set when SessionEnd(reason=clear) fires; cleared when SessionStart(source=clear) reassigns */
   pendingClear?: boolean;

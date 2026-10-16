@@ -51,8 +51,9 @@ import {
   hookProviderById,
   hookProviders,
 } from '../../server/src/providers/index.js';
-import { PixelAgentsServer } from '../../server/src/server.js';
+import { CopilotAgentsServer } from '../../server/src/server.js';
 import {
+  getAllProjectDirPaths,
   getProjectDirPath,
   launchNewTerminal,
   restoreAgents,
@@ -78,7 +79,7 @@ import { VscodeTerminalAdapter } from './vscodeTerminalAdapter.js';
  *  wrong (webviewReady never arriving) — log and drop the oldest. */
 const MAX_PENDING_BROADCASTS = 1_000;
 
-export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
+export class CopilotAgentsViewProvider implements vscode.WebviewViewProvider {
   store = new AgentStateStore();
   webviewView: vscode.WebviewView | undefined;
 
@@ -86,7 +87,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
   // message handlers. Broadcasts that fire in this window are otherwise lost
   // (webview.postMessage delivers to a window without an active listener).
   // Buffer them here and flush on `webviewReady`. Without this, on slow CI
-  // runners hook events that arrive during iframe init (mock-claude scenarios
+  // runners hook events that arrive during iframe init (test scenarios
   // start writing within ~3 s of agent spawn) silently never reach the UI.
   private isWebviewReady = false;
   private pendingBroadcasts: Array<Record<string, unknown>> = [];
@@ -106,8 +107,8 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
   // Cross-window layout sync
   layoutWatcher: LayoutWatcher | null = null;
 
-  // CopilotPixel Server (hook event reception)
-  private pixelAgentsServer: PixelAgentsServer | null = null;
+  // CopilotAgents Server (hook event reception)
+  private copilotAgentsServer: CopilotAgentsServer | null = null;
   private adapter: StateAdapter;
 
   // Auto-spawn guard: ensures the startup spawn fires at most once per VS Code
@@ -204,7 +205,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
     }
     if (this.pendingBroadcasts.length >= MAX_PENDING_BROADCASTS) {
       console.warn(
-        `[CopilotPixel] Webview buffer overflow (${MAX_PENDING_BROADCASTS}). webviewReady never arrived — dropping oldest message.`,
+        `[CopilotAgents] Webview buffer overflow (${MAX_PENDING_BROADCASTS}). webviewReady never arrived — dropping oldest message.`,
       );
       this.pendingBroadcasts.shift();
     }
@@ -212,12 +213,12 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
   }
 
   private initServer(): void {
-    this.pixelAgentsServer = new PixelAgentsServer();
-    this.pixelAgentsServer.onHookEvent((providerId, event) => {
+    this.copilotAgentsServer = new CopilotAgentsServer();
+    this.copilotAgentsServer.onHookEvent((providerId, event) => {
       this.runtime.handleHookEvent(providerId, event);
     });
 
-    this.pixelAgentsServer
+    this.copilotAgentsServer
       .start({ store: this.store, embedded: true })
       .then((config) => {
         // Server always starts regardless of hooks-enabled state.
@@ -229,10 +230,10 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
         if (hooksEnabled) {
           void this.installHooksIfConsented(config.port, config.token);
         }
-        console.log(`[CopilotPixel] Server: ready on port ${config.port}`);
+        console.log(`[CopilotAgents] Server: ready on port ${config.port}`);
       })
       .catch((e) => {
-        console.error(`[CopilotPixel] Failed to start server: ${e}`);
+        console.error(`[CopilotAgents] Failed to start server: ${e}`);
       });
   }
 
@@ -240,7 +241,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
    *  every failure instead of swallowing it.
    *
    *  Script first, deliberately: an entry whose command points at a script that
-   *  is not on disk makes Claude Code spawn a dead `node` for every event, so a
+   *  is not on disk makes the CLI spawn a dead `node` for every event, so a
    *  failed copy must abort the install rather than run alongside it. And
    *  `hooksStatus: true` is sent ONLY after both steps succeeded — it reports
    *  actual install state, never intent (core/asyncapi.yaml). */
@@ -251,7 +252,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
   ): Promise<void> {
     if (!copyHookScript(this.context.extensionPath)) {
       vscode.window.showErrorMessage(
-        'CopilotPixel: could not install the hook script — hooks not installed.',
+        'CopilotAgents: could not install the hook script — hooks not installed.',
       );
       await this.reportHooksStatus(provider);
       return;
@@ -263,7 +264,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
       );
     } catch (err: unknown) {
       vscode.window.showErrorMessage(
-        `CopilotPixel: ${err instanceof Error ? err.message : String(err)}`,
+        `CopilotAgents: ${err instanceof Error ? err.message : String(err)}`,
       );
       await this.reportHooksStatus(provider);
       return;
@@ -288,14 +289,14 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
       // An explicit Settings toggle IS the consent to modify the provider's
       // settings file.
       grantHooksConsent(provider.id);
-      const serverConfig = this.pixelAgentsServer?.getConfig();
+      const serverConfig = this.copilotAgentsServer?.getConfig();
       await this.installHooksAndScript(provider, serverConfig?.port, serverConfig?.token);
     } else {
       try {
         await provider.uninstallHooks();
       } catch (err: unknown) {
         vscode.window.showErrorMessage(
-          `CopilotPixel: ${err instanceof Error ? err.message : String(err)}`,
+          `CopilotAgents: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
     }
@@ -312,7 +313,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
       persistHooksEnabled(provider.id, enabled);
       // The runtime's single hooksEnabled ref follows the active provider.
       if (provider.id === copilotProvider.id) this.runtime.hooksEnabled.current = enabled;
-      console.log(`[CopilotPixel] Hooks ${enabled ? 'enabled' : 'disabled'} by user`);
+      console.log(`[CopilotAgents] Hooks ${enabled ? 'enabled' : 'disabled'} by user`);
     }
     // Report the truth either way: on failure the entries are still on disk and
     // still firing, and a checkbox stuck "off" over live hooks offers no retry.
@@ -334,7 +335,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  /** First-run consent gate: never touch ~/.claude/settings.json until the
+  /** First-run consent gate: never touch hook settings until the
    *  user has approved it once (persisted in config.json, shared with the
    *  standalone CLI).
    *
@@ -385,7 +386,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
           await provider.uninstallHooks();
         } catch (err: unknown) {
           vscode.window.showErrorMessage(
-            `CopilotPixel: ${err instanceof Error ? err.message : String(err)}`,
+            `CopilotAgents: ${err instanceof Error ? err.message : String(err)}`,
           );
         }
       },
@@ -463,7 +464,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
         }
       } else if (message.type === 'saveAgentSeats') {
         // Store seat assignments in a separate key (never touched by persistAgents)
-        console.log(`[CopilotPixel] State: saveAgentSeats:`, JSON.stringify(message.seats));
+        console.log(`[CopilotAgents] State: saveAgentSeats:`, JSON.stringify(message.seats));
         this.adapter.saveSeats(message.seats);
       } else if (message.type === 'saveLayout') {
         this.layoutWatcher?.markOwnWrite();
@@ -509,7 +510,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
           this.globalDismissedFiles.clear();
         } else {
           // Remove all external agents not from the current workspace folders.
-          // PathSet: an agent adopted via hooks carries Claude's spelling of the
+          // PathSet: an agent adopted via hooks carries the CLI's spelling of the
           // project dir, which differs from VS Code's by drive-letter case on Windows.
           const workspaceDirs = new PathSet();
           for (const folder of vscode.workspace.workspaceFolders ?? []) {
@@ -606,7 +607,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
           // blocking the other providers' statuses.
           const installed = await provider.areHooksInstalled().catch((err: unknown) => {
             console.error(
-              `[CopilotPixel] hooks status check failed for provider ${provider.id}:`,
+              `[CopilotAgents] hooks status check failed for provider ${provider.id}:`,
               err,
             );
             return false;
@@ -662,9 +663,9 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
           this.store.size === 0
         ) {
           this.autoSpawnAttempted = true;
-          console.log('[CopilotPixel] Auto-spawning agent on startup');
+          console.log('[CopilotAgents] Auto-spawning agent on startup');
           // When the user also opted into autoShowPanel, skip terminal.show()
-          // so the panel view stays on CopilotPixel. The terminal still runs;
+          // so the panel view stays on CopilotAgents. The terminal still runs;
           // clicking the character focuses it via the focusAgent handler.
           const autoShowPanel = vscode.workspace
             .getConfiguration()
@@ -707,25 +708,29 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
           });
         }
 
-        // Ensure project scan runs even with no restored agents (to adopt external terminals)
-        const projectDir = getProjectDirPath();
+        // Ensure project scan runs across all active providers (Copilot + Antigravity)
+        const projectDirs = getAllProjectDirPaths();
         const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        console.log(`[CopilotPixel] Debug: Platform: ${process.platform}, arch: ${process.arch}`);
+        console.log(`[CopilotAgents] Debug: Platform: ${process.platform}, arch: ${process.arch}`);
         console.log('[Extension] workspaceRoot:', workspaceRoot);
-        console.log('[Extension] projectDir:', projectDir);
-        this.runtime.startProjectScan(projectDir);
-
-        // Start external session scanning (detects VS Code extension panel sessions)
-        this.runtime.startExternalScanning(projectDir);
+        console.log('[Extension] projectDirs:', projectDirs);
+        for (const dir of projectDirs) {
+          if (dir) {
+            this.runtime.startProjectScan(dir);
+            this.runtime.startExternalScanning(dir);
+          }
+        }
 
         // In multi-root workspaces, also scan project dirs for all other folders
         // so agents running in any workspace folder are discovered
         if (wsFolders && wsFolders.length > 1) {
           for (const folder of wsFolders) {
-            const folderProjectDir = getProjectDirPath(folder.uri.fsPath);
-            if (folderProjectDir && folderProjectDir !== projectDir) {
-              console.log(`[CopilotPixel] Registering additional project dir: ${folderProjectDir}`);
-              this.runtime.startProjectScan(folderProjectDir);
+            const folderDirs = getAllProjectDirPaths(folder.uri.fsPath);
+            for (const folderDir of folderDirs) {
+              if (folderDir && !projectDirs.includes(folderDir)) {
+                console.log(`[CopilotAgents] Registering additional project dir: ${folderDir}`);
+                this.runtime.startProjectScan(folderDir);
+              }
             }
           }
         }
@@ -839,16 +844,16 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
       } else if (message.type === 'exportLayout') {
         const layout = readLayoutFromFile();
         if (!layout) {
-          vscode.window.showWarningMessage('CopilotPixel: No saved layout to export.');
+          vscode.window.showWarningMessage('CopilotAgents: No saved layout to export.');
           return;
         }
         const uri = await vscode.window.showSaveDialog({
           filters: { 'JSON Files': ['json'] },
-          defaultUri: vscode.Uri.file(path.join(os.homedir(), 'pixel-agents-layout.json')),
+          defaultUri: vscode.Uri.file(path.join(os.homedir(), 'copilot-agents-layout.json')),
         });
         if (uri) {
           fs.writeFileSync(uri.fsPath, JSON.stringify(layout, null, 2), 'utf-8');
-          vscode.window.showInformationMessage('CopilotPixel: Layout exported successfully.');
+          vscode.window.showInformationMessage('CopilotAgents: Layout exported successfully.');
         }
       } else if (message.type === 'addExternalAssetDirectory') {
         const uris = await vscode.window.showOpenDialog({
@@ -894,15 +899,15 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
           const raw = fs.readFileSync(uris[0].fsPath, 'utf-8');
           const imported = JSON.parse(raw) as Record<string, unknown>;
           if (imported.version !== 1 || !Array.isArray(imported.tiles)) {
-            vscode.window.showErrorMessage('CopilotPixel: Invalid layout file.');
+            vscode.window.showErrorMessage('CopilotAgents: Invalid layout file.');
             return;
           }
           this.layoutWatcher?.markOwnWrite();
           writeLayoutToFile(imported);
           this.webview?.postMessage({ type: 'layoutLoaded', layout: imported });
-          vscode.window.showInformationMessage('CopilotPixel: Layout imported successfully.');
+          vscode.window.showInformationMessage('CopilotAgents: Layout imported successfully.');
         } catch {
-          vscode.window.showErrorMessage('CopilotPixel: Failed to read or parse layout file.');
+          vscode.window.showErrorMessage('CopilotAgents: Failed to read or parse layout file.');
         }
       }
     });
@@ -942,12 +947,12 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
   exportDefaultLayout(): void {
     const layout = readLayoutFromFile();
     if (!layout) {
-      vscode.window.showWarningMessage('CopilotPixel: No saved layout found.');
+      vscode.window.showWarningMessage('CopilotAgents: No saved layout found.');
       return;
     }
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!workspaceRoot) {
-      vscode.window.showErrorMessage('CopilotPixel: No workspace folder found.');
+      vscode.window.showErrorMessage('CopilotAgents: No workspace folder found.');
       return;
     }
     const assetsDir = path.join(workspaceRoot, 'webview-ui', 'public', 'assets');
@@ -969,7 +974,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
     const json = JSON.stringify(layout, null, 2);
     fs.writeFileSync(targetPath, json, 'utf-8');
     vscode.window.showInformationMessage(
-      `CopilotPixel: Default layout exported as revision ${nextRevision} to ${targetPath}`,
+      `CopilotAgents: Default layout exported as revision ${nextRevision} to ${targetPath}`,
     );
   }
 
@@ -1027,14 +1032,14 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
   private startLayoutWatcher(): void {
     if (this.layoutWatcher) return;
     this.layoutWatcher = watchLayoutFile((layout) => {
-      console.log('[CopilotPixel] External layout change — pushing to webview');
+      console.log('[CopilotAgents] External layout change — pushing to webview');
       this.webview?.postMessage({ type: 'layoutLoaded', layout });
     });
   }
 
   dispose() {
-    this.pixelAgentsServer?.stop();
-    this.pixelAgentsServer = null;
+    this.copilotAgentsServer?.stop();
+    this.copilotAgentsServer = null;
     this.runtime.dispose();
     this.layoutWatcher?.dispose();
     this.layoutWatcher = null;

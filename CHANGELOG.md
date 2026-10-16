@@ -10,5 +10,5 @@
 
 ### Packaging
 
-- Rebranded the extension and npm package as CopilotPixel.
+- Rebranded the extension and npm package as CopilotAgents.
 - Added a project README and aligned release metadata with the current repository.

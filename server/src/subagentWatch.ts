@@ -102,7 +102,7 @@ export class SubagentWatch {
     this.store.set(id, agent);
 
     console.log(
-      `[CopilotPixel] Watching background sub-agent transcript for lead Agent ${leadId} (${entry.toolUseId})`,
+      `[CopilotAgents] Watching background sub-agent transcript for lead Agent ${leadId} (${entry.toolUseId})`,
     );
 
     startFileWatching(

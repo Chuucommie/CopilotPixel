@@ -8,7 +8,7 @@
 
 ## Reporting a Vulnerability
 
-Please report security vulnerabilities through [GitHub's private vulnerability reporting](https://github.com/Chuucommie/CopilotPixel/security/advisories/new).
+Please report security vulnerabilities through [GitHub's private vulnerability reporting](https://github.com/Chuucommie/CopilotAgents/security/advisories/new).
 
 **Do not open a public issue for security vulnerabilities.**
 

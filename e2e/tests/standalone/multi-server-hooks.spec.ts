@@ -1,19 +1,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { expect, test } from '../../fixtures/pixel-agents';
+import { expect, test } from '../../fixtures/copilot-agents';
 import { preToolUseBash, sessionStartStartup } from '../../helpers/hooks';
 import {
-  claudeScenario,
-  spawnExternalClaudeScenario,
-  waitForClaudeHookSetup,
-} from '../../helpers/mock-claude';
+  copilotScenario,
+  spawnExternalCopilotScenario,
+  waitForCopilotHookSetup,
+} from '../../helpers/mock-copilot';
 import { expectNoOverlay, expectOverlayCount, expectOverlayVisible } from '../../helpers/office';
 import { launchStandalone } from '../../helpers/standalone';
 import { setSettings } from '../../helpers/webview';
 
 function hookDrivenScenario(name: string, command: string) {
-  return claudeScenario(name)
+  return copilotScenario(name)
     .at(50)
     .emitHook(
       sessionStartStartup('{{sessionId}}', '{{cwd}}', '{{transcriptPath}}') as Record<
@@ -30,9 +30,9 @@ function hookDrivenScenario(name: string, command: string) {
 test.describe('Standalone / multi-server hooks', () => {
   test('extension and standalone both stay hook-driven without cross-contamination @area:standalone', async ({
     page,
-    pixelAgents,
+    copilotAgents,
   }) => {
-    const { frame, tmpHome, workspaceDir: extensionWorkspace, mockLogFile } = pixelAgents;
+    const { frame, tmpHome, workspaceDir: extensionWorkspace, mockLogFile } = copilotAgents;
 
     await setSettings(frame, {
       alwaysShowLabels: true,
@@ -50,9 +50,9 @@ test.describe('Standalone / multi-server hooks', () => {
         debugView: false,
       });
       await standalone.drainMessages();
-      await waitForClaudeHookSetup(tmpHome);
+      await waitForCopilotHookSetup(tmpHome);
 
-      const registryDir = path.join(tmpHome, '.pixel-agents', 'servers');
+      const registryDir = path.join(tmpHome, '.copilot-agents', 'servers');
       await expect
         .poll(
           () => {
@@ -68,7 +68,7 @@ test.describe('Standalone / multi-server hooks', () => {
 
       const extensionSessionId = 'multi-server-extension-owned';
       const extensionCommand = 'npm run extension-owned';
-      await spawnExternalClaudeScenario({
+      await spawnExternalCopilotScenario({
         tmpHome,
         workspaceDir: extensionWorkspace,
         mockLogFile,
@@ -82,7 +82,7 @@ test.describe('Standalone / multi-server hooks', () => {
 
       const standaloneSessionId = 'multi-server-standalone-owned';
       const standaloneCommand = 'npm run standalone-owned';
-      await spawnExternalClaudeScenario({
+      await spawnExternalCopilotScenario({
         tmpHome,
         workspaceDir: standalone.workspaceDir,
         mockLogFile,

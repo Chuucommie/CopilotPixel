@@ -5,13 +5,13 @@ import os from 'os';
 import path from 'path';
 
 import { namespaceE2EPath } from '../run-config';
-import { applyMockHomeEnv } from './mock-claude';
+import { applyMockHomeEnv } from './mock-copilot';
 
 const REPO_ROOT = path.join(__dirname, '../..');
 const VSCODE_PATH_FILE = path.join(REPO_ROOT, '.vscode-test/vscode-executable.txt');
-const MOCK_CLAUDE_PATH = path.join(REPO_ROOT, 'e2e/fixtures/mock-claude');
-const MOCK_CLAUDE_CMD_PATH = path.join(REPO_ROOT, 'e2e/fixtures/mock-claude.cmd');
-const MOCK_CLAUDE_RUNNER_PATH = path.join(REPO_ROOT, 'e2e/fixtures/mock-claude-runner.cjs');
+const MOCK_COPILOT_PATH = path.join(REPO_ROOT, 'e2e/fixtures/mock-copilot');
+const MOCK_COPILOT_CMD_PATH = path.join(REPO_ROOT, 'e2e/fixtures/mock-copilot.cmd');
+const MOCK_COPILOT_RUNNER_PATH = path.join(REPO_ROOT, 'e2e/fixtures/mock-copilot-runner.cjs');
 const TAIL_FOLLOW_PATH = path.join(REPO_ROOT, 'e2e/fixtures/tail-follow.cjs');
 const ARTIFACTS_DIR = namespaceE2EPath(path.join(REPO_ROOT, 'test-results/e2e'));
 const IS_WINDOWS = process.platform === 'win32';
@@ -41,24 +41,24 @@ export interface LaunchOptions {
    * (single-folder default is unchanged).
    */
   workspaceFolders?: string[];
-  /** Pre-seed `~/.pixel-agents/config.json` (written before the server reads it). */
+  /** Pre-seed `~/.copilot-agents/config.json` (written before the server reads it). */
   seedConfig?: unknown;
-  /** Pre-seed `~/.pixel-agents/layout.json` (written before the panel loads). */
+  /** Pre-seed `~/.copilot-agents/layout.json` (written before the panel loads). */
   seedLayout?: unknown;
   /**
-   * Pre-seed `~/.claude/settings.json` (written before the extension activates).
+   * Pre-seed `~/.copilot/settings.json` (written before the extension activates).
    * For consent specs that need an EXISTING hook install to be present at the
    * moment the gate runs — the gate reads it during activation, so a test-body
    * write would be too late.
    */
-  seedClaudeSettings?: unknown;
+  seedCopilotSettings?: unknown;
 }
 
 /**
- * Launch VS Code with the CopilotPixel extension loaded in development mode.
+ * Launch VS Code with the CopilotAgents extension loaded in development mode.
  *
- * Uses an isolated temp HOME and injects the mock `claude` binary at the
- * front of PATH so no real Claude CLI is needed.
+ * Uses an isolated temp HOME and injects the mock `copilot` binary at the
+ * front of PATH so no real Copilot CLI is needed.
  */
 export async function launchVSCode(
   testTitle: string,
@@ -79,7 +79,7 @@ export async function launchVSCode(
   fs.mkdirSync(mockBinDir, { recursive: true });
 
   // Pre-seed user-level config/layout under the isolated HOME, BEFORE VS Code
-  // launches — the server reads ~/.pixel-agents/{config,layout}.json on startup,
+  // launches — the server reads ~/.copilot-agents/{config,layout}.json on startup,
   // so a test that needs specific areaMappings / showAreas / a known layout must
   // write them now. layout.json must carry a high layoutRevision to survive the
   // bundled-default reset gate (server/src/layoutPersistence.ts).
@@ -90,7 +90,7 @@ export async function launchVSCode(
   // through the Settings modal. Missing keys are filled with product defaults
   // by server/src/configPersistence.ts. Tests override via opts.seedConfig
   // (buildSeedConfig in layout-seed.ts carries the same baseline).
-  const paDir = path.join(tmpHome, '.pixel-agents');
+  const paDir = path.join(tmpHome, '.copilot-agents');
   fs.mkdirSync(paDir, { recursive: true });
   // The granted hooksConsent entry is part of the baseline: without it the first-run consent
   // dialog pops up inside the webview on open, gating hook installation and
@@ -99,39 +99,39 @@ export async function launchVSCode(
   const seedConfig = opts.seedConfig ?? {
     vscode: { alwaysShowLabels: true },
     standalone: { alwaysShowLabels: true },
-    hooksConsent: { claude: 'granted' },
+    hooksConsent: { copilot: 'granted' },
   };
   fs.writeFileSync(path.join(paDir, 'config.json'), JSON.stringify(seedConfig, null, 2));
   if (opts.seedLayout !== undefined) {
     fs.writeFileSync(path.join(paDir, 'layout.json'), JSON.stringify(opts.seedLayout, null, 2));
   }
-  if (opts.seedClaudeSettings !== undefined) {
-    const claudeHomeDir = path.join(tmpHome, '.claude');
-    fs.mkdirSync(claudeHomeDir, { recursive: true });
+  if (opts.seedCopilotSettings !== undefined) {
+    const copilotHomeDir = path.join(tmpHome, '.copilot');
+    fs.mkdirSync(copilotHomeDir, { recursive: true });
     // A string is written VERBATIM, so a spec can seed a deliberately
     // unparseable file (JSON.stringify would turn it into a valid quoted
     // string, i.e. the opposite of what such a test needs).
     fs.writeFileSync(
-      path.join(claudeHomeDir, 'settings.json'),
-      typeof opts.seedClaudeSettings === 'string'
-        ? opts.seedClaudeSettings
-        : JSON.stringify(opts.seedClaudeSettings, null, 2),
+      path.join(copilotHomeDir, 'settings.json'),
+      typeof opts.seedCopilotSettings === 'string'
+        ? opts.seedCopilotSettings
+        : JSON.stringify(opts.seedCopilotSettings, null, 2),
     );
   }
 
-  // Enable Claude Agent Teams in the test workspace. Real Claude Code reads this
-  // env from .claude/settings.local.json on startup; without it, team mode is gated
+  // Enable Copilot Agent Teams in the test workspace. Real GitHub Copilot CLI reads this
+  // env from .copilot/settings.local.json on startup; without it, team mode is gated
   // off and the team-related e2e tests can't exercise the
   // feature. Mirrored in the VS Code process env and the macOS terminal profile env
   // below so it survives across all spawn paths.
-  const claudeWorkspaceSettingsDir = path.join(workspaceDir, '.claude');
-  fs.mkdirSync(claudeWorkspaceSettingsDir, { recursive: true });
+  const copilotWorkspaceSettingsDir = path.join(workspaceDir, '.copilot');
+  fs.mkdirSync(copilotWorkspaceSettingsDir, { recursive: true });
   fs.writeFileSync(
-    path.join(claudeWorkspaceSettingsDir, 'settings.local.json'),
+    path.join(copilotWorkspaceSettingsDir, 'settings.local.json'),
     JSON.stringify(
       {
         env: {
-          CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
+          COPILOT_EXPERIMENTAL_AGENT_TEAMS: '1',
         },
       },
       null,
@@ -140,7 +140,7 @@ export async function launchVSCode(
   );
 
   // Normalize to the canonical path so the project dir hash the extension computes
-  // matches the one mock-claude computes from process.cwd().
+  // matches the one mock-copilot computes from process.cwd().
   //
   // Windows: os.tmpdir() may return an 8.3 short path (e.g. RUNNER~1) while child
   // processes see the long path via %CD%. .native uses GetFinalPathNameByHandleW
@@ -150,7 +150,7 @@ export async function launchVSCode(
   // to /private/var. Zsh-spawned terminals see process.cwd() as /private/var/...
   // while VS Code's workspaceFolders[0].uri.fsPath returns /var/... unchanged.
   // Resolving here ensures both sides agree on /private/var/... and the JSONL
-  // project dir resolves to the same path under ~/.claude/projects/.
+  // project dir resolves to the same path under ~/.copilot/projects/.
   const resolvedWorkspaceDir =
     IS_WINDOWS || process.platform === 'darwin'
       ? fs.realpathSync.native(workspaceDir)
@@ -197,7 +197,7 @@ export async function launchVSCode(
       const message = error instanceof Error ? error.message : String(error);
       console.warn(`[e2e] Keychain creation failed for ${keychainPath}: ${message}`);
       try {
-        const launchLog = path.join(tmpHome, '.claude-mock', 'launch.log');
+        const launchLog = path.join(tmpHome, '.copilot-mock', 'launch.log');
         fs.mkdirSync(path.dirname(launchLog), { recursive: true });
         fs.appendFileSync(launchLog, `${new Date().toISOString()} keychain-error: ${message}\n`);
       } catch {
@@ -206,36 +206,36 @@ export async function launchVSCode(
     }
   }
 
-  // Copy mock-claude into an isolated bin dir. The wrapper resolves its sibling
-  // scripts (mock-claude-runner.cjs, tail-follow.cjs) relative to its own dir
+  // Copy mock-copilot into an isolated bin dir. The wrapper resolves its sibling
+  // scripts (mock-copilot-runner.cjs, tail-follow.cjs) relative to its own dir
   // (SCRIPT_DIR / %~dp0), so BOTH must live alongside it here — tail-follow.cjs
   // is what backgrounds the narration tail into each mock terminal tab.
-  const mockClaudeBinaryPath = path.join(mockBinDir, IS_WINDOWS ? 'claude.cmd' : 'claude');
+  const mockCopilotBinaryPath = path.join(mockBinDir, IS_WINDOWS ? 'copilot.cmd' : 'copilot');
   if (IS_WINDOWS) {
-    // Windows: copy the .cmd batch file as 'claude.cmd'
-    fs.copyFileSync(MOCK_CLAUDE_CMD_PATH, mockClaudeBinaryPath);
-    fs.copyFileSync(MOCK_CLAUDE_RUNNER_PATH, path.join(mockBinDir, 'mock-claude-runner.cjs'));
+    // Windows: copy the .cmd batch file as 'copilot.cmd'
+    fs.copyFileSync(MOCK_COPILOT_CMD_PATH, mockCopilotBinaryPath);
+    fs.copyFileSync(MOCK_COPILOT_RUNNER_PATH, path.join(mockBinDir, 'mock-copilot-runner.cjs'));
     fs.copyFileSync(TAIL_FOLLOW_PATH, path.join(mockBinDir, 'tail-follow.cjs'));
   } else {
-    fs.copyFileSync(MOCK_CLAUDE_PATH, mockClaudeBinaryPath);
-    fs.chmodSync(mockClaudeBinaryPath, 0o755);
-    fs.copyFileSync(MOCK_CLAUDE_RUNNER_PATH, path.join(mockBinDir, 'mock-claude-runner.cjs'));
+    fs.copyFileSync(MOCK_COPILOT_PATH, mockCopilotBinaryPath);
+    fs.chmodSync(mockCopilotBinaryPath, 0o755);
+    fs.copyFileSync(MOCK_COPILOT_RUNNER_PATH, path.join(mockBinDir, 'mock-copilot-runner.cjs'));
     fs.copyFileSync(TAIL_FOLLOW_PATH, path.join(mockBinDir, 'tail-follow.cjs'));
   }
 
   // VS Code user settings for the isolated profile. Together with
   // arrangeReviewLayout() (e2e/helpers/webview.ts) they produce the run-video
-  // layout: CopilotPixel panel docked LEFT at ~2/3 width, terminals opening
+  // layout: CopilotAgents panel docked LEFT at ~2/3 width, terminals opening
   // as editor tabs in the remaining right third, all other chrome hidden.
   //
   // - workbench.panel.defaultLocation "left": the panel (which hosts the
-  //   CopilotPixel webview) docks left at full height, so ensurePanelIsLarge()
+  //   CopilotAgents webview) docks left at full height, so ensurePanelIsLarge()
   //   no-ops instead of driving the flaky "View: Toggle Maximized Panel"
   //   command-palette interaction at the start of every test.
-  // - pixel-agents.autoShowPanel: the extension focuses the CopilotPixel view
-  //   on activation (onStartupFinished), so openPixelAgentsPanel({ autoShown })
-  //   skips the "CopilotPixel: Show Panel" palette interaction at setup.
-  // - terminal.integrated.defaultLocation "editor": mock-claude terminals open
+  // - copilot-agents.autoShowPanel: the extension focuses the CopilotAgents view
+  //   on activation (onStartupFinished), so openCopilotAgentsPanel({ autoShown })
+  //   skips the "CopilotAgents: Show Panel" palette interaction at setup.
+  // - terminal.integrated.defaultLocation "editor": mock-copilot terminals open
   //   as editor tabs beside the office instead of stealing the panel (the
   //   webview has no retainContextWhenHidden, so a panel-hosted terminal.show()
   //   used to dispose it).
@@ -250,7 +250,7 @@ export async function launchVSCode(
   fs.mkdirSync(userSettingsDir, { recursive: true });
   const userSettings: Record<string, unknown> = {
     'workbench.panel.defaultLocation': 'left',
-    'pixel-agents.autoShowPanel': true,
+    'copilot-agents.autoShowPanel': true,
     'terminal.integrated.defaultLocation': 'editor',
     'workbench.activityBar.location': 'hidden',
     'workbench.startupEditor': 'none',
@@ -266,24 +266,28 @@ export async function launchVSCode(
         env: {
           PATH: `${mockBinDir}:/usr/local/bin:/usr/bin:/bin`,
           HOME: tmpHome,
-          PIXEL_AGENTS_E2E_CLAUDE_BIN: mockClaudeBinaryPath,
-          PIXEL_AGENTS_NODE_BIN: process.execPath,
+          COPILOT_AGENTS_E2E_COPILOT_BIN: mockCopilotBinaryPath,
+          COPILOT_AGENTS_NODE_BIN: process.execPath,
           ZDOTDIR: tmpHome,
-          CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
+          COPILOT_EXPERIMENTAL_AGENT_TEAMS: '1',
           // inheritEnv is false for this profile, so the diagnostic log
           // path must be set explicitly here or the mock-spawned
-          // claude-hook.js (which runs in this terminal) can't write to
+          // copilot-hook.js (which runs in this terminal) can't write to
           // it. Path matches the `debugLogFile` const below.
-          PIXEL_AGENTS_DEBUG_LOG: path.join(tmpHome, '.pixel-agents', 'debug.log'),
-          // Narration log paths for the mock-claude wrapper's background tail
-          // (see e2e/fixtures/mock-claude). inheritEnv:false means these must
+          COPILOT_AGENTS_DEBUG_LOG: path.join(tmpHome, '.copilot-agents', 'debug.log'),
+          // Narration log paths for the mock-copilot wrapper's background tail
+          // (see e2e/fixtures/mock-copilot). inheritEnv:false means these must
           // be set on the profile too, or internal mock tabs are silently
           // narration-less on macOS — which is where the review videos record.
           // Paths match the process-env block below.
-          PIXEL_AGENTS_TEST_NARRATION_LOG: path.join(tmpHome, '.claude-mock', 'test-narration.log'),
-          PIXEL_AGENTS_EXTERNAL_NARRATION_LOG: path.join(
+          COPILOT_AGENTS_TEST_NARRATION_LOG: path.join(
             tmpHome,
-            '.claude-mock',
+            '.copilot-mock',
+            'test-narration.log',
+          ),
+          COPILOT_AGENTS_EXTERNAL_NARRATION_LOG: path.join(
+            tmpHome,
+            '.copilot-mock',
             'external-narration.log',
           ),
         },
@@ -308,8 +312,8 @@ export async function launchVSCode(
     ),
   );
 
-  const mockLogFile = path.join(tmpHome, '.claude-mock', 'invocations.log');
-  const launchLogFile = path.join(tmpHome, '.claude-mock', 'launch.log');
+  const mockLogFile = path.join(tmpHome, '.copilot-mock', 'invocations.log');
+  const launchLogFile = path.join(tmpHome, '.copilot-mock', 'launch.log');
 
   // --- Video output dir ---
   const safeTitle = testTitle.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
@@ -323,35 +327,35 @@ export async function launchVSCode(
   // USERPROFILE (and clears HOMEDRIVE/HOMEPATH) on Windows, where os.homedir()
   // ignores $HOME — see its doc comment for why this is load-bearing.
   // Diagnostic log: server-side broadcasts + hook events go here. Fixture
-  // attaches it as `pixel-agents-debug-log` so CI failure analysis can read
+  // attaches it as `copilot-agents-debug-log` so CI failure analysis can read
   // the exact event timeline. Per-test isolated under tmpHome so parallel
   // workers don't interleave (though e2e uses workers=1 anyway).
-  const debugLogFile = path.join(tmpHome, '.pixel-agents', 'debug.log');
+  const debugLogFile = path.join(tmpHome, '.copilot-agents', 'debug.log');
   fs.mkdirSync(path.dirname(debugLogFile), { recursive: true });
 
   const env: Record<string, string> = {
     ...(applyMockHomeEnv(process.env, tmpHome) as Record<string, string>),
-    // Prepend mock bin so 'claude' resolves to our mock
+    // Prepend mock bin so 'copilot' resolves to our mock
     PATH: `${mockBinDir}${PATH_SEP}${process.env['PATH'] ?? '/usr/local/bin:/usr/bin:/bin'}`,
-    PIXEL_AGENTS_E2E_CLAUDE_BIN: mockClaudeBinaryPath,
-    PIXEL_AGENTS_E2E_LAUNCH_LOG: launchLogFile,
-    PIXEL_AGENTS_NODE_BIN: process.execPath,
-    PIXEL_AGENTS_DEBUG_LOG: debugLogFile,
-    // Narration log paths, consumed by the mock-claude wrapper to background a
+    COPILOT_AGENTS_E2E_COPILOT_BIN: mockCopilotBinaryPath,
+    COPILOT_AGENTS_E2E_LAUNCH_LOG: launchLogFile,
+    COPILOT_AGENTS_NODE_BIN: process.execPath,
+    COPILOT_AGENTS_DEBUG_LOG: debugLogFile,
+    // Narration log paths, consumed by the mock-copilot wrapper to background a
     // headerless tail into its own terminal tab (yellow [test] + magenta
     // [external] lines interleaved with the runner's cyan output). On Linux the
     // process env propagates to the integrated terminal; macOS also needs these
     // on the e2e terminal profile (inheritEnv:false) — see the block above.
-    PIXEL_AGENTS_TEST_NARRATION_LOG: path.join(tmpHome, '.claude-mock', 'test-narration.log'),
-    PIXEL_AGENTS_EXTERNAL_NARRATION_LOG: path.join(
+    COPILOT_AGENTS_TEST_NARRATION_LOG: path.join(tmpHome, '.copilot-mock', 'test-narration.log'),
+    COPILOT_AGENTS_EXTERNAL_NARRATION_LOG: path.join(
       tmpHome,
-      '.claude-mock',
+      '.copilot-mock',
       'external-narration.log',
     ),
     // Prevent VS Code from trying to talk to real accounts / telemetry
     VSCODE_TELEMETRY_DISABLED: '1',
-    // Enable Claude Agent Teams feature (see workspace settings.local.json above)
-    CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
+    // Enable Copilot Agent Teams feature (see workspace settings.local.json above)
+    COPILOT_EXPERIMENTAL_AGENT_TEAMS: '1',
   };
 
   // --- VS Code launch args ---
@@ -417,7 +421,7 @@ export async function launchVSCode(
       cwd: resolvedWorkspaceDir,
       timeout: 60_000,
     };
-    if (!IS_WINDOWS && process.env['PIXEL_AGENTS_E2E_NO_VIDEO'] !== '1') {
+    if (!IS_WINDOWS && process.env['COPILOT_AGENTS_E2E_NO_VIDEO'] !== '1') {
       launchOptions.recordVideo = {
         dir: videoDir!,
         size: { width: 1280, height: 800 },
@@ -428,14 +432,14 @@ export async function launchVSCode(
 
     const window = await app.firstWindow();
 
-    // Mark this as the e2e harness BEFORE the CopilotPixel webview iframe loads.
+    // Mark this as the e2e harness BEFORE the CopilotAgents webview iframe loads.
     // addInitScript runs in every frame on attach/navigate (including that
     // iframe, which opens later when the panel is shown), so the webview reads
-    // __PIXEL_AGENTS_E2E === true and installs its test-only observability hooks
-    // (window.__pixelAgentsTestHooks). In production the flag is absent, so
+    // __COPILOT_AGENTS_E2E === true and installs its test-only observability hooks
+    // (window.__copilotAgentsTestHooks). In production the flag is absent, so
     // those hooks (and their unbounded logs) never run.
     await window.addInitScript(() => {
-      (window as unknown as { __PIXEL_AGENTS_E2E?: boolean }).__PIXEL_AGENTS_E2E = true;
+      (window as unknown as { __COPILOT_AGENTS_E2E?: boolean }).__COPILOT_AGENTS_E2E = true;
     });
 
     // The Ozone headless backend ignores --window-size CLI flags, so VS Code
