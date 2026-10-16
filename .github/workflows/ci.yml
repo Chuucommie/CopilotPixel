@@ -3,6 +3,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   pull_request:
     branches:
       - main
@@ -152,6 +153,28 @@ jobs:
           if-no-files-found: warn
           path: allure-results/server
 
+      # --- VSIX Package & Smoke Test ---
+
+      - name: Package VSIX
+        id: package_vsix
+        if: always() && steps.build.outcome == 'success' && steps.install_dependencies.outcome == 'success'
+        run: npx @vscode/vsce package --no-dependencies -o copilot-agents-ci.vsix
+        continue-on-error: true
+
+      - name: Verify VSIX Package and Extension Host
+        id: verify_vsix
+        if: always() && steps.package_vsix.outcome == 'success'
+        run: xvfb-run -a node scripts/verify-vsix-package.mjs copilot-agents-ci.vsix
+        continue-on-error: true
+
+      - name: Upload CI VSIX Artifact
+        if: always() && steps.package_vsix.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: copilot-agents-ci-vsix
+          path: copilot-agents-ci.vsix
+          if-no-files-found: warn
+
       # --- Audit Checks (blocking) ---
 
       - name: Audit Dependencies
@@ -175,6 +198,8 @@ jobs:
           BUILD: ${{ steps.build.outcome }}
           NPM_PACKAGE: ${{ steps.npm_package.outcome }}
           SERVER_TEST: ${{ steps.server_test.outcome }}
+          PACKAGE_VSIX: ${{ steps.package_vsix.outcome }}
+          VERIFY_VSIX: ${{ steps.verify_vsix.outcome }}
           AUDIT: ${{ steps.audit.outcome }}
           KNIP: ${{ steps.knip.outcome }}
         run: |
@@ -198,8 +223,10 @@ jobs:
             echo "| **Format check** | $(status "$FORMAT_CHECK") |"
             echo "| **Build** | $(status "$BUILD") |"
             echo "| **npm package artifact** | $(status "$NPM_PACKAGE") |"
-            echo "| **Server tests** | $(status "$SERVER_TEST") |"
-            echo "| Audit dependencies _(advisory)_ | $(advisory "$AUDIT") |"
+                        echo "| **Server tests** | $(status "$SERVER_TEST") |"
+            echo "| **Package VSIX** | $(status "$PACKAGE_VSIX") |"
+            echo "| **Verify VSIX Smoke** | $(status "$VERIFY_VSIX") |"
+            echo "| Audit dependencies _(advisory)_ | $(advisory "$AUDIT") |" 
             echo "| Knip _(advisory)_ | $(advisory "$KNIP") |"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -218,11 +245,14 @@ jobs:
           BUILD: ${{ steps.build.outcome }}
           NPM_PACKAGE: ${{ steps.npm_package.outcome }}
           SERVER_TEST: ${{ steps.server_test.outcome }}
+          PACKAGE_VSIX: ${{ steps.package_vsix.outcome }}
+          VERIFY_VSIX: ${{ steps.verify_vsix.outcome }}
         run: |
           failed=0
           for step in CHECKOUT SETUP_NODE INSTALL_DEPENDENCIES \
                       TYPE_CHECK LINT \
-                      WEBVIEW_TEST FORMAT_CHECK BUILD NPM_PACKAGE SERVER_TEST; do
+                      WEBVIEW_TEST FORMAT_CHECK BUILD NPM_PACKAGE SERVER_TEST \
+                      PACKAGE_VSIX VERIFY_VSIX; do
             val=$(printenv "$step" 2>/dev/null || echo "skipped")
             if [ "$val" != "success" ]; then
               echo "::error::$step failed"
