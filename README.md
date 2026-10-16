@@ -10,12 +10,12 @@ CopilotAgents is a VS Code extension and local browser workspace for monitoring 
 
 ## Install
 
-Install **CopilotAgents** from the Visual Studio Marketplace using extension ID `chuucommie.copilot-pixe`. Hook installation is consent-gated and can be managed from the extension settings.
+Install **CopilotAgents** from the Visual Studio Marketplace using extension ID `chuucommie.copilot-agents`. Hook installation is consent-gated and can be managed from the extension settings.
 
-The standalone server is available as the `copilot-pixe` npm package:
+The standalone server is available as the `copilot-agents` npm package:
 
 ```sh
-npx copilot-pixe
+npx copilot-agents
 ```
 
 The server prints a local URL for the browser workspace. Hook installation requires approval in that workspace.

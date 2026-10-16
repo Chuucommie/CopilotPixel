@@ -115,7 +115,7 @@ describe('testProvider.contextWindowForModel', () => {
     }
   });
 
-  it('gives Haiku and the older line the small window', () => {
+  it('gives small models the small window', () => {
     for (const model of ['model-small', 'model-small-2', 'model-small-3']) {
       expect(contextWindowForModel(model)).toBe(200_000);
     }
@@ -199,7 +199,7 @@ describe('updateContextUsage', () => {
   });
 
   it("measures against the provider's window for the model that wrote the turn", () => {
-    // Real numbers: a fresh Opus 5 session's first turn. Against the 200k
+    // Real numbers: a fresh large-model session's first turn. Against the 200k
     // default this reads 17% -- five times what the CLI itself reports.
     updateContextUsage(
       1,

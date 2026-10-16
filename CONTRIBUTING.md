@@ -52,7 +52,7 @@ The verifier runs the production `prepack` build, creates a tarball outside the 
 
 A published GitHub Release coordinates publishing to the VS Code Marketplace, Open VSX, and npm through [`.github/workflows/publish-extension.yml`](.github/workflows/publish-extension.yml). Publishing is release-driven, not triggered by a push to `main` alone.
 
-One-time npm setup: configure the `copilot-pixe` package's GitHub Actions [trusted publisher](https://docs.npmjs.com/trusted-publishers/) for `Chuucommie/CopilotAgents`, workflow `publish-extension.yml`, no environment, and allow `npm publish`.
+One-time npm setup: configure the `copilot-agents` package's GitHub Actions [trusted publisher](https://docs.npmjs.com/trusted-publishers/) for `Chuucommie/CopilotAgents`, workflow `publish-extension.yml`, no environment, and allow `npm publish`.
 The GitHub-hosted workflow enforces Node >=22.14.0 and npm >=11.5.1 and uses OIDC (`id-token: write`); do not configure a long-lived publish token, and revoke any unused one.
 
 For each release:
@@ -61,7 +61,7 @@ For each release:
 2. Run `npm ci`, `npm test`, and `npm run verify:npm-package`. Inspect the generated package if needed by manually dispatching **Publish Extension** in dry-run mode and downloading its `npm-package-*` artifact; manual dispatch never publishes to npm.
 3. Merge the release changes into `main` and wait for CI to pass.
 4. Create and publish a GitHub Release whose tag is exactly `v<package.json version>` and points to that commit on `main` (for example, `v1.4.0`). The npm job rejects a mismatched tag, ref, package identity, non-incrementing version, or changed tarball integrity.
-5. Confirm the Marketplace, Open VSX, and npm jobs succeeded, and verify the new npm version with `npm view copilot-pixe version`.
+5. Confirm the Marketplace, Open VSX, and npm jobs succeeded, and verify the new npm version with `npm view copilot-agents version`.
 
 ## Development Workflow
 
@@ -99,16 +99,16 @@ Vite will print a local URL (typically `http://localhost:5173`) where the mocked
 
 CopilotAgents uses a layered codebase. `core/` depends on nothing; `server/` and `webview-ui/` depend only on `core/`; `adapters/vscode/` depends on `core/` and `server/`.
 
-| Directory                   | Description                                                                                                                                                                                                                                           |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `core/`                     | Protocol + interface definitions (AsyncAPI 3.0 contract, HookProvider, MessageTransport, StateAdapter). Zero runtime side effects.                                                                                                                    |
-| `server/`                   | Lifecycle runtime: `AgentRuntime`, `AgentStateStore`, `SessionRouter`, `DismissalTracker`, Fastify HTTP/WS server, file watching, transcript parsing, hook installer, providers, Vitest test suite. Also ships the `npx copilot-pixe` standalone CLI. |
-| `adapters/vscode/`          | VS Code surface — `extension.ts`, `WebviewViewProvider`, terminal lifecycle, one-time state migration. Composes `core/` and `server/`.                                                                                                                |
-| `webview-ui/`               | React 19 + Canvas UI. Transport abstraction (`PostMessageTransport` + `WebSocketTransport`). Depends only on `core/`.                                                                                                                                 |
-| `webview-ui/public/assets/` | Bundled sprites, furniture catalog, default layout, fonts.                                                                                                                                                                                            |
-| `scripts/`                  | Build/CI tooling: `generate-messages.ts` (AsyncAPI → TS), `run-e2e.mjs`, `build-allure-report.mjs`, `assemble-vercel-output.mjs`, and the asset extraction pipeline.                                                                                  |
-| `e2e/`                      | Playwright suite — fixtures, helpers, specs for `copilot/hooks-on/`, `copilot/hooks-off/`, and `standalone/`.                                                                                                                                         |
-| `eslint-rules/`             | Custom rules (`no-inline-colors`, `pixel-shadow`, `pixel-font`) enforced project-wide.                                                                                                                                                                |
+| Directory                   | Description                                                                                                                                                                                                                                             |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `core/`                     | Protocol + interface definitions (AsyncAPI 3.0 contract, HookProvider, MessageTransport, StateAdapter). Zero runtime side effects.                                                                                                                      |
+| `server/`                   | Lifecycle runtime: `AgentRuntime`, `AgentStateStore`, `SessionRouter`, `DismissalTracker`, Fastify HTTP/WS server, file watching, transcript parsing, hook installer, providers, Vitest test suite. Also ships the `npx copilot-agents` standalone CLI. |
+| `adapters/vscode/`          | VS Code surface — `extension.ts`, `WebviewViewProvider`, terminal lifecycle, one-time state migration. Composes `core/` and `server/`.                                                                                                                  |
+| `webview-ui/`               | React 19 + Canvas UI. Transport abstraction (`PostMessageTransport` + `WebSocketTransport`). Depends only on `core/`.                                                                                                                                   |
+| `webview-ui/public/assets/` | Bundled sprites, furniture catalog, default layout, fonts.                                                                                                                                                                                              |
+| `scripts/`                  | Build/CI tooling: `generate-messages.ts` (AsyncAPI → TS), `run-e2e.mjs`, `build-allure-report.mjs`, `assemble-vercel-output.mjs`, and the asset extraction pipeline.                                                                                    |
+| `e2e/`                      | Playwright suite — fixtures, helpers, specs for `copilot/hooks-on/`, `copilot/hooks-off/`, and `standalone/`.                                                                                                                                           |
+| `eslint-rules/`             | Custom rules (`no-inline-colors`, `pixel-shadow`, `pixel-font`) enforced project-wide.                                                                                                                                                                  |
 
 The repo uses **npm workspaces** (`server`, `webview-ui` declared in the root `package.json`). A single `npm install` at the root installs dependencies for all workspaces; no nested `cd ... && npm install` is needed.
 

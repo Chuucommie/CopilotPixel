@@ -21,6 +21,7 @@ import {
   ensureProjectScan,
   isTrackedProjectDir,
   reassignAgentToFile,
+  registerWorkspaceRoot,
   scanForBackgroundAgentFiles,
   scanForTeammateFiles,
   setAgentRemovalCallback,
@@ -420,6 +421,7 @@ export class AgentRuntime {
 
   /** Start external session scanning (detects sessions from other terminals). */
   startExternalScanning(projectDir: string): void {
+    registerWorkspaceRoot(projectDir);
     if (this.externalScanTimer) return;
 
     this.externalScanTimer = startExternalSessionScanning(

@@ -272,6 +272,16 @@ export function readNewLines(
 // Track all project directories to scan (supports multi-root workspaces)
 const trackedProjectDirs = new Set<string>();
 
+// Track workspace root paths (for dynamic discovery of external provider sessions)
+const trackedWorkspaceRoots = new Set<string>();
+
+/** Register a workspace root directory to dynamically monitor its sessions across providers. */
+export function registerWorkspaceRoot(wsPath: string): void {
+  if (wsPath) {
+    trackedWorkspaceRoots.add(path.resolve(wsPath));
+  }
+}
+
 /** Check if a project dir is tracked by the workspace scanner. */
 export function isTrackedProjectDir(dir: string): boolean {
   if (trackedProjectDirs.has(dir)) return true;
@@ -1217,7 +1227,7 @@ function adoptExternalSession(
     isExternal: true,
     projectDir,
     jsonlFile,
-    fileOffset,
+    fileOffset: isAntigravity ? 0 : fileOffset,
     lineBuffer: '',
     activeToolIds: new Set(),
     activeToolStatuses: new Map(),
@@ -1233,8 +1243,11 @@ function adoptExternalSession(
     linesProcessed: 0,
     seenUnknownRecordTypes: new Set(),
     folderName,
+    providerId: isAntigravity ? 'antigravity' : undefined,
+    agentName: isAntigravity ? 'Gemini' : undefined,
+    teamName: isAntigravity ? 'Antigravity' : undefined,
     contextTokens: 0,
-    maxContextTokens: DEFAULT_MAX_CONTEXT_TOKENS,
+    maxContextTokens: isAntigravity ? 1_000_000 : DEFAULT_MAX_CONTEXT_TOKENS,
   };
 
   assignPaletteIfNeeded(agent, agents);
@@ -1276,6 +1289,18 @@ export function startExternalSessionScanning(
   hooksEnabledRef?: { current: boolean },
 ): ReturnType<typeof setInterval> {
   return setInterval(() => {
+    // Dynamically discover new session dirs for tracked workspace roots (e.g. newly started Antigravity brain chats)
+    for (const wsRoot of trackedWorkspaceRoots) {
+      for (const p of hookProviders) {
+        const dirs = p.getSessionDirs?.(wsRoot) ?? [];
+        for (const dir of dirs) {
+          if (dir && !trackedProjectDirs.has(dir)) {
+            trackedProjectDirs.add(dir);
+          }
+        }
+      }
+    }
+
     // Scan all tracked project dirs in both hooks and heuristic modes. Hooks are
     // a fast path for producers that emit hook events; polling remains the
     // discovery path for workspace JSONL sessions created without hooks.
@@ -1325,15 +1350,8 @@ export function scanExternalDir(
    *  own teammate sessions; with hooks off this scan IS their discovery path. */
   hooksEnabledRef?: { current: boolean },
 ): void {
-  let files: string[];
-  try {
-    files = fs
-      .readdirSync(projectDir)
-      .filter((f) => f.endsWith('.jsonl'))
-      .map((f) => path.join(projectDir, f));
-  } catch {
-    return;
-  }
+  const files = findJsonlFilesInDir(projectDir);
+  if (files.length === 0) return;
 
   const now = Date.now();
 
@@ -1436,7 +1454,11 @@ export function scanExternalDir(
     // Only adopt recently-active files (modified within threshold).
     try {
       const stat = fs.statSync(file);
-      if (now - stat.mtimeMs > EXTERNAL_ACTIVE_THRESHOLD_MS) continue;
+      const isAntigravity = file.includes('.gemini') || file.includes('antigravity');
+      const threshold = isAntigravity
+        ? GLOBAL_SCAN_ACTIVE_MAX_AGE_MS
+        : EXTERNAL_ACTIVE_THRESHOLD_MS;
+      if (now - stat.mtimeMs > threshold) continue;
     } catch {
       continue;
     }

@@ -149,7 +149,7 @@ describe('dist/cli.js entry-point guard', () => {
   itBuilt('runs main() when executed directly: --help prints usage and exits 0', async () => {
     const { code, stdout } = await runCli(['--help']);
     expect(code).toBe(0);
-    expect(stdout).toContain('Usage: copilot-pixe');
+    expect(stdout).toContain('Usage: copilot-agents');
   });
 
   // 12. Direct execution still runs main()'s port validation (rejects before listen())

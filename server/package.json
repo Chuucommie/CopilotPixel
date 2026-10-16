@@ -1,5 +1,5 @@
 {
-  "name": "copilot-pixe-server",
+  "name": "copilot-agents-server",
   "private": true,
   "scripts": {
     "test": "vitest run",

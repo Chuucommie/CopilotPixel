@@ -97,7 +97,7 @@ test.describe('Hooks ON / spawn paths', () => {
     narrator.check('"Subtask: spawned subtask" overlay up — count 1 → 2');
 
     // The agent is on no team, so this also pins that the context gauge is not
-    // a teams feature. 90k of an Opus 5 window is 9%; reading 45% would mean
+    // a teams feature. 90k of a 1M window is 9%; reading 45% would mean
     // the runtime fell back to assuming a 200k window.
     narrator.step("waiting for the t+7s usage record to fill the agent's context gauge");
     await expectContextGauge(panelFrame, 9);

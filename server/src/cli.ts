@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Standalone CLI entry point: `npx copilot-pixe`
+ * Standalone CLI entry point: `npx copilot-agents`
  *
  * Starts the Fastify server in standalone mode with SPA serving and WebSocket.
  * Loads all assets (PNGs -> SpriteData) on startup and caches in memory.
@@ -66,7 +66,7 @@ export function parseArgs(argv: string[]): CliArgs {
       args.host = argv[i + 1];
       i++;
     } else if (argv[i] === '--help') {
-      console.log(`Usage: copilot-pixe [options]
+      console.log(`Usage: copilot-agents [options]
 
 Options:
   --port, -p <number>   Port to listen on (default: OS-assigned ephemeral port)

@@ -160,7 +160,7 @@ export function buildAssistantUsageRecord(cacheReadTokens: number): Record<strin
   return {
     type: 'assistant',
     message: {
-      model: 'copilot-opus-5',
+      model: 'gpt-4o-mini',
       content: [{ type: 'text', text: 'still working' }],
       usage: {
         input_tokens: 0,

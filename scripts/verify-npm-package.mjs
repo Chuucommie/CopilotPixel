@@ -95,7 +95,7 @@ async function stopChild(child) {
 }
 
 async function verifyInstalledTarball(tarballPath) {
-  const smokeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-pixe-npm-smoke-'));
+  const smokeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-agents-npm-smoke-'));
   const smokeHome = path.join(smokeRoot, 'home');
   const smokeProject = path.join(smokeRoot, 'project');
   fs.mkdirSync(smokeHome, { recursive: true });
@@ -115,7 +115,7 @@ async function verifyInstalledTarball(tarballPath) {
   );
   fs.writeFileSync(
     path.join(smokeProject, 'package.json'),
-    JSON.stringify({ name: 'copilot-pixe-package-smoke', private: true }, null, 2),
+    JSON.stringify({ name: 'copilot-agents-package-smoke', private: true }, null, 2),
   );
 
   let child = null;
@@ -125,12 +125,12 @@ async function verifyInstalledTarball(tarballPath) {
       cwd: smokeProject,
     });
 
-    const installedRoot = path.join(smokeProject, 'node_modules', 'copilot-pixe');
+    const installedRoot = path.join(smokeProject, 'node_modules', 'copilot-agents');
     const installedManifest = JSON.parse(
       fs.readFileSync(path.join(installedRoot, 'package.json'), 'utf-8'),
     );
-    if (installedManifest.bin?.['copilot-pixe'] !== './dist/cli.js') {
-      throw new Error('Installed package has an unexpected copilot-pixe bin entry');
+    if (installedManifest.bin?.['copilot-agents'] !== './dist/cli.js') {
+      throw new Error('Installed package has an unexpected copilot-agents bin entry');
     }
 
     const installedCli = path.join(installedRoot, 'dist', 'cli.js');
@@ -143,15 +143,15 @@ async function verifyInstalledTarball(tarballPath) {
       smokeProject,
       'node_modules',
       '.bin',
-      process.platform === 'win32' ? 'copilot-pixe.cmd' : 'copilot-pixe',
+      process.platform === 'win32' ? 'copilot-agents.cmd' : 'copilot-agents',
     );
     const help = await execFileAsync(installedBin, ['--help'], {
       cwd: smokeProject,
       env: { ...process.env, HOME: smokeHome, USERPROFILE: smokeHome },
       shell: process.platform === 'win32',
     });
-    if (!help.stdout.includes('Usage: copilot-pixe')) {
-      throw new Error('Installed copilot-pixe bin did not print CLI help');
+    if (!help.stdout.includes('Usage: copilot-agents')) {
+      throw new Error('Installed copilot-agents bin did not print CLI help');
     }
 
     const port = await getFreePort();
@@ -229,7 +229,7 @@ async function main() {
   const ownsOutputDir = args.outputDir === null;
   const outputDir = args.outputDir
     ? path.resolve(args.outputDir)
-    : fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-pixe-npm-pack-'));
+    : fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-agents-npm-pack-'));
 
   if (!ownsOutputDir) {
     fs.mkdirSync(outputDir, { recursive: true });

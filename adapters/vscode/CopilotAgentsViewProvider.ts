@@ -34,7 +34,11 @@ import {
   setHooksEnabled as persistHooksEnabled,
   writeConfig,
 } from '../../server/src/configPersistence.js';
-import { setFolderNameResolver, setTerminalAdapter } from '../../server/src/fileWatcher.js';
+import {
+  registerWorkspaceRoot,
+  setFolderNameResolver,
+  setTerminalAdapter,
+} from '../../server/src/fileWatcher.js';
 import type { LayoutWatcher } from '../../server/src/layoutPersistence.js';
 import {
   readLayoutFromFile,
@@ -448,6 +452,8 @@ export class CopilotAgentsViewProvider implements vscode.WebviewViewProvider {
             if (lead?.terminalRef) {
               lead.terminalRef.show();
             }
+          } else if (agent.providerId === 'antigravity') {
+            vscode.commands.executeCommand('workbench.action.chat.open');
           }
         }
       } else if (message.type === 'closeAgent') {
@@ -709,8 +715,16 @@ export class CopilotAgentsViewProvider implements vscode.WebviewViewProvider {
         }
 
         // Ensure project scan runs across all active providers (Copilot + Antigravity)
-        const projectDirs = getAllProjectDirPaths();
         const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (workspaceRoot) {
+          registerWorkspaceRoot(workspaceRoot);
+        }
+        if (wsFolders && wsFolders.length > 1) {
+          for (const folder of wsFolders) {
+            registerWorkspaceRoot(folder.uri.fsPath);
+          }
+        }
+        const projectDirs = getAllProjectDirPaths();
         console.log(`[CopilotAgents] Debug: Platform: ${process.platform}, arch: ${process.arch}`);
         console.log('[Extension] workspaceRoot:', workspaceRoot);
         console.log('[Extension] projectDirs:', projectDirs);

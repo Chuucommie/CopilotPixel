@@ -106,16 +106,17 @@ test.describe('Pets', () => {
     });
     narrator.check('petSpritesLoaded reached the client — pet assets delivered');
 
-    // The two bundled pets (claudio, gitcat) render as carousel thumbnails in
+    // The two bundled pets (buddy, gitcat) render as carousel thumbnails in
     // alphabetical order, each titled with its manifest `name`. Asserting the
     // count + both names covers "loaded" and "manifest names" together.
     narrator.step('opening the layout editor → Pets tab');
     const carousel = await openPetsTab(frame);
-    await expect(carousel.locator('button')).toHaveCount(2);
-    narrator.check('carousel has exactly 2 pet thumbnails');
-    await expect(carousel.locator('button[title="Claudio"]')).toBeVisible();
+    await expect(carousel.locator('button')).toHaveCount(3);
+    narrator.check('carousel has exactly 3 pet thumbnails');
+    await expect(carousel.locator('button[title="Buddy"]')).toBeVisible();
     await expect(carousel.locator('button[title="Gitcat"]')).toBeVisible();
-    narrator.check('thumbnails titled "Claudio" and "Gitcat" — manifest names surfaced');
+    await expect(carousel.locator('button[title="Mimi"]')).toBeVisible();
+    narrator.check('thumbnails titled "Buddy", "Gitcat", and "Mimi" — manifest names surfaced');
   });
 
   test('placing a pet toggles it on/off and persists across a panel reload @area:pets', async ({
@@ -125,29 +126,29 @@ test.describe('Pets', () => {
 
     narrator.step('opening the layout editor → Pets tab');
     const carousel = await openPetsTab(frame);
-    const claudio = carousel.locator('button[title="Claudio"]');
+    const buddy = carousel.locator('button[title="Buddy"]');
     const gitcat = carousel.locator('button[title="Gitcat"]');
 
     // Toggle ON: clicking the carousel button drives the real placement path.
-    narrator.step('clicking Claudio — placing the pet');
-    await claudio.click();
+    narrator.step('clicking Buddy — placing the pet');
+    await buddy.click();
     await frame.waitForFunction(() => {
       const pets = (window as PetWindow).__copilotAgentsTestHooks?.getPets?.() ?? [];
       return pets.length === 1 && pets[0]?.petType === 0;
     });
-    narrator.check('one pet on the canvas (getPets → 1, petType claudio)');
+    narrator.check('one pet on the canvas (getPets → 1, petType buddy)');
 
     // Toggle OFF: clicking the same (now-active) button removes it.
-    narrator.step('clicking Claudio again — removing the pet');
-    await claudio.click();
+    narrator.step('clicking Buddy again — removing the pet');
+    await buddy.click();
     await frame.waitForFunction(
       () => ((window as PetWindow).__copilotAgentsTestHooks?.getPets?.() ?? []).length === 0,
     );
     narrator.check('canvas empty again (getPets → 0)');
 
     // Place both pets, then persist via the EditActionBar Save button.
-    narrator.step('placing both pets — Claudio, then Gitcat');
-    await claudio.click();
+    narrator.step('placing both pets — Buddy, then Gitcat');
+    await buddy.click();
     await frame.waitForFunction(
       () =>
         ((globalThis as unknown as PetWindow).__copilotAgentsTestHooks?.getPets?.() ?? [])
@@ -212,9 +213,9 @@ test.describe('Pets', () => {
 
     // Place one pet through the editor, then read its id back (spawn tile is
     // random, so the id is the only stable handle).
-    narrator.step('placing one pet (Claudio) via the editor');
+    narrator.step('placing one pet (Buddy) via the editor');
     const carousel = await openPetsTab(frame);
-    await carousel.locator('button[title="Claudio"]').click();
+    await carousel.locator('button[title="Buddy"]').click();
     await frame.waitForFunction(
       () => ((window as PetWindow).__copilotAgentsTestHooks?.getPets?.() ?? []).length === 1,
     );
