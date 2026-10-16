@@ -151,6 +151,19 @@ export function processTranscriptLine(
       return;
     }
 
+    // -- VS Code Copilot Chat transcripts (kind: 0, 1, 2 or requests array) --
+    if (isCopilotChatRecord(record as Record<string, unknown>)) {
+      processCopilotChatRecord(
+        agentId,
+        agent,
+        record as Record<string, unknown>,
+        agents,
+        waitingTimers,
+        permissionTimers,
+      );
+      return;
+    }
+
     const assistantContent = record.message?.content ?? record.content;
 
     if (record.type === 'assistant' && Array.isArray(assistantContent)) {
@@ -900,6 +913,238 @@ function processAntigravityRecord(
       agent.activeToolStatuses.delete(foundToolId);
       agent.activeToolNames.delete(foundToolId);
     }
+    return;
+  }
+}
+
+export function isCopilotChatRecord(record: Record<string, unknown>): boolean {
+  if (record.kind === 0 || record.kind === 1 || record.kind === 2) return true;
+  if (Array.isArray(record.requests)) return true;
+  if (
+    record.v &&
+    typeof record.v === 'object' &&
+    Array.isArray((record.v as Record<string, unknown>).requests)
+  )
+    return true;
+  return false;
+}
+
+export function processCopilotChatRecord(
+  agentId: number,
+  agent: AgentState,
+  record: Record<string, unknown>,
+  agents: AgentStateStore,
+  waitingTimers: Map<number, ReturnType<typeof setTimeout>>,
+  permissionTimers: Map<number, ReturnType<typeof setTimeout>>,
+): void {
+  agent.providerId = 'copilot';
+  if (!agent.agentName) {
+    agent.agentName = 'Copilot';
+    agent.teamName = 'GitHub Copilot';
+    agents.broadcast({
+      type: 'agentTeamInfo',
+      id: agentId,
+      agentName: 'Copilot',
+      teamName: 'GitHub Copilot',
+    });
+  }
+
+  const parseToolItem = (
+    item: unknown,
+  ): { toolName: string; input: Record<string, unknown>; isComplete?: boolean } | null => {
+    if (!item || typeof item !== 'object') return null;
+    const obj = item as Record<string, unknown>;
+    if (
+      obj.type === 'toolInvocation' ||
+      obj.kind === 'toolInvocation' ||
+      obj.toolId ||
+      obj.toolInvocationToken
+    ) {
+      const toolName = (obj.name || obj.toolName || obj.tool || 'tool') as string;
+      const input = (obj.parameters || obj.input || obj.args || {}) as Record<string, unknown>;
+      const isComplete =
+        obj.isComplete === true || obj.status === 'completed' || obj.result !== undefined;
+      return { toolName, input, isComplete };
+    }
+    if (obj.call && typeof obj.call === 'object') {
+      const call = obj.call as Record<string, unknown>;
+      const toolName = (call.name || call.tool || 'tool') as string;
+      const input = (call.args || call.parameters || {}) as Record<string, unknown>;
+      return { toolName, input, isComplete: obj.isComplete === true };
+    }
+    return null;
+  };
+
+  const clearAllTools = () => {
+    if (agent.activeToolIds.size > 0) {
+      for (const toolId of agent.activeToolIds) {
+        agents.broadcast({ type: 'agentToolDone', id: agentId, toolId });
+      }
+      agent.activeToolIds.clear();
+      agent.activeToolStatuses.clear();
+      agent.activeToolNames.clear();
+      agents.broadcast({ type: 'agentToolsClear', id: agentId });
+    }
+  };
+
+  // Case A: Snapshot (kind === 0) or raw chat object
+  const snapshot =
+    record.kind === 0 && record.v && typeof record.v === 'object'
+      ? (record.v as Record<string, unknown>)
+      : Array.isArray(record.requests)
+        ? record
+        : null;
+
+  if (snapshot) {
+    const requests = Array.isArray(snapshot.requests)
+      ? (snapshot.requests as Array<Record<string, unknown>>)
+      : [];
+    if (requests.length === 0) {
+      clearAllTools();
+      agent.isWaiting = true;
+      agent.hadToolsInTurn = false;
+      agents.broadcast({
+        type: 'agentStatus',
+        id: agentId,
+        status: 'waiting',
+        awaitingInput: true,
+      });
+      return;
+    }
+
+    const lastReq = requests[requests.length - 1];
+    const isFinished = lastReq.result !== undefined && lastReq.result !== null;
+
+    if (isFinished) {
+      cancelWaitingTimer(agentId, waitingTimers);
+      cancelPermissionTimer(agentId, permissionTimers);
+      clearAllTools();
+      agent.isWaiting = true;
+      agent.hadToolsInTurn = false;
+      agents.broadcast({
+        type: 'agentStatus',
+        id: agentId,
+        status: 'waiting',
+        awaitingInput: false,
+      });
+    } else {
+      cancelWaitingTimer(agentId, waitingTimers);
+      cancelPermissionTimer(agentId, permissionTimers);
+      agent.isWaiting = false;
+      agent.hadToolsInTurn = true;
+      agents.broadcast({ type: 'agentStatus', id: agentId, status: 'active' });
+
+      const responses = Array.isArray(lastReq.response) ? (lastReq.response as unknown[]) : [];
+      let latestActiveTool: {
+        toolName: string;
+        input: Record<string, unknown>;
+        index: number;
+      } | null = null;
+
+      for (let i = 0; i < responses.length; i++) {
+        const parsed = parseToolItem(responses[i]);
+        if (parsed && !parsed.isComplete) {
+          latestActiveTool = { toolName: parsed.toolName, input: parsed.input, index: i };
+        }
+      }
+
+      if (latestActiveTool) {
+        const toolId = `tool_${latestActiveTool.index}_${latestActiveTool.toolName}`;
+        const status = formatToolStatus(latestActiveTool.toolName, latestActiveTool.input);
+        if (!agent.activeToolIds.has(toolId)) {
+          clearAllTools();
+          agent.activeToolIds.add(toolId);
+          agent.activeToolStatuses.set(toolId, status);
+          agent.activeToolNames.set(toolId, latestActiveTool.toolName);
+          agents.broadcast({
+            type: 'agentToolStart',
+            id: agentId,
+            toolId,
+            status,
+            toolName: latestActiveTool.toolName,
+            permissionActive: false,
+          });
+        }
+      } else {
+        clearAllTools();
+      }
+
+      startWaitingTimer(agentId, TEXT_IDLE_DELAY_MS, agents, waitingTimers);
+    }
+    return;
+  }
+
+  // Case B: kind === 1 (New user request)
+  if (record.kind === 1) {
+    cancelWaitingTimer(agentId, waitingTimers);
+    cancelPermissionTimer(agentId, permissionTimers);
+    clearAgentActivity(agent, agentId, agents, permissionTimers);
+    agent.isWaiting = false;
+    agent.hadToolsInTurn = false;
+    agents.broadcast({ type: 'agentStatus', id: agentId, status: 'active' });
+    return;
+  }
+
+  // Case C: kind === 2 (Mutation / streaming delta)
+  if (record.kind === 2) {
+    cancelWaitingTimer(agentId, waitingTimers);
+    cancelPermissionTimer(agentId, permissionTimers);
+
+    const keyPath = Array.isArray(record.k) ? record.k.map(String) : [];
+    const val = record.v;
+
+    if (
+      keyPath.includes('result') ||
+      (val && typeof val === 'object' && 'result' in (val as Record<string, unknown>))
+    ) {
+      clearAllTools();
+      agent.isWaiting = true;
+      agent.hadToolsInTurn = false;
+      agents.broadcast({
+        type: 'agentStatus',
+        id: agentId,
+        status: 'waiting',
+        awaitingInput: false,
+      });
+      return;
+    }
+
+    const parsed = parseToolItem(val);
+    if (parsed) {
+      agent.isWaiting = false;
+      agents.broadcast({ type: 'agentStatus', id: agentId, status: 'active' });
+
+      const toolId = `tool_${keyPath.join('_')}_${parsed.toolName}`;
+      if (parsed.isComplete) {
+        if (agent.activeToolIds.has(toolId)) {
+          agent.activeToolIds.delete(toolId);
+          agent.activeToolStatuses.delete(toolId);
+          agent.activeToolNames.delete(toolId);
+          agents.broadcast({ type: 'agentToolDone', id: agentId, toolId });
+        }
+      } else {
+        const status = formatToolStatus(parsed.toolName, parsed.input);
+        if (!agent.activeToolIds.has(toolId)) {
+          agent.activeToolIds.add(toolId);
+          agent.activeToolStatuses.set(toolId, status);
+          agent.activeToolNames.set(toolId, parsed.toolName);
+          agents.broadcast({
+            type: 'agentToolStart',
+            id: agentId,
+            toolId,
+            status,
+            toolName: parsed.toolName,
+            permissionActive: false,
+          });
+        }
+      }
+      return;
+    }
+
+    // Markdown text streaming / generation
+    agent.isWaiting = false;
+    agents.broadcast({ type: 'agentStatus', id: agentId, status: 'active' });
+    startWaitingTimer(agentId, TEXT_IDLE_DELAY_MS, agents, waitingTimers);
     return;
   }
 }

@@ -1,14 +1,53 @@
-function findJsonlFilesInDir(dirPath: string): string[] {
+export function findJsonlFilesInDir(dirPath: string): string[] {
   const files: string[] = [];
   try {
     const direct = fs
       .readdirSync(dirPath)
-      .filter((f) => f.endsWith('.jsonl'))
+      .filter((f) => {
+        if (f.endsWith('.jsonl')) return true;
+        if (f.endsWith('.json')) {
+          return (
+            !f.endsWith('workspace.json') &&
+            !f.endsWith('package.json') &&
+            !f.endsWith('state.vscdb') &&
+            !f.endsWith('tsconfig.json')
+          );
+        }
+        return false;
+      })
       .map((f) => path.join(dirPath, f));
     files.push(...direct);
     const antigravityLog = path.join(dirPath, '.system_generated', 'logs', 'transcript.jsonl');
     if (fs.existsSync(antigravityLog)) {
       files.push(antigravityLog);
+    }
+
+    // Also check chatSessions subdirectory if dirPath is a workspaceStorage hash folder
+    const chatSessionsSubdir = path.join(dirPath, 'chatSessions');
+    if (fs.existsSync(chatSessionsSubdir)) {
+      try {
+        const chatFiles = fs
+          .readdirSync(chatSessionsSubdir)
+          .filter(
+            (f) => f.endsWith('.jsonl') || (f.endsWith('.json') && !f.endsWith('state.vscdb')),
+          )
+          .map((f) => path.join(chatSessionsSubdir, f));
+        files.push(...chatFiles);
+      } catch {
+        /* ignore */
+      }
+    }
+    const copilotChatTranscripts = path.join(dirPath, 'GitHub.copilot-chat', 'transcripts');
+    if (fs.existsSync(copilotChatTranscripts)) {
+      try {
+        const transcriptFiles = fs
+          .readdirSync(copilotChatTranscripts)
+          .filter((f) => f.endsWith('.jsonl') || f.endsWith('.json'))
+          .map((f) => path.join(copilotChatTranscripts, f));
+        files.push(...transcriptFiles);
+      } catch {
+        /* ignore */
+      }
     }
   } catch {
     /* dir may not exist or be readable */
@@ -1173,7 +1212,7 @@ export function adoptExternalSessionFromHook(
   }
 }
 
-function adoptExternalSession(
+export function adoptExternalSession(
   jsonlFile: string,
   projectDir: string,
   nextAgentIdRef: { current: number },
@@ -1217,9 +1256,16 @@ function adoptExternalSession(
     /* start from beginning if stat fails */
   }
   const isAntigravity = jsonlFile.includes('.gemini') || jsonlFile.includes('antigravity');
+  const isCopilotChat =
+    jsonlFile.includes('chatSessions') ||
+    jsonlFile.includes('GitHub.copilot-chat') ||
+    jsonlFile.includes('chatEditor') ||
+    jsonlFile.includes('.copilot');
+
   const sessionId = isAntigravity
     ? path.basename(path.resolve(path.dirname(jsonlFile), '../..'))
-    : path.basename(jsonlFile, '.jsonl');
+    : path.basename(jsonlFile).replace(/\.(jsonl|json)$/, '');
+
   const agent: AgentState = {
     id,
     sessionId,
@@ -1227,7 +1273,7 @@ function adoptExternalSession(
     isExternal: true,
     projectDir,
     jsonlFile,
-    fileOffset: isAntigravity ? 0 : fileOffset,
+    fileOffset: isAntigravity || isCopilotChat ? 0 : fileOffset,
     lineBuffer: '',
     activeToolIds: new Set(),
     activeToolStatuses: new Map(),
@@ -1243,9 +1289,9 @@ function adoptExternalSession(
     linesProcessed: 0,
     seenUnknownRecordTypes: new Set(),
     folderName,
-    providerId: isAntigravity ? 'antigravity' : undefined,
-    agentName: isAntigravity ? 'Gemini' : undefined,
-    teamName: isAntigravity ? 'Antigravity' : undefined,
+    providerId: isAntigravity ? 'antigravity' : isCopilotChat ? 'copilot' : undefined,
+    agentName: isAntigravity ? 'Gemini' : isCopilotChat ? 'Copilot' : undefined,
+    teamName: isAntigravity ? 'Antigravity' : isCopilotChat ? 'GitHub Copilot' : undefined,
     contextTokens: 0,
     maxContextTokens: isAntigravity ? 1_000_000 : DEFAULT_MAX_CONTEXT_TOKENS,
   };
@@ -1455,9 +1501,15 @@ export function scanExternalDir(
     try {
       const stat = fs.statSync(file);
       const isAntigravity = file.includes('.gemini') || file.includes('antigravity');
-      const threshold = isAntigravity
-        ? GLOBAL_SCAN_ACTIVE_MAX_AGE_MS
-        : EXTERNAL_ACTIVE_THRESHOLD_MS;
+      const isCopilotChat =
+        file.includes('chatSessions') ||
+        file.includes('GitHub.copilot-chat') ||
+        file.includes('chatEditor') ||
+        file.includes('.copilot');
+      const threshold =
+        isAntigravity || isCopilotChat
+          ? GLOBAL_SCAN_ACTIVE_MAX_AGE_MS
+          : EXTERNAL_ACTIVE_THRESHOLD_MS;
       if (now - stat.mtimeMs > threshold) continue;
     } catch {
       continue;

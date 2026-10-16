@@ -426,7 +426,14 @@ export function restoreAgents(
     try {
       if (fs.existsSync(p.jsonlFile)) {
         const stat = fs.statSync(p.jsonlFile);
-        agent.fileOffset = stat.size;
+        const isAntigravity =
+          p.jsonlFile.includes('.gemini') || p.jsonlFile.includes('antigravity');
+        const isCopilotChat =
+          p.jsonlFile.includes('chatSessions') ||
+          p.jsonlFile.includes('GitHub.copilot-chat') ||
+          p.jsonlFile.includes('chatEditor') ||
+          p.jsonlFile.includes('.copilot');
+        agent.fileOffset = isAntigravity || isCopilotChat ? 0 : stat.size;
         startFileWatching(
           p.id,
           p.jsonlFile,

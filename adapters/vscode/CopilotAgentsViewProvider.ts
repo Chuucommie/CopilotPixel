@@ -455,7 +455,11 @@ export class CopilotAgentsViewProvider implements vscode.WebviewViewProvider {
             if (lead?.terminalRef) {
               lead.terminalRef.show();
             }
-          } else if (agent.providerId === 'antigravity') {
+          } else if (
+            agent.providerId === 'antigravity' ||
+            agent.providerId === 'copilot' ||
+            agent.isExternal
+          ) {
             vscode.commands.executeCommand('workbench.action.chat.open');
           }
         }
@@ -735,6 +739,34 @@ export class CopilotAgentsViewProvider implements vscode.WebviewViewProvider {
           if (dir) {
             this.runtime.startProjectScan(dir);
             this.runtime.startExternalScanning(dir);
+          }
+        }
+
+        if (this.context.storageUri) {
+          try {
+            const wsStorageDir = path.dirname(this.context.storageUri.fsPath);
+            const chatSessionsDir = path.join(wsStorageDir, 'chatSessions');
+            const copilotTranscriptsDir = path.join(
+              wsStorageDir,
+              'GitHub.copilot-chat',
+              'transcripts',
+            );
+            const chatEditorDir = path.join(wsStorageDir, 'chatEditor');
+
+            for (const chatDir of [
+              chatSessionsDir,
+              copilotTranscriptsDir,
+              chatEditorDir,
+              wsStorageDir,
+            ]) {
+              if (fs.existsSync(chatDir) && !projectDirs.includes(chatDir)) {
+                console.log(`[CopilotAgents] Registering direct workspace chat dir: ${chatDir}`);
+                this.runtime.startProjectScan(chatDir);
+                this.runtime.startExternalScanning(chatDir);
+              }
+            }
+          } catch {
+            /* ignore */
           }
         }
 
