@@ -466,9 +466,7 @@ Rules:
     }
   }
 
-  private parseAction(
-    text: string,
-  ): {
+  private parseAction(text: string): {
     action: string;
     path?: string;
     content?: string;
