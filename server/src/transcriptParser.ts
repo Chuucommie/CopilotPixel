@@ -1,4 +1,5 @@
 import { formatAntigravityToolStatus } from './providers/hook/antigravity/antigravity.js';
+import { formatToolStatus as formatCopilotToolStatus } from './providers/hook/copilot/copilot.js';
 const debug = process.env.COPILOT_AGENTS_DEBUG !== '0';
 
 import type { HookProvider } from '../../core/src/provider.js';
@@ -949,9 +950,23 @@ export function processCopilotChatRecord(
     });
   }
 
+  const extractMessage = (msg: unknown): string | null => {
+    if (typeof msg === 'string' && msg.trim()) return msg.trim();
+    if (msg && typeof msg === 'object' && typeof (msg as { value?: unknown }).value === 'string') {
+      const val = (msg as { value: string }).value.trim();
+      if (val) return val;
+    }
+    return null;
+  };
+
   const parseToolItem = (
     item: unknown,
-  ): { toolName: string; input: Record<string, unknown>; isComplete?: boolean } | null => {
+  ): {
+    toolName: string;
+    input: Record<string, unknown>;
+    status: string;
+    isComplete?: boolean;
+  } | null => {
     if (!item || typeof item !== 'object') return null;
     const obj = item as Record<string, unknown>;
     if (
@@ -960,17 +975,33 @@ export function processCopilotChatRecord(
       obj.toolId ||
       obj.toolInvocationToken
     ) {
-      const toolName = (obj.name || obj.toolName || obj.tool || 'tool') as string;
+      const rawName = (obj.name || obj.toolName || obj.tool || obj.toolId || '') as string;
+      const cleanName = rawName.replace(/^(copilot_|vscode_)/, '').replace(/^.*[./]/, '') || 'tool';
       const input = (obj.parameters || obj.input || obj.args || {}) as Record<string, unknown>;
       const isComplete =
         obj.isComplete === true || obj.status === 'completed' || obj.result !== undefined;
-      return { toolName, input, isComplete };
+
+      const invocationMsg = extractMessage(obj.invocationMessage);
+      const pastTenseMsg = extractMessage(obj.pastTenseMessage);
+      let status = isComplete && pastTenseMsg ? pastTenseMsg : invocationMsg;
+      if (!status) {
+        status = formatCopilotToolStatus(cleanName, input);
+      }
+      return { toolName: cleanName, input, status, isComplete };
     }
     if (obj.call && typeof obj.call === 'object') {
       const call = obj.call as Record<string, unknown>;
-      const toolName = (call.name || call.tool || 'tool') as string;
+      const rawName = (call.name || call.tool || call.toolId || 'tool') as string;
+      const cleanName = rawName.replace(/^(copilot_|vscode_)/, '').replace(/^.*[./]/, '') || 'tool';
       const input = (call.args || call.parameters || {}) as Record<string, unknown>;
-      return { toolName, input, isComplete: obj.isComplete === true };
+      const isComplete = obj.isComplete === true;
+      const invocationMsg = extractMessage(call.invocationMessage || obj.invocationMessage);
+      const pastTenseMsg = extractMessage(call.pastTenseMessage || obj.pastTenseMessage);
+      let status = isComplete && pastTenseMsg ? pastTenseMsg : invocationMsg;
+      if (!status) {
+        status = formatCopilotToolStatus(cleanName, input);
+      }
+      return { toolName: cleanName, input, status, isComplete };
     }
     return null;
   };
@@ -1025,7 +1056,7 @@ export function processCopilotChatRecord(
         type: 'agentStatus',
         id: agentId,
         status: 'waiting',
-        awaitingInput: false,
+        awaitingInput: true,
       });
     } else {
       cancelWaitingTimer(agentId, waitingTimers);
@@ -1038,19 +1069,25 @@ export function processCopilotChatRecord(
       let latestActiveTool: {
         toolName: string;
         input: Record<string, unknown>;
+        status: string;
         index: number;
       } | null = null;
 
       for (let i = 0; i < responses.length; i++) {
         const parsed = parseToolItem(responses[i]);
         if (parsed && !parsed.isComplete) {
-          latestActiveTool = { toolName: parsed.toolName, input: parsed.input, index: i };
+          latestActiveTool = {
+            toolName: parsed.toolName,
+            input: parsed.input,
+            status: parsed.status,
+            index: i,
+          };
         }
       }
 
       if (latestActiveTool) {
         const toolId = `tool_${latestActiveTool.index}_${latestActiveTool.toolName}`;
-        const status = formatToolStatus(latestActiveTool.toolName, latestActiveTool.input);
+        const status = latestActiveTool.status;
         if (!agent.activeToolIds.has(toolId)) {
           clearAllTools();
           agent.activeToolIds.add(toolId);
@@ -1067,6 +1104,18 @@ export function processCopilotChatRecord(
         }
       } else {
         clearAllTools();
+        const thinkToolId = 'chat_turn';
+        agent.activeToolIds.add(thinkToolId);
+        agent.activeToolStatuses.set(thinkToolId, 'Responding...');
+        agent.activeToolNames.set(thinkToolId, 'Chat');
+        agents.broadcast({
+          type: 'agentToolStart',
+          id: agentId,
+          toolId: thinkToolId,
+          status: 'Responding...',
+          toolName: 'Chat',
+          permissionActive: false,
+        });
       }
 
       startWaitingTimer(agentId, TEXT_IDLE_DELAY_MS, agents, waitingTimers);
@@ -1082,6 +1131,19 @@ export function processCopilotChatRecord(
     agent.isWaiting = false;
     agent.hadToolsInTurn = false;
     agents.broadcast({ type: 'agentStatus', id: agentId, status: 'active' });
+
+    const thinkToolId = 'chat_turn';
+    agent.activeToolIds.add(thinkToolId);
+    agent.activeToolStatuses.set(thinkToolId, 'Thinking...');
+    agent.activeToolNames.set(thinkToolId, 'Chat');
+    agents.broadcast({
+      type: 'agentToolStart',
+      id: agentId,
+      toolId: thinkToolId,
+      status: 'Thinking...',
+      toolName: 'Chat',
+      permissionActive: false,
+    });
     return;
   }
 
@@ -1104,7 +1166,7 @@ export function processCopilotChatRecord(
         type: 'agentStatus',
         id: agentId,
         status: 'waiting',
-        awaitingInput: false,
+        awaitingInput: true,
       });
       return;
     }
@@ -1114,6 +1176,14 @@ export function processCopilotChatRecord(
       agent.isWaiting = false;
       agents.broadcast({ type: 'agentStatus', id: agentId, status: 'active' });
 
+      // If generic chat_turn is running, replace it with this specific tool
+      if (agent.activeToolIds.has('chat_turn')) {
+        agent.activeToolIds.delete('chat_turn');
+        agent.activeToolStatuses.delete('chat_turn');
+        agent.activeToolNames.delete('chat_turn');
+        agents.broadcast({ type: 'agentToolDone', id: agentId, toolId: 'chat_turn' });
+      }
+
       const toolId = `tool_${keyPath.join('_')}_${parsed.toolName}`;
       if (parsed.isComplete) {
         if (agent.activeToolIds.has(toolId)) {
@@ -1122,8 +1192,22 @@ export function processCopilotChatRecord(
           agent.activeToolNames.delete(toolId);
           agents.broadcast({ type: 'agentToolDone', id: agentId, toolId });
         }
+        if (agent.activeToolIds.size === 0) {
+          const respToolId = 'chat_turn';
+          agent.activeToolIds.add(respToolId);
+          agent.activeToolStatuses.set(respToolId, 'Responding...');
+          agent.activeToolNames.set(respToolId, 'Chat');
+          agents.broadcast({
+            type: 'agentToolStart',
+            id: agentId,
+            toolId: respToolId,
+            status: 'Responding...',
+            toolName: 'Chat',
+            permissionActive: false,
+          });
+        }
       } else {
-        const status = formatToolStatus(parsed.toolName, parsed.input);
+        const status = parsed.status;
         if (!agent.activeToolIds.has(toolId)) {
           agent.activeToolIds.add(toolId);
           agent.activeToolStatuses.set(toolId, status);
@@ -1144,6 +1228,25 @@ export function processCopilotChatRecord(
     // Markdown text streaming / generation
     agent.isWaiting = false;
     agents.broadcast({ type: 'agentStatus', id: agentId, status: 'active' });
+
+    if (
+      agent.activeToolIds.size === 0 ||
+      (agent.activeToolIds.size === 1 && agent.activeToolIds.has('chat_turn'))
+    ) {
+      const respToolId = 'chat_turn';
+      agent.activeToolIds.add(respToolId);
+      agent.activeToolStatuses.set(respToolId, 'Responding...');
+      agent.activeToolNames.set(respToolId, 'Chat');
+      agents.broadcast({
+        type: 'agentToolStart',
+        id: agentId,
+        toolId: respToolId,
+        status: 'Responding...',
+        toolName: 'Chat',
+        permissionActive: false,
+      });
+    }
+
     startWaitingTimer(agentId, TEXT_IDLE_DELAY_MS, agents, waitingTimers);
     return;
   }

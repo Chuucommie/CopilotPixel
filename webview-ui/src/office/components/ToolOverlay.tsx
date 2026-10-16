@@ -51,9 +51,6 @@ function getActivityText(
   waitingAwaitingInput: boolean,
 ): string {
   if (bubbleType === 'permission') return 'Needs approval';
-  // Only the idle case ("Waiting for input") gets a dedicated label. A finished
-  // turn (Stop, waitingAwaitingInput=false) falls through so the checkmark alone
-  // signals "done", same as the original behavior.
   if (bubbleType === 'waiting' && waitingAwaitingInput) return WAITING_INPUT_ACTIVITY_TEXT;
 
   const tools = agentTools[agentId];
@@ -71,7 +68,15 @@ function getActivityText(
     }
   }
 
-  return 'Idle';
+  if (isActive) {
+    return 'Thinking...';
+  }
+
+  if (bubbleType === 'waiting') {
+    return 'Done';
+  }
+
+  return 'Waiting for input';
 }
 
 function getFuelColor(ratio: number): string {
@@ -190,14 +195,13 @@ export function ToolOverlay({
         // Determine dot color
         const tools = agentTools[id];
         const hasPermission = subHasPermission || tools?.some((t) => t.permissionWait && !t.done);
-        const hasActiveTools = tools?.some((t) => !t.done);
         const isActive = ch.isActive;
         const hasWaiting = ch.bubbleType === 'waiting';
 
         let dotColor: string | null = null;
         if (hasPermission || hasWaiting) {
           dotColor = 'var(--color-status-permission)';
-        } else if (isActive && hasActiveTools) {
+        } else if (isActive) {
           dotColor = 'var(--color-status-active)';
         }
 

@@ -151,7 +151,8 @@ describe('VS Code Copilot Chat Integration', () => {
       permissionTimers,
     );
     expect(agent.isWaiting).toBe(false);
-    expect(agent.activeToolIds.size).toBe(0);
+    expect(agent.activeToolIds.has('chat_turn')).toBe(true);
+    expect(agent.activeToolStatuses.get('chat_turn')).toBe('Thinking...');
 
     // 2. Tool invocation via kind: 2
     processCopilotChatRecord(
@@ -173,6 +174,42 @@ describe('VS Code Copilot Chat Integration', () => {
       permissionTimers,
     );
     expect(agent.activeToolNames.get('tool_requests_1_response_0_editFiles')).toBe('editFiles');
+
+    // 2b. Tool complete via kind: 2 -> transitions back to Responding...
+    processCopilotChatRecord(
+      2,
+      agent,
+      {
+        kind: 2,
+        k: ['requests', 1, 'response', 0],
+        v: {
+          type: 'toolInvocation',
+          toolId: 'call_2',
+          name: 'editFiles',
+          parameters: { filePath: 'src/index.ts' },
+          isComplete: true,
+        },
+      },
+      agents,
+      waitingTimers,
+      permissionTimers,
+    );
+    expect(agent.activeToolStatuses.get('chat_turn')).toBe('Responding...');
+
+    // 2c. Streaming text delta via kind: 2
+    processCopilotChatRecord(
+      2,
+      agent,
+      {
+        kind: 2,
+        k: ['requests', 1, 'response', 1],
+        v: 'I have updated src/index.ts for you.',
+      },
+      agents,
+      waitingTimers,
+      permissionTimers,
+    );
+    expect(agent.activeToolStatuses.get('chat_turn')).toBe('Responding...');
 
     // 3. Result finished turn via kind: 2
     processCopilotChatRecord(

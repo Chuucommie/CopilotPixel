@@ -2,7 +2,7 @@
   "name": "copilot-pixel",
   "displayName": "CopilotPixel - Pixel Office for Copilot",
   "description": "A virtual pixel art office where your GitHub Copilot and AI coding agents come to life.",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "publisher": "Chuucommie",
   "repository": {
     "type": "git",

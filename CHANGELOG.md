@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.4.4
+
+### Live Agent Status & Activity Labels
+
+- Replaced static "Idle" fallback text with live status tracking across both GitHub Copilot Chat and Antigravity sessions.
+- Added live "Thinking..." status when an agent begins processing a new prompt turn.
+- Added live "Responding..." status during streaming markdown response generation.
+- Integrated native VS Code chat invocation messages (`invocationMessage` and `pastTenseMessage`) for detailed live activity labels (e.g., "Reading package.json", "Running command").
+- Updated turn completion state to display "Waiting for input" / "Done" with active status indicators instead of "Idle".
+- Ensured active status indicators pulse green dynamically whenever the agent is actively working.
+
 ## v1.4.3
 
 ### GitHub Copilot Chat Integration
