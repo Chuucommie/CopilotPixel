@@ -270,6 +270,20 @@ export function handleClientMessage(
       break;
     }
 
+    case 'executeAgentOrder': {
+      send({
+        type: 'agentOrderProgress',
+        agentId: (msg as any).agentId,
+        status: 'error',
+        message:
+          'Autonomous AI execution via GitHub Copilot/Gemini is supported when running in the VS Code extension.',
+      });
+      break;
+    }
+
+    case 'cancelAgentOrder':
+      break;
+
     default:
       // focusAgent, exportLayout, importLayout
       // require IDE-specific handling (not yet implemented for standalone)

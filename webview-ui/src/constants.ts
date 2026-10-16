@@ -282,6 +282,7 @@ export const ROLE_BADGE_DEVOPS_COLOR = '#f97316';
 export const ROLE_BADGE_GENERALIST_COLOR = '#94a3b8';
 export const AGENT_STATUS_IDLE_DOT_COLOR = '#64748b';
 export const AGENT_STATUS_ACTIVE_DOT_COLOR = '#22c55e';
+export const AGENT_STATUS_RUNNING_DOT_COLOR = '#eab308';
 
 // ── Agent Teams ─────────────────────────────────────────────
 export const TEAM_LEAD_COLOR = '#ffd700';

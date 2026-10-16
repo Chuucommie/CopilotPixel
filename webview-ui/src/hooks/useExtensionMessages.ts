@@ -687,6 +687,15 @@ export function useExtensionMessages(
       } else if (msg.type === 'workspaceFolders') {
         const folders = msg.folders as WorkspaceFolder[];
         setWorkspaceFolders(folders);
+      } else if (msg.type === 'agentOrderProgress') {
+        const id = msg.agentId;
+        const os = getOfficeState();
+        os.setAgentOrderProgress(
+          id,
+          msg.status,
+          msg.message,
+          typeof msg.modelName === 'string' ? msg.modelName : undefined,
+        );
       } else if (msg.type === 'settingsLoaded') {
         const soundOn = msg.soundEnabled as boolean;
         setSoundEnabled(soundOn);

@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.4.7
+
+### Autonomous Background Agent Execution & Low-Cost Copilot/Gemini Model Engine
+
+- **Autonomous Background Agent Execution**:
+  - Direct orders assigned via the Agent Roster panel now execute real AI directives continuously in the background on the active workspace, running independently of the manual chat window.
+  - Integrated directly with VS Code's official Language Model API (`vscode.lm`), leveraging the developer's existing GitHub Copilot and Google Gemini subscriptions without requiring external paid API keys.
+  - **Intelligent Low-Cost Model Selection**: Automatically selects and prioritizes the most cost-effective and lightweight models (`gpt-4o-mini`, `gemini-*-flash`, `luna`, `haiku`, `turbo`, `lite`) to preserve subscription quotas.
+  - **Model Preference Selector**: Added options in the Agent Roster to choose between `Auto (Lowest Cost / Fast)`, `GitHub Copilot (Economy: gpt-4o-mini / luna)`, and `Google Gemini (Fast: gemini-flash)`.
+- **Workspace Tool Calling & Live Office Sprites**:
+  - Autonomous agents can search files (`list_files`), read code (`read_file`), write/edit files (`write_file`), and complete tasks (`finish`).
+  - While reading files, the agent streams live events to the pixel office: the character sits at their desk, takes out a document, and animates `sprites.reading` with `Reading <filename>` in real time.
+  - While writing or modifying files, the character sits at their computer and animates typing with `Editing <filename>`.
+- **Full Execution Controls, Reports & Delegation**:
+  - Live execution status card in the Agent Roster panel with animated gear `⚙️`, step indicator, active model label, and an immediate `Stop / Cancel` button to abort running tasks at any time.
+  - When finished, directives display a green `✅ Completed` card with the full summary of work performed.
+  - Delegating tasks to teammates or spawning helper subagents automatically dispatches background AI execution for the assigned target.
+  - Character tool overlays in the virtual office display live execution badges `(⚙️ reading ...)`.
+- **Dedicated Output Channel**:
+  - Added the `CopilotPixel Autonomous Agents` output channel in VS Code for inspecting full background execution traces, tool arguments, and model output.
+
 ## v1.4.6
 
 ### Agent Roles, 50 English Names, Team Directives & Office Layout Presets

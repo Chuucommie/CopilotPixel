@@ -279,6 +279,13 @@ export function ToolOverlay({
                   >
                     📋 {ch.delegatedFrom ? `${ch.delegatedFrom} ➔ ` : ''}
                     {ch.currentOrder}
+                    {ch.orderStatus === 'running' ||
+                    ch.orderStatus === 'reading' ||
+                    ch.orderStatus === 'writing' ? (
+                      <span className="text-yellow-400 font-mono ml-1">
+                        (⚙️ {ch.orderProgressMessage || 'running'})
+                      </span>
+                    ) : null}
                   </span>
                 )}
                 {ch.folderName && (

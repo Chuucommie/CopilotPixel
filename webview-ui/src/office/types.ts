@@ -258,6 +258,12 @@ export interface Character {
   orderHistory?: string[];
   /** Name of agent who delegated the current order */
   delegatedFrom?: string | null;
+  /** Live autonomous execution status */
+  orderStatus?: 'running' | 'reading' | 'writing' | 'completed' | 'error' | 'cancelled' | null;
+  /** Live execution progress message */
+  orderProgressMessage?: string | null;
+  /** Model running the order */
+  orderModelName?: string | null;
 
   // -- Context gauge --
   /** Tokens in the agent's context as of its newest turn; 0 until reported.

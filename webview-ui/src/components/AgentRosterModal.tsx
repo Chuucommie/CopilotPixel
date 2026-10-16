@@ -1,9 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import { AGENT_STATUS_ACTIVE_DOT_COLOR, AGENT_STATUS_IDLE_DOT_COLOR } from '../constants.js';
+import type { ModelPreference } from '../../../core/src/messages.js';
+import {
+  AGENT_STATUS_ACTIVE_DOT_COLOR,
+  AGENT_STATUS_IDLE_DOT_COLOR,
+  AGENT_STATUS_RUNNING_DOT_COLOR,
+} from '../constants.js';
 import { getAllRoles, getRandomEnglishName, getRoleDefinition } from '../office/agentRoles.js';
 import type { OfficeState } from '../office/engine/officeState.js';
 import type { ToolActivity } from '../office/types.js';
+import { transport } from '../transport/index.js';
 import { Button } from './ui/Button.js';
 import { Modal } from './ui/Modal.js';
 
@@ -29,11 +35,24 @@ export function AgentRosterModal({
 
   // Form states for orders & delegation
   const [orderInput, setOrderInput] = useState('');
+  const [modelPreference, setModelPreference] = useState<ModelPreference>('cheapest');
   const [delegateTargetId, setDelegateTargetId] = useState<number | null>(null);
   const [delegateInput, setDelegateInput] = useState('');
   const [spawnRole, setSpawnRole] = useState('Coder');
   const [spawnTask, setSpawnTask] = useState('');
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
+
+  const triggerRefresh = () => {
+    setRefreshKey((k) => k + 1);
+  };
+
+  useEffect(() => {
+    return transport.onMessage((msg) => {
+      if (msg.type === 'agentOrderProgress') {
+        triggerRefresh();
+      }
+    });
+  }, []);
 
   if (!isOpen) return null;
 
@@ -44,16 +63,11 @@ export function AgentRosterModal({
   });
 
   const activeChar = characters.find((c) => c.id === selectedAgentId) || characters[0] || null;
-
   const roles = getAllRoles();
-
-  const triggerRefresh = () => {
-    setRefreshKey((k) => k + 1);
-  };
 
   const showFeedback = (msg: string) => {
     setFeedbackMsg(msg);
-    setTimeout(() => setFeedbackMsg(null), 3000);
+    setTimeout(() => setFeedbackMsg(null), 3500);
   };
 
   const handleNameChange = (agentId: number, newName: string) => {
@@ -78,9 +92,37 @@ export function AgentRosterModal({
 
   const handleSendOrder = () => {
     if (!activeChar || !orderInput.trim()) return;
-    officeState.setAgentOrder(activeChar.id, orderInput.trim());
-    showFeedback(`Order sent to ${activeChar.customName || 'Agent'}: "${orderInput.trim()}"`);
+    const order = orderInput.trim();
+    officeState.setAgentOrder(activeChar.id, order);
+    officeState.setAgentOrderProgress(
+      activeChar.id,
+      'running',
+      'Starting autonomous background execution...',
+    );
+
+    transport.send({
+      type: 'executeAgentOrder',
+      agentId: activeChar.id,
+      order,
+      role: activeChar.role || 'Coder',
+      agentName: activeChar.customName || `Agent #${activeChar.id}`,
+      modelPreference,
+    });
+
+    showFeedback(
+      `Directive assigned to ${activeChar.customName || 'Agent'} with background AI (${modelPreference})!`,
+    );
     setOrderInput('');
+    triggerRefresh();
+  };
+
+  const handleCancelOrder = (agentId: number) => {
+    officeState.setAgentOrderProgress(agentId, 'cancelled', 'Order cancelled by user.');
+    transport.send({
+      type: 'cancelAgentOrder',
+      agentId,
+    });
+    showFeedback('Order execution cancelled.');
     triggerRefresh();
   };
 
@@ -94,28 +136,59 @@ export function AgentRosterModal({
     if (!activeChar || delegateTargetId === null || !delegateInput.trim()) return;
     const targetChar = officeState.characters.get(delegateTargetId);
     if (!targetChar) return;
+    const order = delegateInput.trim();
 
-    officeState.delegateOrder(activeChar.id, delegateTargetId, delegateInput.trim());
-    showFeedback(
-      `Delegated from ${activeChar.customName} to ${targetChar.customName}: "${delegateInput.trim()}"`,
+    officeState.delegateOrder(activeChar.id, delegateTargetId, order);
+    officeState.setAgentOrderProgress(
+      delegateTargetId,
+      'running',
+      `Delegated from ${activeChar.customName || 'Lead'}`,
     );
+
+    transport.send({
+      type: 'executeAgentOrder',
+      agentId: delegateTargetId,
+      order,
+      role: targetChar.role || 'Coder',
+      agentName: targetChar.customName || `Agent #${delegateTargetId}`,
+      delegatedFrom: activeChar.customName || `Agent #${activeChar.id}`,
+      modelPreference,
+    });
+
+    showFeedback(`Delegated from ${activeChar.customName} to ${targetChar.customName}: "${order}"`);
     setDelegateInput('');
     triggerRefresh();
   };
 
   const handleSpawnHelper = () => {
     if (!activeChar) return;
+    const task = spawnTask.trim();
     const subId = officeState.spawnSubagentWithRole(
       activeChar.id,
       spawnRole,
       undefined,
-      spawnTask.trim() || undefined,
+      task || undefined,
     );
     const subChar = officeState.characters.get(subId);
+
+    if (task) {
+      officeState.setAgentOrderProgress(subId, 'running', 'Starting spawned task...');
+      transport.send({
+        type: 'executeAgentOrder',
+        agentId: subId,
+        order: task,
+        role: spawnRole,
+        agentName: subChar?.customName || `Agent #${subId}`,
+        delegatedFrom: activeChar.customName || `Agent #${activeChar.id}`,
+        modelPreference,
+      });
+    }
+
     showFeedback(
       `Spawned new ${spawnRole} helper: ${subChar?.customName || 'Subagent'} (ID: ${subId})!`,
     );
     setSpawnTask('');
+    setSelectedAgentId(subId);
     triggerRefresh();
   };
 
@@ -138,64 +211,76 @@ export function AgentRosterModal({
       if (active) return active.status;
     }
     if (ch.bubbleType === 'waiting') return 'Waiting for input';
-    return ch.isActive ? 'Thinking...' : 'Idle at desk';
+    if (ch.bubbleType === 'permission') return 'Permission required';
+    if (ch.bubbleType === 'done') return 'Completed step';
+    return ch.isActive ? 'Active' : 'Idle';
   };
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Agent Roster & Team Directives"
-      zIndex={55}
-      className="max-w-4xl w-full"
+      title="Agent Roster & Directives"
+      className="max-w-4xl"
     >
-      <div className="flex flex-col gap-4 text-text max-h-[80vh] overflow-hidden">
+      <div className="flex flex-col gap-4">
+        {/* Feedback alert */}
         {feedbackMsg && (
-          <div className="bg-accent/20 border border-accent text-accent-bright px-8 py-4 text-sm font-semibold rounded">
-            ✓ {feedbackMsg}
+          <div className="bg-accent/20 border border-accent/50 text-accent-bright px-3 py-1.5 rounded text-xs flex items-center justify-between">
+            <span>{feedbackMsg}</span>
+            <button
+              onClick={() => setFeedbackMsg(null)}
+              className="text-text-muted hover:text-text text-sm ml-2"
+            >
+              ×
+            </button>
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 overflow-hidden">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Left Column: Agent List */}
-          <div className="flex flex-col gap-2 overflow-y-auto max-h-[65vh] pr-2 border-r border-border">
-            <div className="text-sm font-bold text-text-muted uppercase tracking-wider mb-2">
-              Office Agents ({characters.length})
+          <div className="pixel-panel p-2 flex flex-col gap-1.5 max-h-[65vh] overflow-y-auto">
+            <div className="text-2xs font-bold uppercase tracking-wider text-text-muted px-2 py-1">
+              Active Agents ({characters.length})
             </div>
+
             {characters.length === 0 ? (
-              <div className="text-text-muted text-sm italic py-4">
-                No agents currently in office
+              <div className="text-xs text-text-muted p-4 italic text-center">
+                No agents in office. Start an AI session or spawn an agent.
               </div>
             ) : (
               characters.map((ch) => {
-                const roleDef = getRoleDefinition(ch.role);
                 const isSelected = activeChar?.id === ch.id;
+                const roleDef = getRoleDefinition(ch.role);
                 const status = getAgentStatusText(ch);
+                const isRunningOrder =
+                  ch.orderStatus === 'running' ||
+                  ch.orderStatus === 'reading' ||
+                  ch.orderStatus === 'writing';
 
                 return (
                   <div
                     key={ch.id}
-                    onClick={() => {
-                      setSelectedAgentId(ch.id);
-                      onFocusAgent?.(ch.id);
-                    }}
-                    className={`p-3 rounded border cursor-pointer transition-colors flex flex-col gap-1 ${
+                    onClick={() => setSelectedAgentId(ch.id)}
+                    className={`p-2.5 rounded cursor-pointer transition-all border flex flex-col gap-1 ${
                       isSelected
-                        ? 'border-accent bg-accent/15'
-                        : 'border-border/60 hover:border-border hover:bg-white/5'
+                        ? 'bg-accent/20 border-accent shadow-sm'
+                        : 'bg-black/20 hover:bg-black/30 border-transparent hover:border-border/50'
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 overflow-hidden">
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1.5 min-w-0">
                         <span
-                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          className="w-2 h-2 rounded-full shrink-0"
                           style={{
-                            background: ch.isActive
-                              ? AGENT_STATUS_ACTIVE_DOT_COLOR
-                              : AGENT_STATUS_IDLE_DOT_COLOR,
+                            backgroundColor: isRunningOrder
+                              ? AGENT_STATUS_RUNNING_DOT_COLOR
+                              : ch.isActive
+                                ? AGENT_STATUS_ACTIVE_DOT_COLOR
+                                : AGENT_STATUS_IDLE_DOT_COLOR,
                           }}
                         />
-                        <span className="font-bold text-base truncate">
+                        <span className="font-bold text-xs truncate text-text">
                           {ch.customName || `Agent #${ch.id}`}
                         </span>
                         {ch.isSubagent && (
@@ -218,11 +303,16 @@ export function AgentRosterModal({
 
                     <div className="text-2xs text-text-muted truncate">{status}</div>
 
-                    {ch.currentOrder && (
+                    {isRunningOrder ? (
+                      <div className="text-2xs text-yellow-400 truncate font-medium flex items-center gap-1">
+                        <span>⚙️</span>
+                        <span>{ch.orderProgressMessage || ch.currentOrder}</span>
+                      </div>
+                    ) : ch.currentOrder ? (
                       <div className="text-2xs text-accent-bright truncate font-medium">
                         📋 {ch.currentOrder}
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 );
               })
@@ -243,7 +333,7 @@ export function AgentRosterModal({
                           type="text"
                           value={activeChar.customName || ''}
                           onChange={(e) => handleNameChange(activeChar.id, e.target.value)}
-                          className="bg-bg border border-border px-2 py-1 text-base font-bold text-text rounded focus:border-accent outline-none"
+                          className="bg-bg border border-border px-2 py-1 text-sm font-bold rounded text-text focus:border-accent outline-none"
                           placeholder="Agent Name"
                         />
                         <Button
@@ -254,6 +344,19 @@ export function AgentRosterModal({
                         >
                           🎲 Random
                         </Button>
+                        {onFocusAgent && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              onFocusAgent(activeChar.id);
+                              onClose();
+                            }}
+                            title="Focus this agent terminal or chat"
+                          >
+                            🔍 Focus
+                          </Button>
+                        )}
                       </div>
                       <div className="text-2xs text-text-muted mt-1">
                         ID: {activeChar.id} • Seat: {activeChar.seatId || 'Roaming'}
@@ -283,10 +386,10 @@ export function AgentRosterModal({
                 </div>
               </div>
 
-              {/* Direct Order Form */}
+              {/* Direct Order Form & Autonomous AI */}
               <div className="pixel-panel p-4 flex flex-col gap-3">
                 <div className="font-bold text-sm text-accent-bright flex items-center justify-between">
-                  <span>Direct Order / Task</span>
+                  <span>Direct Order / Autonomous Task</span>
                   {activeChar.currentOrder && (
                     <Button
                       variant="ghost"
@@ -298,21 +401,85 @@ export function AgentRosterModal({
                   )}
                 </div>
 
+                {/* Model Preference Selection */}
+                <div className="flex flex-wrap items-center justify-between gap-2 bg-black/20 p-2 rounded text-xs">
+                  <span className="text-text-muted font-bold">Background AI Model:</span>
+                  <select
+                    value={modelPreference}
+                    onChange={(e) => setModelPreference(e.target.value as ModelPreference)}
+                    className="bg-bg border border-border px-2 py-1 rounded text-text focus:border-accent outline-none text-xs"
+                  >
+                    <option value="cheapest">
+                      ⚡ Auto: Lowest Cost / Fast (gpt-4o-mini / gemini-flash)
+                    </option>
+                    <option value="copilot">🐙 GitHub Copilot: Economy (gpt-4o-mini / luna)</option>
+                    <option value="gemini">✨ Google Gemini: Fast (gemini-flash)</option>
+                  </select>
+                </div>
+
                 {activeChar.currentOrder ? (
-                  <div className="p-3 bg-accent/10 border border-accent/40 rounded text-sm flex items-start justify-between gap-2">
-                    <div>
-                      <span className="font-semibold text-accent-bright">Active Directive:</span>{' '}
-                      <span>{activeChar.currentOrder}</span>
-                      {activeChar.delegatedFrom && (
-                        <div className="text-2xs text-text-muted mt-1">
-                          Delegated by: {activeChar.delegatedFrom}
-                        </div>
-                      )}
+                  <div className="p-3 bg-accent/10 border border-accent/40 rounded text-sm flex flex-col gap-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <span className="font-semibold text-accent-bright">Active Directive:</span>{' '}
+                        <span>{activeChar.currentOrder}</span>
+                        {activeChar.delegatedFrom && (
+                          <div className="text-2xs text-text-muted mt-0.5">
+                            Delegated by: {activeChar.delegatedFrom}
+                          </div>
+                        )}
+                      </div>
                     </div>
+
+                    {/* Live Execution Status */}
+                    {activeChar.orderStatus === 'running' ||
+                    activeChar.orderStatus === 'reading' ||
+                    activeChar.orderStatus === 'writing' ? (
+                      <div className="flex items-center justify-between p-2.5 bg-yellow-500/10 border border-yellow-500/40 rounded text-xs mt-1">
+                        <div className="flex items-center gap-2">
+                          <span className="animate-spin text-sm">⚙️</span>
+                          <div>
+                            <div className="font-bold text-yellow-300">
+                              Running on workspace ({activeChar.orderModelName || 'Background AI'})
+                            </div>
+                            <div className="text-text-muted mt-0.5">
+                              {activeChar.orderProgressMessage || 'Analyzing workspace...'}
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          className="text-red-400 hover:text-red-300 border border-red-500/40 hover:border-red-400"
+                          size="sm"
+                          onClick={() => handleCancelOrder(activeChar.id)}
+                        >
+                          Stop / Cancel
+                        </Button>
+                      </div>
+                    ) : activeChar.orderStatus === 'completed' ? (
+                      <div className="p-2.5 bg-green-500/10 border border-green-500/40 rounded text-xs flex flex-col gap-1 mt-1">
+                        <div className="font-bold text-green-400 flex items-center gap-1.5">
+                          <span>✅</span> Completed{' '}
+                          {activeChar.orderModelName ? `via ${activeChar.orderModelName}` : ''}
+                        </div>
+                        <div className="text-text whitespace-pre-wrap max-h-36 overflow-y-auto font-mono text-2xs bg-black/30 p-2 rounded">
+                          {activeChar.orderProgressMessage}
+                        </div>
+                      </div>
+                    ) : activeChar.orderStatus === 'cancelled' ? (
+                      <div className="p-2 bg-white/5 border border-white/20 rounded text-2xs text-text-muted italic mt-1">
+                        ⏹️ Autonomous execution cancelled.
+                      </div>
+                    ) : activeChar.orderStatus === 'error' ? (
+                      <div className="p-2 bg-red-500/10 border border-red-500/40 rounded text-2xs text-red-300 mt-1">
+                        ❌ {activeChar.orderProgressMessage}
+                      </div>
+                    ) : null}
                   </div>
                 ) : (
                   <div className="text-xs text-text-muted italic">
-                    No active direct order. Enter an instruction below to guide this agent.
+                    No active direct order. Enter an instruction below to guide this agent with
+                    background AI.
                   </div>
                 )}
 

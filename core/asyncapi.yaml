@@ -118,6 +118,8 @@ components:
         - $ref: '#/components/schemas/WorkspaceFolders'
         # Diagnostics
         - $ref: '#/components/schemas/AgentDiagnostics'
+        # Autonomous agent orders
+        - $ref: '#/components/schemas/AgentOrderProgress'
       discriminator: type
 
     ClientMessage:
@@ -144,6 +146,8 @@ components:
         - $ref: '#/components/schemas/SaveAreaMappings'
         - $ref: '#/components/schemas/SetShowAreas'
         - $ref: '#/components/schemas/RequestDiagnostics'
+        - $ref: '#/components/schemas/ExecuteAgentOrder'
+        - $ref: '#/components/schemas/CancelAgentOrder'
       discriminator: type
 
     # ── Server message variants ────────────────────────────────────
@@ -783,6 +787,25 @@ components:
         agents:
           type: array
           description: Per-agent diagnostic info; shape opaque to the protocol.
+
+    AgentOrderProgress:
+      description: Progress update for an autonomous agent order executing on the workspace.
+      type: object
+      additionalProperties: false
+      required: [type, agentId, status, message]
+      properties:
+        type:
+          const: agentOrderProgress
+        agentId:
+          type: integer
+        status:
+          $ref: '#/components/schemas/AgentOrderStatus'
+        message:
+          type: string
+        details:
+          type: string
+        modelName:
+          type: string
           items:
             type: object
 
@@ -1064,7 +1087,47 @@ components:
         type:
           const: requestDiagnostics
 
+    ExecuteAgentOrder:
+      description: Instructs an agent to execute an autonomous order on the workspace using low-cost background AI.
+      type: object
+      additionalProperties: false
+      required: [type, agentId, order]
+      properties:
+        type:
+          const: executeAgentOrder
+        agentId:
+          type: integer
+        order:
+          type: string
+        role:
+          type: string
+        agentName:
+          type: string
+        delegatedFrom:
+          type: string
+        modelPreference:
+          $ref: '#/components/schemas/ModelPreference'
+
+    CancelAgentOrder:
+      description: Cancels an in-progress autonomous order for an agent.
+      type: object
+      additionalProperties: false
+      required: [type, agentId]
+      properties:
+        type:
+          const: cancelAgentOrder
+        agentId:
+          type: integer
+
     # ── Supporting schemas ─────────────────────────────────────────
+
+    AgentOrderStatus:
+      type: string
+      enum: [running, reading, writing, completed, error, cancelled]
+
+    ModelPreference:
+      type: string
+      enum: [cheapest, copilot, gemini]
 
     AgentSeatMeta:
       description: |

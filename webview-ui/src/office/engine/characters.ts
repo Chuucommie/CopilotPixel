@@ -89,6 +89,9 @@ export function createCharacter(
     currentOrder: null,
     orderHistory: [],
     delegatedFrom: null,
+    orderStatus: null,
+    orderProgressMessage: null,
+    orderModelName: null,
     contextTokens: 0,
     maxContextTokens: DEFAULT_MAX_CONTEXT_TOKENS,
   };

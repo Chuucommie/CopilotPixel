@@ -1237,7 +1237,29 @@ export class OfficeState {
     if (ch) {
       ch.currentOrder = null;
       ch.delegatedFrom = null;
+      ch.orderStatus = null;
+      ch.orderProgressMessage = null;
+      ch.orderModelName = null;
       updateAgentProfile(id, { currentOrder: null, delegatedFrom: null });
+    }
+  }
+
+  setAgentOrderProgress(
+    id: number,
+    status: 'running' | 'reading' | 'writing' | 'completed' | 'error' | 'cancelled' | null,
+    message?: string,
+    modelName?: string,
+  ): void {
+    const ch = this.characters.get(id);
+    if (ch) {
+      ch.orderStatus = status;
+      ch.orderProgressMessage = message || null;
+      if (modelName) {
+        ch.orderModelName = modelName;
+      }
+      if (status === 'completed') {
+        ch.bubbleTimer = 3;
+      }
     }
   }
 

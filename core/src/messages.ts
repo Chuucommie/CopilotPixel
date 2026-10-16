@@ -38,7 +38,8 @@ export type ServerMessage =
   | ExternalAssetDirectoriesUpdated
   | AreaMappingsLoaded
   | WorkspaceFolders
-  | AgentDiagnostics;
+  | AgentDiagnostics
+  | AgentOrderProgress;
 
 export type ClientMessage =
   | WebviewReady
@@ -62,7 +63,9 @@ export type ClientMessage =
   | RemoveExternalAssetDirectory
   | SaveAreaMappings
   | SetShowAreas
-  | RequestDiagnostics;
+  | RequestDiagnostics
+  | ExecuteAgentOrder
+  | CancelAgentOrder;
 
 export interface ProviderCapabilities {
   type: 'providerCapabilities';
@@ -312,8 +315,20 @@ export interface WorkspaceFolder {
 
 export interface AgentDiagnostics {
   type: 'agentDiagnostics';
-  agents: Record<string, any>[];
+  agents: any[];
 }
+
+export interface AgentOrderProgress {
+  type: 'agentOrderProgress';
+  agentId: number;
+  status: AgentOrderStatus;
+  message: string;
+  details?: string;
+  modelName?: Record<string, any>[] | string;
+}
+
+export type AgentOrderStatus =
+  'running' | 'reading' | 'writing' | 'completed' | 'error' | 'cancelled';
 
 export interface WebviewReady {
   type: 'webviewReady';
@@ -428,4 +443,21 @@ export interface SetShowAreas {
 
 export interface RequestDiagnostics {
   type: 'requestDiagnostics';
+}
+
+export interface ExecuteAgentOrder {
+  type: 'executeAgentOrder';
+  agentId: number;
+  order: string;
+  role?: string;
+  agentName?: string;
+  delegatedFrom?: string;
+  modelPreference?: ModelPreference;
+}
+
+export type ModelPreference = 'cheapest' | 'copilot' | 'gemini';
+
+export interface CancelAgentOrder {
+  type: 'cancelAgentOrder';
+  agentId: number;
 }

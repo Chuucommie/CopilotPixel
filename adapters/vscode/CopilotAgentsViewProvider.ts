@@ -65,6 +65,7 @@ import {
   sendExistingAgents,
   sendLayout,
 } from './agentManager.js';
+import { AutonomousAgentRunner } from './autonomousAgentRunner.js';
 import {
   CONFIG_KEY_AUTO_SHOW_PANEL,
   CONFIG_KEY_AUTO_SPAWN_AGENT,
@@ -118,6 +119,9 @@ export class CopilotAgentsViewProvider implements vscode.WebviewViewProvider {
   // Auto-spawn guard: ensures the startup spawn fires at most once per VS Code
   // session, even though webviewReady fires on every panel focus.
   private autoSpawnAttempted = false;
+
+  // Autonomous background AI runner for direct agent orders
+  private readonly autonomousRunner = new AutonomousAgentRunner();
 
   // Track event listener and webview disposables for clean deactivation
   private readonly disposables: vscode.Disposable[] = [];
@@ -964,6 +968,14 @@ export class CopilotAgentsViewProvider implements vscode.WebviewViewProvider {
         } catch {
           vscode.window.showErrorMessage('CopilotAgents: Failed to read or parse layout file.');
         }
+      } else if (message.type === 'executeAgentOrder') {
+        void this.autonomousRunner.executeOrder(message, (msg) => {
+          this.webview?.postMessage(msg);
+        });
+      } else if (message.type === 'cancelAgentOrder') {
+        this.autonomousRunner.cancelOrder(message.agentId, (msg) => {
+          this.webview?.postMessage(msg);
+        });
       }
     });
 
@@ -1107,6 +1119,7 @@ export class CopilotAgentsViewProvider implements vscode.WebviewViewProvider {
     }
     this.disposables.length = 0;
 
+    this.autonomousRunner.dispose();
     this.copilotAgentsServer?.stop();
     this.copilotAgentsServer = null;
     this.runtime.dispose();
