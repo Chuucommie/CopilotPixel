@@ -1,5 +1,8 @@
 import { formatAntigravityToolStatus } from './providers/hook/antigravity/antigravity.js';
-import { formatToolStatus as formatCopilotToolStatus } from './providers/hook/copilot/copilot.js';
+import {
+  copilotProvider,
+  formatToolStatus as formatCopilotToolStatus,
+} from './providers/hook/copilot/copilot.js';
 const debug = process.env.COPILOT_AGENTS_DEBUG !== '0';
 
 import type { HookProvider } from '../../core/src/provider.js';
@@ -972,16 +975,43 @@ export function processCopilotChatRecord(
     if (
       obj.type === 'toolInvocation' ||
       obj.kind === 'toolInvocation' ||
+      obj.kind === 'toolInvocationSerialized' ||
+      obj.kind === 'prepareToolInvocation' ||
+      obj.kind === 'progressTask' ||
       obj.toolId ||
+      obj.toolCallId ||
       obj.toolInvocationToken
     ) {
-      const rawName = (obj.name || obj.toolName || obj.tool || obj.toolId || '') as string;
-      const cleanName = rawName.replace(/^(copilot_|vscode_)/, '').replace(/^.*[./]/, '') || 'tool';
-      const input = (obj.parameters || obj.input || obj.args || {}) as Record<string, unknown>;
-      const isComplete =
-        obj.isComplete === true || obj.status === 'completed' || obj.result !== undefined;
+      let rawName = (obj.name || obj.toolName || obj.tool || obj.toolId || obj.id || '') as string;
+      const input = (obj.parameters ||
+        obj.input ||
+        obj.args ||
+        (obj.resultDetails as Record<string, unknown>)?.input ||
+        {}) as Record<string, unknown>;
 
-      const invocationMsg = extractMessage(obj.invocationMessage);
+      if ((obj.toolSpecificData as { kind?: string })?.kind === 'terminal') {
+        rawName = 'runInTerminal';
+        const termData = obj.toolSpecificData as {
+          commandLine?: { original?: string; toolEdited?: string; userEdited?: string };
+        };
+        if (termData?.commandLine) {
+          input.command =
+            termData.commandLine.userEdited ||
+            termData.commandLine.toolEdited ||
+            termData.commandLine.original ||
+            input.command;
+        }
+      }
+
+      const cleanName =
+        rawName.replace(/^(copilot_|vscode_|tools_)/, '').replace(/^.*[./]/, '') || 'tool';
+      const isComplete =
+        obj.isComplete === true ||
+        obj.status === 'completed' ||
+        obj.result !== undefined ||
+        obj.isConfirmed !== undefined;
+
+      const invocationMsg = extractMessage(obj.invocationMessage || obj.message || obj.content);
       const pastTenseMsg = extractMessage(obj.pastTenseMessage);
       let status = isComplete && pastTenseMsg ? pastTenseMsg : invocationMsg;
       if (!status) {
@@ -992,7 +1022,8 @@ export function processCopilotChatRecord(
     if (obj.call && typeof obj.call === 'object') {
       const call = obj.call as Record<string, unknown>;
       const rawName = (call.name || call.tool || call.toolId || 'tool') as string;
-      const cleanName = rawName.replace(/^(copilot_|vscode_)/, '').replace(/^.*[./]/, '') || 'tool';
+      const cleanName =
+        rawName.replace(/^(copilot_|vscode_|tools_)/, '').replace(/^.*[./]/, '') || 'tool';
       const input = (call.args || call.parameters || {}) as Record<string, unknown>;
       const isComplete = obj.isComplete === true;
       const invocationMsg = extractMessage(call.invocationMessage || obj.invocationMessage);
@@ -1100,6 +1131,7 @@ export function processCopilotChatRecord(
             status,
             toolName: latestActiveTool.toolName,
             permissionActive: false,
+            runInBackground: copilotProvider.subagentToolNames.has(latestActiveTool.toolName),
           });
         }
       } else {
@@ -1171,6 +1203,32 @@ export function processCopilotChatRecord(
       return;
     }
 
+    if (keyPath.includes('isComplete') && val === true) {
+      for (const toolId of [...agent.activeToolIds]) {
+        if (toolId !== 'chat_turn') {
+          agent.activeToolIds.delete(toolId);
+          agent.activeToolStatuses.delete(toolId);
+          agent.activeToolNames.delete(toolId);
+          agents.broadcast({ type: 'agentToolDone', id: agentId, toolId });
+        }
+      }
+      if (agent.activeToolIds.size === 0) {
+        const respToolId = 'chat_turn';
+        agent.activeToolIds.add(respToolId);
+        agent.activeToolStatuses.set(respToolId, 'Responding...');
+        agent.activeToolNames.set(respToolId, 'Chat');
+        agents.broadcast({
+          type: 'agentToolStart',
+          id: agentId,
+          toolId: respToolId,
+          status: 'Responding...',
+          toolName: 'Chat',
+          permissionActive: false,
+        });
+      }
+      return;
+    }
+
     const parsed = parseToolItem(val);
     if (parsed) {
       agent.isWaiting = false;
@@ -1219,6 +1277,7 @@ export function processCopilotChatRecord(
             status,
             toolName: parsed.toolName,
             permissionActive: false,
+            runInBackground: copilotProvider.subagentToolNames.has(parsed.toolName),
           });
         }
       }

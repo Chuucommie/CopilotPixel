@@ -70,6 +70,7 @@ export interface FurnitureInstance {
 
 export interface ToolActivity {
   toolId: string;
+  toolName?: string | null;
   status: string;
   done: boolean;
   permissionWait?: boolean;

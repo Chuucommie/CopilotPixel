@@ -696,21 +696,32 @@ export class OfficeState {
     const palette = parentCh ? parentCh.palette : 0;
     const hueShift = parentCh ? parentCh.hueShift : 0;
 
-    // Find the closest walkable tile to the parent, avoiding tiles occupied by other characters
+    // Try to find a free seat in the office first, or fall back to closest walkable tile to parent
+    const seatId = this.findFreeSeat(parentCh?.folderName);
+    const seat = seatId ? (this.seats.get(seatId) ?? null) : null;
+    if (seat) seat.assigned = true;
+
     const parentCol = parentCh ? parentCh.tileCol : 0;
     const parentRow = parentCh ? parentCh.tileRow : 0;
-    let spawn = { col: parentCol, row: parentRow };
-    if (this.walkableTiles.length > 0) {
+    let spawn = seat
+      ? { col: seat.seatCol, row: seat.seatRow }
+      : { col: parentCol, row: parentRow };
+    if (!seat && this.walkableTiles.length > 0) {
       spawn = this.closestFreeWalkableTile(parentCol, parentRow) ?? this.walkableTiles[0];
     }
 
-    const ch = createCharacter(id, palette, null, null, hueShift);
+    const ch = createCharacter(id, palette, seatId, seat, hueShift);
     ch.x = spawn.col * TILE_SIZE + TILE_SIZE / 2;
     ch.y = spawn.row * TILE_SIZE + TILE_SIZE / 2;
     ch.tileCol = spawn.col;
     ch.tileRow = spawn.row;
-    // Face the same direction as the parent agent
-    if (parentCh) ch.dir = parentCh.dir;
+    if (seat) {
+      ch.dir = seat.facingDir;
+      ch.state = CharacterState.TYPE;
+    } else if (parentCh) {
+      ch.dir = parentCh.dir;
+      ch.state = CharacterState.TYPE;
+    }
     ch.isSubagent = true;
     ch.parentAgentId = parentAgentId;
     startMatrixEffect(ch, 'spawn');

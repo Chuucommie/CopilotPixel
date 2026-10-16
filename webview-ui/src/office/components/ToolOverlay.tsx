@@ -174,12 +174,10 @@ export function ToolOverlay({
           if (subHasPermission) {
             activityText = 'Needs approval';
           } else {
-            // Hover shows the subtask title; SELECTING the sub reveals its live
-            // tool activity (watched sub-agents stream it via subagentToolStart).
+            // Show active subagent tool status if any, otherwise fall back to subtask label
             const sub = subagentCharacters.find((s) => s.id === id);
             const rows = sub ? subagentTools[sub.parentAgentId]?.[sub.parentToolId] : undefined;
-            const activeRow =
-              isSelected && rows ? [...rows].reverse().find((t) => !t.done) : undefined;
+            const activeRow = rows ? [...rows].reverse().find((t) => !t.done) : undefined;
             activityText = activeRow?.status ?? (sub?.label || 'Subtask');
           }
         } else {

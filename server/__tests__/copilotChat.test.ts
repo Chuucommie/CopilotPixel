@@ -331,4 +331,109 @@ describe('VS Code Copilot Chat Integration', () => {
       delete process.env['COPILOT_STORAGE_ROOT'];
     }
   });
+  it('parses toolInvocationSerialized, terminal data, and subagents with runInBackground', () => {
+    const broadcastEvents: unknown[] = [];
+    agents.broadcast = (msg: unknown) => broadcastEvents.push(msg);
+
+    const agent: AgentState = {
+      id: 3,
+      sessionId: 'session-serialized',
+      terminalRef: undefined,
+      isExternal: true,
+      projectDir: tmpDir,
+      jsonlFile: path.join(tmpDir, 'session-serialized.jsonl'),
+      fileOffset: 0,
+      lineBuffer: '',
+      activeToolIds: new Set(),
+      activeToolStatuses: new Map(),
+      activeToolNames: new Map(),
+      activeSubagentToolIds: new Map(),
+      activeSubagentToolNames: new Map(),
+      backgroundAgentToolIds: new Set(),
+      isWaiting: false,
+      permissionSent: false,
+      hadToolsInTurn: false,
+      lastDataAt: 0,
+      linesProcessed: 0,
+      seenUnknownRecordTypes: new Set(),
+      hookDelivered: false,
+      contextTokens: 0,
+      maxContextTokens: 200_000,
+    };
+    agents.set(3, agent);
+
+    // Terminal tool invocation via kind: 2 toolInvocationSerialized
+    processCopilotChatRecord(
+      3,
+      agent,
+      {
+        kind: 2,
+        k: ['requests', 0, 'response', 0],
+        v: {
+          kind: 'toolInvocationSerialized',
+          toolCallId: 'term-1',
+          toolSpecificData: {
+            kind: 'terminal',
+            commandLine: { original: 'npm test -- --coverage' },
+          },
+          isComplete: false,
+        },
+      },
+      agents,
+      waitingTimers,
+      permissionTimers,
+    );
+
+    expect(agent.activeToolNames.get('tool_requests_0_response_0_runInTerminal')).toBe(
+      'runInTerminal',
+    );
+    const termStart = broadcastEvents.find(
+      (e: any) => e.type === 'agentToolStart' && e.toolName === 'runInTerminal',
+    ) as any;
+    expect(termStart).toBeDefined();
+    expect(termStart.status).toContain('npm test');
+
+    // Subagent tool invocation via kind: 2
+    processCopilotChatRecord(
+      3,
+      agent,
+      {
+        kind: 2,
+        k: ['requests', 0, 'response', 1],
+        v: {
+          kind: 'toolInvocation',
+          toolId: 'sub-1',
+          name: 'runSubagent',
+          parameters: { description: 'Research API docs' },
+          isComplete: false,
+        },
+      },
+      agents,
+      waitingTimers,
+      permissionTimers,
+    );
+
+    const subStart = broadcastEvents.find(
+      (e: any) => e.type === 'agentToolStart' && e.toolName === 'runSubagent',
+    ) as any;
+    expect(subStart).toBeDefined();
+    expect(subStart.runInBackground).toBe(true);
+    expect(subStart.status).toContain('Research API docs');
+
+    // Leaf isComplete: true completes active tools and transitions to Responding...
+    processCopilotChatRecord(
+      3,
+      agent,
+      {
+        kind: 2,
+        k: ['requests', 0, 'response', 1, 'isComplete'],
+        v: true,
+      },
+      agents,
+      waitingTimers,
+      permissionTimers,
+    );
+
+    expect(agent.activeToolStatuses.get('chat_turn')).toBe('Responding...');
+  });
 });

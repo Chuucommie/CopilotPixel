@@ -559,10 +559,16 @@ export class CopilotAgentsViewProvider implements vscode.WebviewViewProvider {
         // Provider capabilities: tool taxonomy for webview animation + subagent rendering.
         // Sent once before restoreAgents so characters render with correct animations
         // from the first frame.
+        const allReadingTools = new Set<string>();
+        const allSubagentToolNames = new Set<string>();
+        for (const p of hookProviders) {
+          p.readingTools.forEach((t) => allReadingTools.add(t));
+          p.subagentToolNames.forEach((t) => allSubagentToolNames.add(t));
+        }
         this.webview?.postMessage({
           type: 'providerCapabilities',
-          readingTools: [...copilotProvider.readingTools],
-          subagentToolNames: [...copilotProvider.subagentToolNames],
+          readingTools: [...allReadingTools],
+          subagentToolNames: [...allSubagentToolNames],
         });
 
         // Settings + folder→Area mappings MUST be dispatched BEFORE restoreAgents

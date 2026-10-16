@@ -359,48 +359,65 @@ export function useExtensionMessages(
         const toolId = msg.toolId as string;
         const status = msg.status as string;
         const permissionActive = msg.permissionActive as boolean | undefined;
+        const toolName = (msg.toolName as string | undefined) ?? extractToolName(status);
         setAgentTools((prev) => {
           const list = prev[id] || [];
-          if (list.some((t) => t.toolId === toolId)) return prev;
+          const existing = list.find((t) => t.toolId === toolId);
+          if (existing) {
+            if (
+              existing.status === status &&
+              existing.permissionWait === (permissionActive || false) &&
+              !existing.done &&
+              existing.toolName === toolName
+            ) {
+              return prev;
+            }
+            return {
+              ...prev,
+              [id]: list.map((t) =>
+                t.toolId === toolId
+                  ? {
+                      ...t,
+                      status,
+                      toolName,
+                      done: false,
+                      permissionWait: permissionActive || false,
+                    }
+                  : t,
+              ),
+            };
+          }
           return {
             ...prev,
             [id]: [
               ...list,
-              { toolId, status, done: false, permissionWait: permissionActive || false },
+              { toolId, toolName, status, done: false, permissionWait: permissionActive || false },
             ],
           };
         });
-        const toolName = (msg.toolName as string | undefined) ?? extractToolName(status);
         os.setAgentTool(id, toolName);
         os.setAgentActive(id, true);
         // Don't clear the permission bubble if the hook already confirmed permission is needed
         if (!permissionActive) {
           os.clearPermissionBubble(id);
         }
-        // Create sub-agent character for Task/Agent tool subtasks.
-        // agentToolStart for Task/Agent is always emitted via JSONL (with the stable
-        // toolu_* id), never from the hook path — handlePreToolUse skips these tools.
+        // Create sub-agent character for Task/Agent/subagent tools.
         // runInBackground routing:
-        //   - parent HAS teamName: teammate path (onTeammateDetected) creates the
-        //     teammate; we skip here so we don't spawn a ghost sub-agent alongside.
-        //   - parent has NO teamName: no teammate path exists, so we must still
-        //     create the Subtask sub-character or the background task is invisible.
+        //   - tmux teammate path (onTeammateDetected) creates the teammate;
+        //   - other subagents (Antigravity invoke_subagent/browser_subagent, Copilot Task/subagent)
+        //     must create the sub-agent character in the office.
         const runInBackground = msg.runInBackground as boolean | undefined;
         if (runInBackground) {
           const set = (backgroundParentToolIdsRef.current[id] ??= new Set());
           set.add(toolId);
         }
-        // Named spawns are Teammates-to-be: a teammate character will represent
-        // them, so never create the Subtask ghost the teammate would replace.
         const isTeammateSpawn = msg.isTeammateSpawn as boolean | undefined;
         const parentChar = os.characters.get(id);
-        const parentHasTeam = !!parentChar?.teamName;
-        if (
-          isSubagentToolName(toolName) &&
-          !isTeammateSpawn &&
-          (!runInBackground || !parentHasTeam)
-        ) {
-          const label = status.startsWith('Subtask:') ? status.slice('Subtask:'.length).trim() : '';
+        const isTmuxTeam = !!(parentChar?.teamName && parentChar?.teamUsesTmux);
+        if (isSubagentToolName(toolName) && !isTeammateSpawn && (!runInBackground || !isTmuxTeam)) {
+          const label = status.startsWith('Subtask:')
+            ? status.slice('Subtask:'.length).trim()
+            : status;
           const subId = os.addSubagent(id, toolId);
           setSubagentCharacters((prev) => {
             if (prev.some((s) => s.id === subId)) return prev;
@@ -413,9 +430,15 @@ export function useExtensionMessages(
         setAgentTools((prev) => {
           const list = prev[id];
           if (!list) return prev;
+          const updated = list.map((t) => (t.toolId === toolId ? { ...t, done: true } : t));
+          const nextActive = [...updated].reverse().find((t) => !t.done);
+          os.setAgentTool(
+            id,
+            nextActive ? (nextActive.toolName ?? extractToolName(nextActive.status)) : null,
+          );
           return {
             ...prev,
-            [id]: list.map((t) => (t.toolId === toolId ? { ...t, done: true } : t)),
+            [id]: updated,
           };
         });
       } else if (msg.type === 'agentToolsClear') {
@@ -532,20 +555,34 @@ export function useExtensionMessages(
         const parentToolId = msg.parentToolId as string;
         const toolId = msg.toolId as string;
         const status = msg.status as string;
+        const subToolName = (msg.toolName as string | undefined) ?? extractToolName(status);
         setSubagentTools((prev) => {
           const agentSubs = prev[id] || {};
           const list = agentSubs[parentToolId] || [];
-          if (list.some((t) => t.toolId === toolId)) return prev;
+          const existing = list.find((t) => t.toolId === toolId);
+          if (existing) {
+            if (existing.status === status && !existing.done && existing.toolName === subToolName) {
+              return prev;
+            }
+            return {
+              ...prev,
+              [id]: {
+                ...agentSubs,
+                [parentToolId]: list.map((t) =>
+                  t.toolId === toolId ? { ...t, status, toolName: subToolName, done: false } : t,
+                ),
+              },
+            };
+          }
           return {
             ...prev,
-            [id]: { ...agentSubs, [parentToolId]: [...list, { toolId, status, done: false }] },
+            [id]: {
+              ...agentSubs,
+              [parentToolId]: [...list, { toolId, toolName: subToolName, status, done: false }],
+            },
           };
         });
-        // Update sub-agent character's tool and active state. The sub-agent is
-        // usually created by an earlier agentToolStart from JSONL using the same
-        // (real) parentToolId. When it's missing — a teamed lead's background
-        // spawn (the creation gate above suppressed the Subtask) or a reloaded
-        // panel that lost it — create it lazily; addSubagent is idempotent.
+        // Update sub-agent character's tool and active state.
         let subId = os.getSubagentId(id, parentToolId);
         if (subId === null) {
           subId = os.addSubagent(id, parentToolId);
@@ -554,12 +591,9 @@ export function useExtensionMessages(
             if (prev.some((s) => s.id === newSubId)) return prev;
             return [...prev, { id: newSubId, parentAgentId: id, parentToolId, label: '' }];
           });
-          // Only watched background spawns are created lazily -- mark the
-          // parent tool as background so agentToolsClear preserves the sub.
           const set = (backgroundParentToolIdsRef.current[id] ??= new Set());
           set.add(parentToolId);
         }
-        const subToolName = extractToolName(status);
         os.setAgentTool(subId, subToolName);
         os.setAgentActive(subId, true);
       } else if (msg.type === 'subagentToolDone') {
@@ -571,11 +605,20 @@ export function useExtensionMessages(
           if (!agentSubs) return prev;
           const list = agentSubs[parentToolId];
           if (!list) return prev;
+          const updated = list.map((t) => (t.toolId === toolId ? { ...t, done: true } : t));
+          const subId = os.getSubagentId(id, parentToolId);
+          if (subId !== null) {
+            const nextActive = [...updated].reverse().find((t) => !t.done);
+            os.setAgentTool(
+              subId,
+              nextActive ? (nextActive.toolName ?? extractToolName(nextActive.status)) : null,
+            );
+          }
           return {
             ...prev,
             [id]: {
               ...agentSubs,
-              [parentToolId]: list.map((t) => (t.toolId === toolId ? { ...t, done: true } : t)),
+              [parentToolId]: updated,
             },
           };
         });

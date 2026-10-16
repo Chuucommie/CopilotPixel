@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.4.5
+
+### Subagent Spawning, Live Office Animations & Copilot Activity Fixes
+
+- **Multi-Subagent Support in Office**: Unlocked character spawning for all subagent tools (`browser_subagent`, `invoke_subagent`, `runSubagent`, `Task`, `subagent`, `executeTask`). Subagents are now automatically assigned free office desks (`findFreeSeat`) or positioned next to the lead agent, appearing and working as active office team members.
+- **Provider Capabilities Synchronization**: Aggregated tool taxonomies across all providers (Google Antigravity + GitHub Copilot) in `CopilotAgentsViewProvider`, ensuring webview classification of reading tools and subagent tools is complete for all agent types.
+- **Dynamic Office Animations (Reading vs. Typing)**: Synchronized sprite animation states so agents and subagents dynamically switch to the `reading` sprite when inspecting files or searching (`view_file`, `readFile`, `list_dir`, `grep_search`, `searchCode`, `fetchWeb`) and `typing` when writing code, editing files, or running terminal commands (`runInTerminal`, `editFiles`, `run_command`, `write_to_file`).
+- **Unfrozen Copilot Activity Labels**: Fixed state update deduplication in `useExtensionMessages` so Copilot agents fluidly transition from 'Thinking...' to 'Responding...' and individual tool progress labels instead of getting stuck on 'Thinking...'.
+- **Enhanced Tool Parsing**: Added support for `toolInvocationSerialized`, terminal command line execution data, and property-level delta completion (`isComplete: true`) in VS Code Copilot Chat.
+- **Subagent Live Status Overlay**: Subagent activity status labels are now displayed directly above their heads in real-time without requiring selection.
+
 ## v1.4.4
 
 ### Live Agent Status & Activity Labels

@@ -92,27 +92,48 @@ function normalizeHookEvent(
 
 export function formatToolStatus(toolName: string, input?: unknown): string {
   const args = (input ?? {}) as Record<string, unknown>;
-  const base = (value: unknown): string => (typeof value === 'string' ? path.basename(value) : '');
+  const extractPath = (val: unknown): string => {
+    if (typeof val === 'string') return val;
+    if (val && typeof val === 'object') {
+      const obj = val as Record<string, unknown>;
+      if (typeof obj.path === 'string') return obj.path;
+      if (typeof obj.fsPath === 'string') return obj.fsPath;
+    }
+    return '';
+  };
+  const base = (value: unknown): string => {
+    const p = extractPath(value);
+    return p ? path.basename(p) : '';
+  };
 
   switch (toolName) {
     case 'Read':
     case 'readFile':
     case 'read_file':
-      return `Reading ${base(args.file_path || args.filePath || args.path || 'file')}`;
+      return `Reading ${base(args.file_path || args.filePath || args.path || args.uri || args.resource || args.file || 'file')}`;
     case 'Edit':
     case 'editFiles':
     case 'edit_files':
     case 'applyChanges':
-      return `Editing ${base(args.file_path || args.filePath || args.path || 'file')}`;
+      return `Editing ${base(args.file_path || args.filePath || args.path || args.uri || args.resource || args.file || 'file')}`;
     case 'Write':
     case 'writeFile':
     case 'write_file':
-      return `Writing ${base(args.file_path || args.filePath || args.path || 'file')}`;
+      return `Writing ${base(args.file_path || args.filePath || args.path || args.uri || args.resource || args.file || 'file')}`;
     case 'Bash':
     case 'runCommand':
     case 'run_command':
     case 'runInTerminal': {
-      const command = typeof args.command === 'string' ? args.command : '';
+      const command =
+        typeof args.command === 'string'
+          ? args.command
+          : typeof args.commandLine === 'string'
+            ? args.commandLine
+            : typeof args.cmd === 'string'
+              ? args.cmd
+              : typeof args.text === 'string'
+                ? args.text
+                : '';
       return `Running: ${command.length > BASH_COMMAND_DISPLAY_MAX_LENGTH ? `${command.slice(0, BASH_COMMAND_DISPLAY_MAX_LENGTH)}…` : command}`;
     }
     case 'Glob':
@@ -134,7 +155,9 @@ export function formatToolStatus(toolName: string, input?: unknown): string {
     case 'Agent':
     case 'Task':
     case 'runSubagent':
-    case 'subagent': {
+    case 'subagent':
+    case 'executeTask':
+    case 'subtask': {
       const description = typeof args.description === 'string' ? args.description : '';
       return description
         ? `Subtask: ${description.length > TASK_DESCRIPTION_DISPLAY_MAX_LENGTH ? `${description.slice(0, TASK_DESCRIPTION_DISPLAY_MAX_LENGTH)}…` : description}`
@@ -236,7 +259,14 @@ export const copilotProvider: HookProvider = {
     'searchWeb',
     'web_search',
   ]),
-  subagentToolNames: new Set(['Agent', 'Task', 'runSubagent', 'subagent']),
+  subagentToolNames: new Set([
+    'Agent',
+    'Task',
+    'runSubagent',
+    'subagent',
+    'executeTask',
+    'subtask',
+  ]),
   readingTools: new Set([
     'Read',
     'Grep',
