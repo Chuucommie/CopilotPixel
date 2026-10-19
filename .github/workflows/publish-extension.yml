@@ -70,6 +70,8 @@ jobs:
           npx @vscode/vsce package --no-dependencies -o "$VSIX_NAME"
           echo "vsixPath=$(pwd)/$VSIX_NAME" >> "$GITHUB_OUTPUT"
           echo "vsixName=$VSIX_NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Verify VSIX Package and Extension Host
         shell: bash
@@ -78,9 +80,11 @@ jobs:
         run: xvfb-run -a node scripts/verify-vsix-package.mjs "$VSIX_PATH"
 
       - name: Upload VSIX to Release
-        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v')
+        if: (github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && inputs.dry_run != true
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ steps.package-vsix.outputs.tag }}
+          name: v${{ steps.package-vsix.outputs.version }}
           files: ${{ steps.package-vsix.outputs.vsixPath }}
           generate_release_notes: true
         env:
@@ -166,7 +170,7 @@ jobs:
           retention-days: 7
 
       - name: Publish Verified Artifact to npm
-        if: (github.event_name == 'release' && github.event.action == 'published') || startsWith(github.ref, 'refs/tags/v')
+        if: ((github.event_name == 'release' && github.event.action == 'published') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && inputs.dry_run != true
         continue-on-error: true
         run: >-
           node scripts/publish-npm-package.mjs

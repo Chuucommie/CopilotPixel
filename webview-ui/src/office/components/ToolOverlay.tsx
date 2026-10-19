@@ -150,6 +150,8 @@ export function ToolOverlay({
                 key={`bubble-${id}`}
                 className="absolute flex flex-col items-center -translate-x-1/2 pointer-events-none z-50"
                 style={{ left: screenX, top: screenY - 24 }}
+                data-testid="agent-overlay"
+                data-agent-id={id}
               >
                 <div className="px-3 py-1.5 bg-white/95 text-slate-900 border border-slate-700 font-semibold text-2xs rounded-lg shadow-xl animate-bounce max-w-[280px] text-center whitespace-normal break-words leading-tight relative">
                   <span>{ch.speechBubbleText}</span>
@@ -180,7 +182,8 @@ export function ToolOverlay({
           );
         }
 
-        // Get activity text
+        // Tools and activity text
+        const tools = agentTools[id];
         const hasWaitingBubble = ch.bubbleType === 'waiting';
         const subHasPermission = isSub && ch.bubbleType === 'permission';
         let activityText: string;
@@ -207,13 +210,15 @@ export function ToolOverlay({
             ch.bubbleType,
             ch.waitingAwaitingInput ?? false,
           );
+          if (ch.isTeamLead && ch.isActive && tools?.some((t) => !t.done) && allIds.length > 1) {
+            activityText = 'Coordinating tasks';
+          }
           if (!ch.isActive && ch.routineActivity && activityText === 'Waiting for tasks') {
             activityText = `${ch.routineIcon || '💻'} ${ch.routineActivity}`;
           }
         }
 
         // Determine dot color
-        const tools = agentTools[id];
         const hasPermission = subHasPermission || tools?.some((t) => t.permissionWait && !t.done);
         const isActive = ch.isActive;
         const hasWaiting = ch.bubbleType === 'waiting';

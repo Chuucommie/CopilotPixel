@@ -25,9 +25,14 @@ import { LAYOUT_FILE_DIR } from './constants.js';
 
 const ADAPTER_SETTING_KEY_SET: ReadonlySet<string> = new Set(ADAPTER_SETTING_KEYS);
 
-/** Strip leading "copilot-agents." prefix to match AdapterSettings field names. */
+/** Strip leading "pixel-office." or "copilot-agents." prefix to match AdapterSettings field names. */
 function settingNameOf(key: string): AdapterSettingKey | null {
-  const bare = key.startsWith('copilot-agents.') ? key.slice('copilot-agents.'.length) : key;
+  let bare = key;
+  if (bare.startsWith('pixel-office.')) {
+    bare = bare.slice('pixel-office.'.length);
+  } else if (bare.startsWith('copilot-agents.')) {
+    bare = bare.slice('copilot-agents.'.length);
+  }
   return ADAPTER_SETTING_KEY_SET.has(bare) ? (bare as AdapterSettingKey) : null;
 }
 

@@ -485,14 +485,21 @@ export function useExtensionMessages(
         const isTeammateSpawn = msg.isTeammateSpawn as boolean | undefined;
         const parentChar = os.characters.get(id);
         const isTmuxTeam = !!(parentChar?.teamName && parentChar?.teamUsesTmux);
-        // Update active agent speech bubble and state in-place (never spawn duplicate bubbles)
-        const activeChar = os.characters.get(id);
-        if (activeChar) {
-          const displayLabel = status.startsWith('Subtask:')
-            ? status.slice('Subtask:'.length).trim()
-            : status;
-          activeChar.speechBubbleText = displayLabel;
-          activeChar.speechBubbleTimer = 5.0;
+        const displayLabel = status.startsWith('Subtask:')
+          ? status.slice('Subtask:'.length).trim()
+          : status;
+
+        // User requirement:
+        // Execution messages appear in random agent speech bubbles,
+        // overwriting whatever bubble was there before (no duplicate bubbles).
+        const allChars = Array.from(os.characters.values());
+        if (allChars.length > 0) {
+          const randomIndex = Math.floor(Math.random() * allChars.length);
+          const chosenChar = allChars[randomIndex];
+          if (chosenChar) {
+            chosenChar.speechBubbleText = displayLabel;
+            chosenChar.speechBubbleTimer = 5.0;
+          }
         }
 
         // ONLY delegate to a subagent character if this is an explicit subagent tool or teammate spawn!
@@ -576,8 +583,18 @@ export function useExtensionMessages(
           const activeChar = os.characters.get(id);
           if (activeChar) {
             if (nextActive) {
-              activeChar.speechBubbleText = nextActive.status;
-              activeChar.speechBubbleTimer = 5.0;
+              const nextLabel = nextActive.status.startsWith('Subtask:')
+                ? nextActive.status.slice('Subtask:'.length).trim()
+                : nextActive.status;
+              const allChars = Array.from(os.characters.values());
+              if (allChars.length > 0) {
+                const randomIndex = Math.floor(Math.random() * allChars.length);
+                const chosenChar = allChars[randomIndex];
+                if (chosenChar) {
+                  chosenChar.speechBubbleText = nextLabel;
+                  chosenChar.speechBubbleTimer = 5.0;
+                }
+              }
             } else {
               activeChar.speechBubbleText = 'Completed task';
               activeChar.speechBubbleTimer = 2.5;
