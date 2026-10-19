@@ -109,14 +109,14 @@ async function verifyInstalledTarball(tarballPath) {
   // gate's own behavior is pinned by server/__tests__/cli.test.ts,
   // consentFlow.test.ts, and the consent e2e specs). Same shape as
   // server/__tests__/cli.test.ts.
-  fs.mkdirSync(path.join(smokeHome, '.copilot-agents'), { recursive: true });
+  fs.mkdirSync(path.join(smokeHome, '.pixel-office'), { recursive: true });
   fs.writeFileSync(
-    path.join(smokeHome, '.copilot-agents', 'config.json'),
+    path.join(smokeHome, '.pixel-office', 'config.json'),
     JSON.stringify({ hooksConsent: { copilot: 'granted' } }),
   );
   fs.writeFileSync(
     path.join(smokeProject, 'package.json'),
-    JSON.stringify({ name: 'copilot-agents-package-smoke', private: true }, null, 2),
+    JSON.stringify({ name: 'pixel-office-package-smoke', private: true }, null, 2),
   );
 
   let child = null;
@@ -131,7 +131,7 @@ async function verifyInstalledTarball(tarballPath) {
       fs.readFileSync(path.join(installedRoot, 'package.json'), 'utf-8'),
     );
     if (installedManifest.bin?.[packageManifest.name] !== './dist/cli.js') {
-      throw new Error('Installed package has an unexpected copilot-agents bin entry');
+      throw new Error('Installed package has an unexpected pixel-office bin entry');
     }
 
     const installedCli = path.join(installedRoot, 'dist', 'cli.js');
@@ -153,7 +153,7 @@ async function verifyInstalledTarball(tarballPath) {
     });
     if (
       !help.stdout.includes(`Usage: ${packageManifest.name}`) &&
-      !help.stdout.includes('Usage: copilot-agents')
+      !help.stdout.includes('Usage: pixel-office')
     ) {
       throw new Error('Installed copilot-agents bin did not print CLI help');
     }
@@ -205,7 +205,7 @@ async function verifyInstalledTarball(tarballPath) {
       throw new Error(`Installed package did not load non-empty bundled assets:\n${output}`);
     }
 
-    const installedHook = path.join(smokeHome, '.copilot-agents', 'hooks', 'copilot-hook.js');
+    const installedHook = path.join(smokeHome, '.pixel-office', 'hooks', 'copilot-hook.js');
     const settingsPath = path.join(smokeHome, '.copilot', 'hooks', 'copilotagents.json');
     await waitFor(
       () => fs.existsSync(installedHook) && fs.existsSync(settingsPath),

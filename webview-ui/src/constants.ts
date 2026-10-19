@@ -96,7 +96,7 @@ export const LAYOUT_SAVE_DEBOUNCE_MS = 500;
 
 // ── Layout Import/Export (browser-native, standalone) ────────
 /** Suggested filename when exporting the office layout from the standalone browser. */
-export const LAYOUT_EXPORT_FILENAME = 'copilot-agents-layout.json';
+export const LAYOUT_EXPORT_FILENAME = 'pixel-office-layout.json';
 /** MIME type for the exported layout Blob. */
 export const LAYOUT_EXPORT_MIME = 'application/json';
 export const DEFAULT_FLOOR_COLOR: ColorValue = { h: 35, s: 30, b: 15, c: 0 };
@@ -280,6 +280,8 @@ export const ROLE_BADGE_REVIEWER_COLOR = '#ec4899';
 export const ROLE_BADGE_TESTER_COLOR = '#22c55e';
 export const ROLE_BADGE_DEVOPS_COLOR = '#f97316';
 export const ROLE_BADGE_GENERALIST_COLOR = '#94a3b8';
+export const ROLE_BADGE_DESIGNER_COLOR = '#f43f5e';
+export const ROLE_BADGE_TEAMMATE_COLOR = '#a855f7';
 export const AGENT_STATUS_IDLE_DOT_COLOR = '#64748b';
 export const AGENT_STATUS_ACTIVE_DOT_COLOR = '#22c55e';
 export const AGENT_STATUS_RUNNING_DOT_COLOR = '#eab308';
@@ -333,6 +335,11 @@ export const BREAK_COFFEE_LIQUID_COLOR = '#451a03';
 export const BREAK_COFFEE_STEAM_COLOR_1 = '#e2e8f0';
 export const BREAK_COFFEE_STEAM_COLOR_2 = '#93c5fd';
 
+export const BREAK_TEA_LIQUID_COLOR = '#aed581';
+export const BREAK_TEA_CUP_COLOR = '#ffffff';
+export const BREAK_TEA_SHADOW_COLOR = '#cfd8dc';
+export const BREAK_TEA_TAG_COLOR = '#81c784';
+
 export const BREAK_SNACK_BASE_COLOR = '#b45309';
 export const BREAK_SNACK_FROSTING_COLOR = '#ec4899';
 export const BREAK_SNACK_CRUMB_COLOR = '#fef08a';
@@ -343,8 +350,45 @@ export const BREAK_STEAMDECK_SCREEN_ON_1 = '#06b6d4';
 export const BREAK_STEAMDECK_SCREEN_ON_2 = '#10b981';
 export const BREAK_STEAMDECK_SCREEN_ON_3 = '#8b5cf6';
 export const BREAK_STEAMDECK_GLOW_COLOR = '#38bdf8';
+export const BREAK_SNACK_SPRINKLE_COLOR = '#38bdf8';
+export const BREAK_STEAMDECK_HERO_COLOR = '#22c55e';
+export const BREAK_STEAMDECK_COIN_COLOR = '#fbbf24';
+export const BREAK_STEAMDECK_ENEMY_COLOR = '#ef4444';
+export const BREAK_STEAMDECK_SLASH_COLOR = '#e0e7ff';
+export const BREAK_STEAMDECK_VICTORY_COLOR = '#a855f7';
+export const BREAK_HAND_COLOR = '#f5cba7';
+export const BREAK_HAND_SHADOW_COLOR = '#d5a075';
+export const BREAK_COOKING_POT_COLOR = '#475569';
+export const BREAK_COOKING_FLAME_COLOR = '#f97316';
 
-// ── CopilotPixel Badge Colors ────────────────────────────────
-export const COPILOT_PIXEL_BADGE_BG = '#581c87';
-export const COPILOT_PIXEL_BADGE_BORDER = '#a855f7';
-export const COPILOT_PIXEL_BADGE_TEXT = '#facc15';
+// ── Pixel Office Badge Colors ────────────────────────────────
+export const PIXEL_OFFICE_BADGE_BG = '#581c87';
+export const PIXEL_OFFICE_BADGE_BORDER = '#a855f7';
+export const PIXEL_OFFICE_BADGE_TEXT = '#facc15';
+
+// ── Office Clock Colors ─────────────────────────────────────
+export const CLOCK_DIAL_BG = '#faf6ed';
+export const CLOCK_RIM_BORDER = '#6d4c41';
+export const CLOCK_TICK_PRIMARY = '#2e1c14';
+export const CLOCK_TICK_SECONDARY = '#8d6e63';
+export const CLOCK_HOUR_HAND = '#221510';
+export const CLOCK_MINUTE_HAND = '#322018';
+export const CLOCK_SECOND_HAND = '#e53935';
+export const CLOCK_PIVOT_PIN = '#b71c1c';
+
+// ── Office Lighting & Night Device Glow Colors ──────────────
+export const LIGHTING_NIGHT_AMBIENT_PREFIX = 'rgba(8, 12, 26, ';
+export const LIGHTING_EVENING_AMBIENT_PREFIX = 'rgba(24, 18, 36, ';
+export const LIGHTING_DAY_AMBIENT = 'rgba(0, 0, 0, 0)';
+export const LIGHTING_MONITOR_COLOR = 'rgba(130, 210, 255, 0.95)';
+export const LIGHTING_CHARACTER_MONITOR = 'rgba(150, 220, 255, 0.9)';
+export const LIGHTING_STEAMDECK_COLOR = 'rgba(80, 205, 255, 0.95)';
+export const LIGHTING_COFFEE_COLOR = 'rgba(255, 180, 80, 0.8)';
+export const LIGHTING_TEA_COLOR = 'rgba(255, 210, 110, 0.7)';
+export const LIGHTING_MICROWAVE_COLOR = 'rgba(110, 255, 160, 0.75)';
+export const LIGHTING_FRIDGE_COLOR = 'rgba(180, 230, 255, 0.5)';
+export const LIGHTING_STOVETOP_COLOR = 'rgba(255, 130, 50, 0.65)';
+export const LIGHTING_CLOCK_COLOR = 'rgba(255, 250, 210, 0.5)';
+export const LIGHTING_MUG_COLOR = 'rgba(255, 190, 100, 0.6)';
+export const LIGHTING_GRADIENT_STOP_DARK = 'rgba(0, 0, 0, ';
+export const LIGHTING_GRADIENT_STOP_CLEAR = 'rgba(0, 0, 0, 0)';

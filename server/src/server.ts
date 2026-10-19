@@ -44,7 +44,7 @@ type HookEventCallback = (providerId: string, event: Record<string, unknown>) =>
  * VS Code server and a standalone `npx copilot-agents` server can run at once,
  * each owning its own registry entry, both reachable by hook fan-out.
  */
-export class CopilotAgentsServer {
+export class PixelOfficeServer {
   private app: FastifyInstance | null = null;
   private config: ServerConfig | null = null;
   private ownsServer = false;
@@ -85,7 +85,7 @@ export class CopilotAgentsServer {
       this.config = candidate;
       this.ownsServer = false;
       console.log(
-        `[CopilotAgents] Reusing existing ${wantsSpa ? 'standalone' : 'embedded'} server on port ${candidate.port} (PID ${candidate.pid})`,
+        `[PixelOffice] Reusing existing ${wantsSpa ? 'standalone' : 'embedded'} server on port ${candidate.port} (PID ${candidate.pid})`,
       );
       return candidate;
     }
@@ -127,7 +127,7 @@ export class CopilotAgentsServer {
     // entry (new hook scripts fan out to every entry here).
     this.writeServerJson(this.config);
     this.writeRegistryEntry(this.config);
-    console.log(`[CopilotAgents] Server: listening on 127.0.0.1:${port}`);
+    console.log(`[PixelOffice] Server: listening on 127.0.0.1:${port}`);
 
     return this.config;
   }
@@ -138,7 +138,7 @@ export class CopilotAgentsServer {
       try {
         void this.app.close();
       } catch (e) {
-        console.error(`[CopilotAgents] Error closing HTTP server: ${e}`);
+        console.error(`[PixelOffice] Error closing HTTP server: ${e}`);
       }
       this.app = null;
     }
@@ -172,7 +172,7 @@ export class CopilotAgentsServer {
       fs.writeFileSync(tmpPath, JSON.stringify(config, null, 2), { mode: 0o600 });
       fs.renameSync(tmpPath, filePath);
     } catch (e) {
-      console.error(`[CopilotAgents] Failed to write server.json: ${e}`);
+      console.error(`[PixelOffice] Failed to write server.json: ${e}`);
     }
   }
 
@@ -267,7 +267,7 @@ export class CopilotAgentsServer {
       fs.writeFileSync(tmpPath, JSON.stringify(config, null, 2), { mode: 0o600 });
       fs.renameSync(tmpPath, filePath);
     } catch (e) {
-      console.error(`[CopilotAgents] Failed to write registry entry: ${e}`);
+      console.error(`[PixelOffice] Failed to write registry entry: ${e}`);
     }
   }
 
@@ -292,3 +292,6 @@ function isProcessRunning(pid: number): boolean {
     return false;
   }
 }
+
+export const CopilotAgentsServer = PixelOfficeServer;
+export type CopilotAgentsServer = PixelOfficeServer;

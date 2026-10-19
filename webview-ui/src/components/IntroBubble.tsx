@@ -214,7 +214,7 @@ export function IntroBubble({
   };
 
   const titles = [
-    'Welcome to CopilotAgents!',
+    'Welcome to Pixel Office!',
     'Powered by GitHub Copilot CLI',
     headline,
     installFailed ? "Hooks couldn't be installed" : "You're all set!",

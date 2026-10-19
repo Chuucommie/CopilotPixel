@@ -3,7 +3,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Use isolated temp HOME to avoid touching real ~/.copilot-agents/
+// Use isolated temp HOME to avoid touching real ~/.pixel-office/
 let tmpBase: string;
 let serverJsonDir: string;
 let serverJsonPath: string;
@@ -47,7 +47,7 @@ describe('CopilotAgentsServer', () => {
 
   beforeEach(() => {
     tmpBase = fs.mkdtempSync(path.join(os.tmpdir(), 'pxl-server-test-'));
-    serverJsonDir = path.join(tmpBase, '.copilot-agents');
+    serverJsonDir = path.join(tmpBase, '.pixel-office');
     serverJsonPath = path.join(serverJsonDir, 'server.json');
     registryDir = path.join(serverJsonDir, 'servers');
     fs.mkdirSync(serverJsonDir, { recursive: true });

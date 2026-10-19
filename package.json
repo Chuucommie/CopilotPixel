@@ -1,8 +1,8 @@
 {
-  "name": "copilot-pixel",
-  "displayName": "CopilotPixel - Pixel Office for Copilot",
-  "description": "A virtual pixel art office where your GitHub Copilot and AI coding agents come to life.",
-  "version": "1.4.8",
+  "name": "pixel-office",
+  "displayName": "Pixel Office",
+  "description": "Pixel-art office visualizing Copilot and Antigravity/Gemini autonomous agents collaborating in real-time.",
+  "version": "1.4.9",
   "publisher": "Chuucommie",
   "repository": {
     "type": "git",
@@ -30,50 +30,69 @@
   ],
   "main": "./dist/extension.js",
   "bin": {
+    "pixel-office": "./dist/cli.js",
     "copilot-pixel": "./dist/cli.js",
     "copilot-agents": "./dist/cli.js"
   },
   "contributes": {
     "commands": [
       {
+        "command": "pixel-office.showPanel",
+        "title": "Pixel Office: Show Panel"
+      },
+      {
+        "command": "pixel-office.exportDefaultLayout",
+        "title": "Pixel Office: Export Layout as Default"
+      },
+      {
         "command": "copilot-agents.showPanel",
-        "title": "CopilotPixel: Show Panel"
+        "title": "Pixel Office: Show Panel (Legacy Alias)"
       },
       {
         "command": "copilot-agents.exportDefaultLayout",
-        "title": "CopilotPixel: Export Layout as Default"
+        "title": "Pixel Office: Export Layout as Default (Legacy Alias)"
       }
     ],
     "viewsContainers": {
       "panel": [
         {
-          "id": "copilot-agents-panel",
-          "title": "CopilotPixel",
+          "id": "pixel-office-panel",
+          "title": "Pixel Office",
           "icon": "$(window)"
         }
       ]
     },
     "views": {
-      "copilot-agents-panel": [
+      "pixel-office-panel": [
         {
           "type": "webview",
-          "id": "copilot-agents.panelView",
-          "name": "CopilotPixel"
+          "id": "pixel-office.panelView",
+          "name": "Pixel Office"
         }
       ]
     },
     "configuration": {
-      "title": "CopilotPixel",
+      "title": "Pixel Office",
       "properties": {
+        "pixel-office.autoShowPanel": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically show the Pixel Office panel on startup."
+        },
+        "pixel-office.autoSpawnAgent": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically spawn an agent when a supported AI session starts."
+        },
         "copilot-agents.autoShowPanel": {
           "type": "boolean",
-          "default": false,
-          "description": "Automatically open and focus the CopilotPixel panel when VS Code starts."
+          "default": true,
+          "description": "Legacy alias for pixel-office.autoShowPanel."
         },
         "copilot-agents.autoSpawnAgent": {
           "type": "boolean",
-          "default": false,
-          "description": "Automatically spawn a GitHub Copilot CLI session when VS Code starts, if no agents are currently running."
+          "default": true,
+          "description": "Legacy alias for pixel-office.autoSpawnAgent."
         }
       }
     }

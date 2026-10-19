@@ -145,6 +145,7 @@ export class CopilotAgentsViewProvider implements vscode.WebviewViewProvider {
         hooksOnly: agent.hooksOnly || undefined,
         palette: agent.palette,
         hueShift: agent.hueShift,
+        isTeamLead: agent.isTeamLead || undefined,
       });
     });
     this.store.on('agentRemoved', (id) => {

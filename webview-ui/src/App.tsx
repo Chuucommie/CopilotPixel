@@ -209,10 +209,13 @@ function App() {
   // geometry — the handlers still own undo/dirty/rebuild. Guarded on isE2E.
   useEffect(() => {
     if (!isE2E || typeof window === 'undefined') return;
-    const hooks = (window.__copilotAgentsTestHooks ??= {});
-    hooks.editorTileAction = (col, row) => editor.handleEditorTileAction(col, row);
-    hooks.editorEraseAction = (col, row) => editor.handleEditorEraseAction(col, row);
-    hooks.getShowAreas = () => effectiveShowAreas;
+    const testHooks = (window.__copilotAgentsTestHooks ??= {});
+    window.__pixelOfficeTestHooks = testHooks;
+    testHooks.editorTileAction = (col: number, row: number) =>
+      editor.handleEditorTileAction(col, row);
+    testHooks.editorEraseAction = (col: number, row: number) =>
+      editor.handleEditorEraseAction(col, row);
+    testHooks.getShowAreas = () => effectiveShowAreas;
   }, [editor.handleEditorTileAction, editor.handleEditorEraseAction, effectiveShowAreas]);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -515,14 +518,14 @@ function App() {
         zIndex={52}
       >
         <div className="text-base text-text px-10" style={{ lineHeight: 1.4 }}>
-          <p className="mb-8">Your CopilotAgents office now reacts in real-time:</p>
+          <p className="mb-8">Your Pixel Office now reacts in real-time:</p>
           <ul className="mb-8 pl-18 list-disc m-0">
             <li className="text-sm mb-2">Permission prompts appear instantly</li>
             <li className="text-sm mb-2">Turn completions detected the moment they happen</li>
             <li className="text-sm mb-2">Sound notifications play immediately</li>
           </ul>
           <p className="mb-12 text-text-muted">
-            This works through GitHub Copilot CLI hooks, which notify CopilotAgents when your
+            This works through GitHub Copilot CLI hooks, which notify Pixel Office when your
             sessions start, use tools, or request permission.
           </p>
           <div className="text-center">

@@ -91,7 +91,8 @@ export const SESSION_END_GRACE_MS = 2000;
 export const MAX_HOOK_BODY_SIZE = 65_536; // 64KB
 
 // ── Layout/Config Persistence ──────────────────────────────
-export const LAYOUT_FILE_DIR = '.copilot-agents';
+export const LAYOUT_FILE_DIR = '.pixel-office';
+export const LEGACY_LAYOUT_FILE_DIRS = ['.copilot-pixel', '.copilot-agents', '.pixel-agents'];
 export const LAYOUT_FILE_NAME = 'layout.json';
 export const LAYOUT_FILE_POLL_INTERVAL_MS = 2000;
 export const LAYOUT_REVISION_KEY = 'layoutRevision';

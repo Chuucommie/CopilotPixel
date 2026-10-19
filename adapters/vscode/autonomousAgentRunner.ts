@@ -24,7 +24,7 @@ export class AutonomousAgentRunner {
   private readonly outputChannel: vscode.OutputChannel;
 
   constructor() {
-    this.outputChannel = vscode.window.createOutputChannel('CopilotPixel Autonomous Agents');
+    this.outputChannel = vscode.window.createOutputChannel('Pixel Office');
   }
 
   /**
@@ -151,7 +151,7 @@ export class AutonomousAgentRunner {
       const errorMsg =
         'No language models available via VS Code Language Model API. Please ensure GitHub Copilot or Google Gemini extension is installed and signed in.';
       this.log(`[Error] ${errorMsg}`);
-      vscode.window.showWarningMessage(`CopilotPixel: ${errorMsg}`);
+      vscode.window.showWarningMessage(`Pixel Office: ${errorMsg}`);
       postMessage({
         type: 'agentOrderProgress',
         agentId,
@@ -497,7 +497,7 @@ Rules:
       });
 
       vscode.window.showInformationMessage(
-        `CopilotPixel: [${agentName} - ${role}] Completed task: ${finalSummary.slice(0, 90)}${finalSummary.length > 90 ? '...' : ''}`,
+        `Pixel Office: [${agentName} - ${role}] Completed task: ${finalSummary.slice(0, 90)}${finalSummary.length > 90 ? '...' : ''}`,
       );
     } catch (err: any) {
       if (token.isCancellationRequested) return;
@@ -516,7 +516,7 @@ Rules:
         id: agentId,
       });
 
-      vscode.window.showErrorMessage(`CopilotPixel: Agent #${agentId} failed: ${errorMsg}`);
+      vscode.window.showErrorMessage(`Pixel Office: Agent #${agentId} failed: ${errorMsg}`);
     } finally {
       this.activeTasks.delete(agentId);
     }

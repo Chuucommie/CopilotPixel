@@ -94,7 +94,18 @@ export function layoutToFurnitureInstances(furniture: PlacedFurniture[]): Furnit
       }
     }
 
-    instances.push({ sprite, x, y, zY, ...(mirrored ? { mirrored: true } : {}) });
+    const width = entry ? entry.width : undefined;
+    const height = entry ? entry.height : undefined;
+    instances.push({
+      type: item.type,
+      sprite,
+      x,
+      y,
+      zY,
+      width,
+      height,
+      ...(mirrored ? { mirrored: true } : {}),
+    });
   }
   return instances;
 }

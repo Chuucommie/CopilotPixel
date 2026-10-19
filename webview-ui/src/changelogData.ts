@@ -21,7 +21,7 @@ export function toMajorMinor(version: string): string {
   return parts.length >= 2 ? `${parts[0]}.${parts[1]}` : version;
 }
 
-export const CHANGELOG_REPO_URL = 'https://github.com/Chuucommie/CopilotAgents';
+export const CHANGELOG_REPO_URL = 'https://github.com/Chuucommie/PixelOffice';
 
 export const changelogEntries: ChangelogEntry[] = [
   {

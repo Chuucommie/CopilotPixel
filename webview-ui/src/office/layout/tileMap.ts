@@ -49,13 +49,14 @@ export function findPath(
   const startKey = key(startCol, startRow);
   const endKey = key(endCol, endRow);
 
-  // End must be walkable (or be a chair tile which may be adjacent to desk)
-  // We allow the end tile even if it's not strictly walkable for chair positions
-  const endWalkable = isWalkable(endCol, endRow, tileMap, blockedTiles);
-  if (!endWalkable) {
-    // If the end is a desk tile, we still can't path there
-    return [];
-  }
+  const rows = tileMap.length;
+  const cols = rows > 0 ? tileMap[0].length : 0;
+  if (endRow < 0 || endRow >= rows || endCol < 0 || endCol >= cols) return [];
+
+  // End tile must not be a solid wall or void.
+  // We allow chair/sofa tiles at the destination even if they are in blockedTiles.
+  const endTile = tileMap[endRow][endCol];
+  if (endTile === TileType.WALL || endTile === TileType.VOID) return [];
 
   const visited = new Set<string>();
   visited.add(startKey);
@@ -92,7 +93,9 @@ export function findPath(
       const nk = key(nc, nr);
 
       if (visited.has(nk)) continue;
-      if (!isWalkable(nc, nr, tileMap, blockedTiles)) continue;
+      // Allow end tile (e.g. chair, couch, desk seat) even if it is in blockedTiles,
+      // as long as it is not a wall or void
+      if (nk !== endKey && !isWalkable(nc, nr, tileMap, blockedTiles)) continue;
 
       visited.add(nk);
       parent.set(nk, currKey);

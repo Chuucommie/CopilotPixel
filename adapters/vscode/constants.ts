@@ -15,13 +15,13 @@ export {
 } from '../../server/src/constants.js';
 
 // ── Settings Persistence (VS Code globalState keys) ─────────
-export const GLOBAL_KEY_SOUND_ENABLED = 'copilot-agents.soundEnabled';
-export const GLOBAL_KEY_LAST_SEEN_VERSION = 'copilot-agents.lastSeenVersion';
-export const GLOBAL_KEY_ALWAYS_SHOW_LABELS = 'copilot-agents.alwaysShowLabels';
-export const GLOBAL_KEY_GHOST_HEADLESS_AGENTS = 'copilot-agents.ghostHeadlessAgents';
-export const GLOBAL_KEY_WATCH_ALL_SESSIONS = 'copilot-agents.watchAllSessions';
-export const GLOBAL_KEY_HOOKS_INFO_SHOWN = 'copilot-agents.hooksInfoShown';
-export const GLOBAL_KEY_SHOW_AREAS = 'copilot-agents.showAreas';
+export const GLOBAL_KEY_SOUND_ENABLED = 'pixel-office.soundEnabled';
+export const GLOBAL_KEY_LAST_SEEN_VERSION = 'pixel-office.lastSeenVersion';
+export const GLOBAL_KEY_ALWAYS_SHOW_LABELS = 'pixel-office.alwaysShowLabels';
+export const GLOBAL_KEY_GHOST_HEADLESS_AGENTS = 'pixel-office.ghostHeadlessAgents';
+export const GLOBAL_KEY_WATCH_ALL_SESSIONS = 'pixel-office.watchAllSessions';
+export const GLOBAL_KEY_HOOKS_INFO_SHOWN = 'pixel-office.hooksInfoShown';
+export const GLOBAL_KEY_SHOW_AREAS = 'pixel-office.showAreas';
 
 /**
  * Folder→Area mappings live inside the shared ~/.copilot-agents/config.json
@@ -30,13 +30,16 @@ export const GLOBAL_KEY_SHOW_AREAS = 'copilot-agents.showAreas';
  *
  * @public
  */
-export const SETTING_KEY_AREA_MAPPINGS = 'copilot-agents.areaMappings';
+export const SETTING_KEY_AREA_MAPPINGS = 'pixel-office.areaMappings';
 
 // ── VS Code Settings (contributes.configuration keys) ───────
-export const CONFIG_KEY_AUTO_SHOW_PANEL = 'copilot-agents.autoShowPanel';
-export const CONFIG_KEY_AUTO_SPAWN_AGENT = 'copilot-agents.autoSpawnAgent';
+export const CONFIG_KEY_AUTO_SHOW_PANEL = 'pixel-office.autoShowPanel';
+export const CONFIG_KEY_AUTO_SPAWN_AGENT = 'pixel-office.autoSpawnAgent';
 
 // ── VS Code Identifiers ─────────────────────────────────────
-export const VIEW_ID = 'copilot-agents.panelView';
-export const COMMAND_SHOW_PANEL = 'copilot-agents.showPanel';
-export const COMMAND_EXPORT_DEFAULT_LAYOUT = 'copilot-agents.exportDefaultLayout';
+export const VIEW_ID = 'pixel-office.panelView';
+export const LEGACY_VIEW_ID = 'copilot-agents.panelView';
+export const COMMAND_SHOW_PANEL = 'pixel-office.showPanel';
+export const LEGACY_COMMAND_SHOW_PANEL = 'copilot-agents.showPanel';
+export const COMMAND_EXPORT_DEFAULT_LAYOUT = 'pixel-office.exportDefaultLayout';
+export const LEGACY_COMMAND_EXPORT_DEFAULT_LAYOUT = 'copilot-agents.exportDefaultLayout';

@@ -42,7 +42,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['src/constants.ts', 'src/fonts/**', 'src/office/sprites/**'],
+    files: ['src/constants.ts', 'src/fonts/**', 'src/office/sprites/**', 'test/**'],
     rules: {
       'copilot-agents/no-inline-colors': 'off',
       'copilot-agents/pixel-shadow': 'off',

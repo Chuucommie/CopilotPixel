@@ -3,7 +3,7 @@ import fs from 'node:fs';
 
 import semver from 'semver';
 
-export const EXPECTED_PACKAGE_NAME = 'copilot-pixel';
+export const EXPECTED_PACKAGE_NAME = 'pixel-office';
 export const EXPECTED_REPOSITORY_URL = 'https://github.com/Chuucommie/CopilotPixel.git';
 
 // fastify + @fastify/{cors,static,websocket} are root runtime `dependencies` even though

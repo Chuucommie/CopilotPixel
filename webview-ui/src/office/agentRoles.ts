@@ -1,11 +1,13 @@
 import {
   ROLE_BADGE_ARCHITECT_COLOR,
   ROLE_BADGE_CODER_COLOR,
+  ROLE_BADGE_DESIGNER_COLOR,
   ROLE_BADGE_DEVOPS_COLOR,
   ROLE_BADGE_GENERALIST_COLOR,
   ROLE_BADGE_LEAD_COLOR,
   ROLE_BADGE_RESEARCHER_COLOR,
   ROLE_BADGE_REVIEWER_COLOR,
+  ROLE_BADGE_TEAMMATE_COLOR,
   ROLE_BADGE_TESTER_COLOR,
 } from '../constants.js';
 export const ENGLISH_NAMES_50: readonly string[] = [
@@ -81,18 +83,18 @@ export const AGENT_ROLES: readonly AgentRoleDefinition[] = [
   },
   {
     id: 'Architect',
-    name: 'Architect',
-    icon: '🏛️',
+    name: 'Software Architect',
+    icon: '📐',
     badgeColor: ROLE_BADGE_ARCHITECT_COLOR,
-    description: 'Designs systems, defines APIs, and coordinates implementations.',
+    description: 'Designs system architectures, schemas, protocols, and high-level structure.',
     canDelegate: true,
   },
   {
     id: 'Coder',
-    name: 'Full-Stack Coder',
+    name: 'Software Engineer',
     icon: '💻',
     badgeColor: ROLE_BADGE_CODER_COLOR,
-    description: 'Implements features, fixes bugs, and writes clean code.',
+    description: 'Implements clean code, refactors logic, and fixes workspace bugs.',
     canDelegate: false,
   },
   {
@@ -100,31 +102,31 @@ export const AGENT_ROLES: readonly AgentRoleDefinition[] = [
     name: 'Researcher',
     icon: '🔍',
     badgeColor: ROLE_BADGE_RESEARCHER_COLOR,
-    description: 'Gathers context, scans documentation, and inspects dependencies.',
+    description: 'Gathers web intelligence, scans documentation, and analyzes references.',
     canDelegate: false,
   },
   {
     id: 'Reviewer',
     name: 'Code Reviewer',
-    icon: '📝',
+    icon: '🛡️',
     badgeColor: ROLE_BADGE_REVIEWER_COLOR,
-    description: 'Reviews pull requests, audits code quality, and checks security.',
+    description: 'Performs static analysis, reviews pull requests, and audits code quality.',
     canDelegate: false,
   },
   {
     id: 'Tester',
-    name: 'QA & Tester',
+    name: 'QA & Test Engineer',
     icon: '🧪',
     badgeColor: ROLE_BADGE_TESTER_COLOR,
-    description: 'Writes test suites, discovers edge cases, and verifies behaviors.',
+    description: 'Writes unit tests, verifies edge cases, and ensures quality assurance.',
     canDelegate: false,
   },
   {
     id: 'DevOps',
     name: 'DevOps & SRE',
-    icon: '⚙️',
+    icon: '🚀',
     badgeColor: ROLE_BADGE_DEVOPS_COLOR,
-    description: 'Manages builds, pipelines, dependencies, and deployment config.',
+    description: 'Automates builds, packaging, CI pipelines, and terminal tooling.',
     canDelegate: false,
   },
   {
@@ -169,7 +171,34 @@ export function getAllRoles(): readonly AgentRoleDefinition[] {
 }
 
 export function getRoleDefinition(roleId: string | undefined): AgentRoleDefinition {
-  const match = AGENT_ROLES.find((r) => r.id.toLowerCase() === (roleId || '').toLowerCase());
+  const norm = (roleId || '').toLowerCase().trim();
+  if (norm === 'designer' || norm.includes('design')) {
+    return {
+      id: 'Designer',
+      name: 'UI/UX Designer',
+      icon: '🎨',
+      badgeColor: ROLE_BADGE_DESIGNER_COLOR,
+      description: 'Crafts pixel art, CSS aesthetics, layouts, and responsive components.',
+      canDelegate: false,
+    };
+  }
+  if (norm === 'teammate' || norm.includes('break')) {
+    return {
+      id: 'Teammate',
+      name: 'Teammate (On Break)',
+      icon: '☕',
+      badgeColor: ROLE_BADGE_TEAMMATE_COLOR,
+      description: 'Resting in the Break Room (coffee, snack, Steam Deck) ready for delegation.',
+      canDelegate: false,
+    };
+  }
+  if (norm === 'software architect') return AGENT_ROLES[1];
+  if (norm === 'software engineer') return AGENT_ROLES[2];
+  if (norm === 'code reviewer') return AGENT_ROLES[4];
+  if (norm === 'test engineer') return AGENT_ROLES[5];
+  if (norm === 'devops engineer') return AGENT_ROLES[6];
+
+  const match = AGENT_ROLES.find((r) => r.id.toLowerCase() === norm);
   return (
     match || {
       id: 'Generalist',
@@ -220,7 +249,13 @@ export function getAgentProfile(
   const profiles = loadAgentProfiles();
   const key = String(agentId);
   if (profiles[key]) {
-    return profiles[key];
+    const p = profiles[key];
+    if (!isLeadOrFirst && p.role === 'Lead') {
+      p.role = 'Coder';
+      profiles[key] = p;
+      saveAgentProfiles(profiles);
+    }
+    return p;
   }
 
   const assignedName = getRandomEnglishName(existingNames);

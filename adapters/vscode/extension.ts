@@ -5,6 +5,9 @@ import {
   COMMAND_EXPORT_DEFAULT_LAYOUT,
   COMMAND_SHOW_PANEL,
   CONFIG_KEY_AUTO_SHOW_PANEL,
+  LEGACY_COMMAND_EXPORT_DEFAULT_LAYOUT,
+  LEGACY_COMMAND_SHOW_PANEL,
+  LEGACY_VIEW_ID,
   VIEW_ID,
 } from './constants.js';
 import { CopilotAgentsViewProvider } from './CopilotAgentsViewProvider.js';
@@ -14,7 +17,7 @@ let providerInstance: CopilotAgentsViewProvider | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
   console.log(
-    `[CopilotAgents] COPILOT_AGENTS_DEBUG=${process.env.COPILOT_AGENTS_DEBUG ?? 'not set'}`,
+    `[PixelOffice] COPILOT_AGENTS_DEBUG=${process.env.COPILOT_AGENTS_DEBUG ?? 'not set'}`,
   );
 
   // Shared file-backed state adapter (VS Code namespace in ~/.copilot-agents/config.json).
@@ -28,15 +31,30 @@ export function activate(context: vscode.ExtensionContext) {
   providerInstance = provider;
 
   context.subscriptions.push(vscode.window.registerWebviewViewProvider(VIEW_ID, provider));
+  try {
+    context.subscriptions.push(vscode.window.registerWebviewViewProvider(LEGACY_VIEW_ID, provider));
+  } catch {
+    // Ignore legacy view registration error if already claimed
+  }
 
   context.subscriptions.push(
     vscode.commands.registerCommand(COMMAND_SHOW_PANEL, () => {
       vscode.commands.executeCommand(`${VIEW_ID}.focus`);
     }),
   );
+  context.subscriptions.push(
+    vscode.commands.registerCommand(LEGACY_COMMAND_SHOW_PANEL, () => {
+      vscode.commands.executeCommand(`${VIEW_ID}.focus`);
+    }),
+  );
 
   context.subscriptions.push(
     vscode.commands.registerCommand(COMMAND_EXPORT_DEFAULT_LAYOUT, () => {
+      provider.exportDefaultLayout();
+    }),
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand(LEGACY_COMMAND_EXPORT_DEFAULT_LAYOUT, () => {
       provider.exportDefaultLayout();
     }),
   );

@@ -41,11 +41,13 @@ export function closestFreeSeat(
   seats: ReadonlyMap<string, SeatLike>,
   col: number,
   row: number,
+  filter?: (seat: SeatLike) => boolean,
 ): string | null {
   let best: string | null = null;
   let bestDist = Infinity;
   for (const [uid, seat] of seats) {
     if (seat.assigned) continue;
+    if (filter && !filter(seat)) continue;
     const d = Math.abs(seat.seatCol - col) + Math.abs(seat.seatRow - row);
     if (d < bestDist) {
       best = uid;

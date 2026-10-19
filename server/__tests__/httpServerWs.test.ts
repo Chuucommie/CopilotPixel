@@ -6,8 +6,8 @@ import { WebSocket } from 'ws';
 
 import { WS_CLOSE_FORBIDDEN_ORIGIN, WS_CLOSE_UNAUTHORIZED } from '../src/constants.js';
 
-// Isolated temp HOME: the server writes ~/.copilot-agents/{server.json,servers/}
-// and the consent assertions below read ~/.copilot-agents/config.json.
+// Isolated temp HOME: the server writes ~/.pixel-office/{server.json,servers/}
+// and the consent assertions below read ~/.pixel-office/config.json.
 let tmpBase: string;
 
 vi.mock('os', async () => {
@@ -91,7 +91,7 @@ function waitForMessage(socket: WebSocket, type: string, ms = 2_000): Promise<un
 
 function readHooksConsent(): boolean {
   try {
-    const raw = fs.readFileSync(path.join(tmpBase, '.copilot-agents', 'config.json'), 'utf-8');
+    const raw = fs.readFileSync(path.join(tmpBase, '.pixel-office', 'config.json'), 'utf-8');
     const consent = (JSON.parse(raw) as { hooksConsent?: Record<string, string> }).hooksConsent;
     return consent?.copilot === 'granted';
   } catch {
@@ -105,7 +105,7 @@ describe('/ws connection gate', () => {
 
   beforeEach(() => {
     tmpBase = fs.mkdtempSync(path.join(os.tmpdir(), 'pxl-ws-test-'));
-    fs.mkdirSync(path.join(tmpBase, '.copilot-agents'), { recursive: true });
+    fs.mkdirSync(path.join(tmpBase, '.pixel-office'), { recursive: true });
     server = new CopilotAgentsServer();
   });
 
@@ -257,7 +257,7 @@ describe('/ws privileged-message gate', () => {
 
   beforeEach(() => {
     tmpBase = fs.mkdtempSync(path.join(os.tmpdir(), 'pxl-ws-priv-'));
-    fs.mkdirSync(path.join(tmpBase, '.copilot-agents'), { recursive: true });
+    fs.mkdirSync(path.join(tmpBase, '.pixel-office'), { recursive: true });
     sideEffects = [];
     server = new CopilotAgentsServer();
   });

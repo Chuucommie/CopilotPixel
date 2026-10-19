@@ -66,7 +66,7 @@ export function parseArgs(argv: string[]): CliArgs {
       args.host = argv[i + 1];
       i++;
     } else if (argv[i] === '--help') {
-      console.log(`Usage: copilot-agents [options] / copilot-pixel [options]
+      console.log(`Usage: pixel-office [options] / copilot-pixel [options]
 
 Options:
   --port, -p <number>   Port to listen on (default: OS-assigned ephemeral port)
@@ -97,7 +97,7 @@ Options:
  */
 function copyHookScriptOrReport(packageRoot: string, context = ''): boolean {
   if (copyHookScript(packageRoot)) return true;
-  console.error(`[CopilotAgents] Hooks NOT installed${context}: hook script missing.`);
+  console.error(`[PixelOffice] Hooks NOT installed${context}: hook script missing.`);
   return false;
 }
 
@@ -108,7 +108,7 @@ async function main(): Promise<void> {
   try {
     args = parseArgs(process.argv.slice(2));
   } catch (err) {
-    console.error(`[CopilotAgents] ${err instanceof Error ? err.message : String(err)}`);
+    console.error(`[PixelOffice] ${err instanceof Error ? err.message : String(err)}`);
     process.exit(1);
   }
 
@@ -121,7 +121,7 @@ async function main(): Promise<void> {
   // External asset directories are merged at startup too, so directories added
   // in a previous session survive a restart. buildAssetCache is the shared
   // loader used by both the standalone server and the VS Code adapter.
-  console.log('[CopilotAgents] Loading assets...');
+  console.log('[PixelOffice] Loading assets...');
   const assetCache: AssetCache = await buildAssetCache(
     distRoot,
     readConfig().externalAssetDirectories,
@@ -130,7 +130,7 @@ async function main(): Promise<void> {
   const petCount = assetCache.pets?.pets.length ?? 0;
   const furnitureCount = assetCache.furniture?.catalog.length ?? 0;
   console.log(
-    `[CopilotAgents] Assets loaded: ${charCount} characters, ${petCount} pets, ${furnitureCount} furniture items`,
+    `[PixelOffice] Assets loaded: ${charCount} characters, ${petCount} pets, ${furnitureCount} furniture items`,
   );
 
   // ── Store + adapter (shared settings + standalone-scoped agents/seats) ──
@@ -171,16 +171,16 @@ async function main(): Promise<void> {
             currentConfig.token,
           );
         } catch (err) {
-          console.error(`[CopilotAgents] ${err instanceof Error ? err.message : String(err)}`);
+          console.error(`[PixelOffice] ${err instanceof Error ? err.message : String(err)}`);
           return;
         }
-        console.log('[CopilotAgents] Hooks installed (user toggle)');
+        console.log('[PixelOffice] Hooks installed (user toggle)');
       } else {
         try {
           await provider.uninstallHooks();
-          console.log('[CopilotAgents] Hooks uninstalled (user toggle)');
+          console.log('[PixelOffice] Hooks uninstalled (user toggle)');
         } catch (err) {
-          console.error(`[CopilotAgents] ${err instanceof Error ? err.message : String(err)}`);
+          console.error(`[PixelOffice] ${err instanceof Error ? err.message : String(err)}`);
         }
       }
     };
@@ -219,7 +219,7 @@ async function main(): Promise<void> {
           sprites: Object.fromEntries(furniture.sprites),
         });
       }
-      console.log('[CopilotAgents] Assets reloaded (external directory change)');
+      console.log('[PixelOffice] Assets reloaded (external directory change)');
     };
 
     const config = await server.start({
@@ -252,21 +252,21 @@ async function main(): Promise<void> {
       }
       if (!consent) {
         console.log(
-          '[CopilotAgents] Hooks not installed: modifying the Copilot hook config needs one-time approval — open the URL below to review and approve it.',
+          '[PixelOffice] Hooks not installed: modifying the Copilot hook config needs one-time approval — open the URL below to review and approve it.',
         );
       } else if (copyHookScriptOrReport(packageRoot)) {
         try {
           await copilotProvider.installHooks(`http://127.0.0.1:${config.port}`, config.token);
-          console.log('[CopilotAgents] Hooks installed');
+          console.log('[PixelOffice] Hooks installed');
         } catch (err) {
-          console.error(`[CopilotAgents] ${err instanceof Error ? err.message : String(err)}`);
+          console.error(`[PixelOffice] ${err instanceof Error ? err.message : String(err)}`);
         }
       }
     } else {
       // Without this line, a persisted hooks-off makes startup skip the entire
       // consent/install flow with zero output — indistinguishable from a bug.
       console.log(
-        '[CopilotAgents] Hooks disabled — enable "Instant Detection (Hooks)" in the UI settings to install them.',
+        '[PixelOffice] Hooks disabled — enable "Instant Detection (Hooks)" in the UI settings to install them.',
       );
     }
 
@@ -275,7 +275,7 @@ async function main(): Promise<void> {
     const dirs = copilotProvider.getSessionDirs?.(cwd);
     if (dirs && dirs[0]) {
       const projectDir = dirs[0];
-      console.log(`[CopilotAgents] Scanning project dir: ${projectDir}`);
+      console.log(`[PixelOffice] Scanning project dir: ${projectDir}`);
       runtime.startProjectScan(projectDir);
       runtime.startExternalScanning(projectDir);
       runtime.startStaleCheck();
@@ -291,7 +291,7 @@ async function main(): Promise<void> {
     const displayHost =
       args.host === '0.0.0.0' || args.host === '::' || args.host === '' ? '127.0.0.1' : args.host;
     console.log(
-      `\n  CopilotAgents server running at http://${displayHost}:${config.port}/?token=${config.token}\n`,
+      `\n  Pixel Office server running at http://${displayHost}:${config.port}/?token=${config.token}\n`,
     );
 
     // ── Graceful shutdown ──

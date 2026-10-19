@@ -1,3 +1,17 @@
+export interface TeamDialogueMessage {
+  id: string;
+  timestamp: number;
+  fromAgentId: number;
+  fromName: string;
+  fromRole: string;
+  toAgentId?: number;
+  toName?: string;
+  toRole?: string;
+  text: string;
+  context: 'delegation' | 'ai_progress' | 'completion' | 'break_room' | 'chat';
+  aiAction?: string;
+}
+
 export {
   DEFAULT_COLS,
   DEFAULT_ROWS,
@@ -67,8 +81,14 @@ export interface FurnitureInstance {
   y: number;
   /** Y value used for depth sorting (typically bottom edge) */
   zY: number;
+  /** Logical target width in unscaled pixels (for high-DPI sprites) */
+  width?: number;
+  /** Logical target height in unscaled pixels (for high-DPI sprites) */
+  height?: number;
   /** Render-time horizontal flip flag (for mirrored side variants) */
   mirrored?: boolean;
+  /** Original furniture catalog type (e.g. CLOCK, PC_FRONT, etc.) */
+  type?: string;
 }
 
 export interface ToolActivity {
@@ -97,6 +117,8 @@ export type EditTool = (typeof EditTool)[keyof typeof EditTool];
 export interface FurnitureCatalogEntry {
   type: string; // asset ID from furniture manifest
   label: string;
+  width: number;
+  height: number;
   footprintW: number;
   footprintH: number;
   sprite: SpriteData;
@@ -167,6 +189,15 @@ export interface OfficeLayout {
   areas?: AreaDefinition[];
   /** Per-tile Area label, parallel to tiles array. null = no area assignment. */
   areaTiles?: Array<string | null>;
+}
+
+export interface BreakSpot {
+  col: number;
+  row: number;
+  breakType: 'coffee' | 'tea' | 'snack' | 'steamdeck';
+  state: CharacterState;
+  dir: Direction;
+  isSitting: boolean;
 }
 
 export interface Character {
@@ -271,11 +302,29 @@ export interface Character {
   isCopilotPixelAgent?: boolean;
   /** True if currently taking a break in office common areas */
   isTakingBreak?: boolean;
+  /** True if the agent is seated in a chair or sofa (applies sitting offset and seated pose) */
+  isSitting?: boolean;
+  /** Pending break spot when walking to a new break activity */
+  pendingBreakSpot?: BreakSpot | null;
   /** Active break activity */
-  breakType?: 'coffee' | 'snack' | 'steamdeck' | null;
+  breakType?: 'coffee' | 'tea' | 'snack' | 'steamdeck' | null;
   /** Break target tile */
   breakTargetCol?: number | null;
   breakTargetRow?: number | null;
+  /** Name of the Lead agent who spawned this subagent */
+  spawnedByName?: string;
+  /** Timestamp when current break started */
+  breakStartTime?: number;
+  /** Accumulated break duration in seconds */
+  breakDuration?: number;
+  /** Speech bubble text for inter-agent dialogue */
+  speechBubbleText?: string | null;
+  /** Timer countdown for speech bubble display */
+  speechBubbleTimer?: number;
+  /** Elder Scrolls Radiant AI current routine activity name */
+  routineActivity?: string;
+  /** Emoji icon for current routine */
+  routineIcon?: string;
 
   // -- Context gauge --
   /** Tokens in the agent's context as of its newest turn; 0 until reported.

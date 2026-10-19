@@ -7,10 +7,10 @@
 # that's expected and harmless until Modelina catches up.
 asyncapi: 3.0.0
 info:
-  title: CopilotAgents Protocol
+  title: Pixel Office Protocol
   version: 1.0.0
   description: |
-    Bidirectional WebSocket protocol between the CopilotAgents server and any UI client
+    Bidirectional WebSocket protocol between the Pixel Office server and any UI client
     (the bundled VS Code webview, the standalone browser SPA, or future third-party
     clients). The server watches AI-coding-agent transcripts, parses tool activity, 
     owns office layout, and streams events to all connected clients. 
@@ -22,14 +22,14 @@ info:
   license:
     name: MIT
   contact:
-    name: CopilotAgents
-    url: https://github.com/Chuucommie/CopilotAgents
+    name: Pixel Office
+    url: https://github.com/Chuucommie/PixelOffice
 
 servers:
   local:
     host: 127.0.0.1:3100
     protocol: ws
-    description: Local CopilotAgents server (default port 3100)
+    description: Local Pixel Office server (default port 3100)
     pathname: /ws
 
 channels:
@@ -118,8 +118,9 @@ components:
         - $ref: '#/components/schemas/WorkspaceFolders'
         # Diagnostics
         - $ref: '#/components/schemas/AgentDiagnostics'
-        # Autonomous agent orders
+        # Autonomous agent orders & team dialogue
         - $ref: '#/components/schemas/AgentOrderProgress'
+        - $ref: '#/components/schemas/AgentTeamDialogue'
       discriminator: type
 
     ClientMessage:
@@ -811,6 +812,33 @@ components:
         delegation:
           $ref: '#/components/schemas/AgentOrderDelegation'
 
+    AgentTeamDialogue:
+      description: Real-time dialogue exchange between autonomous agents.
+      type: object
+      additionalProperties: false
+      required: [type, fromAgentId, fromName, fromRole, text, context]
+      properties:
+        type:
+          const: agentTeamDialogue
+        fromAgentId:
+          type: integer
+        fromName:
+          type: string
+        fromRole:
+          type: string
+        toAgentId:
+          type: integer
+        toName:
+          type: string
+        toRole:
+          type: string
+        text:
+          type: string
+        context:
+          type: string
+        aiAction:
+          type: string
+
     # ── Client message variants ────────────────────────────────────
 
     WebviewReady:
@@ -873,7 +901,7 @@ components:
             $ref: '#/components/schemas/SeatAssignment'
 
     SaveLayout:
-      description: Save the office layout to ~/.copilot-agents/layout.json.
+      description: Save the office layout to ~/.pixel-office/layout.json.
       type: object
       additionalProperties: false
       required: [type, layout]

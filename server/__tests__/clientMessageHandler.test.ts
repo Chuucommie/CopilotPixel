@@ -184,7 +184,7 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
   describe('setHooksEnabled persistence', () => {
     /** Put our command on every installed event, as a real install would. */
     function seedInstalledHooks(): void {
-      const hookPath = path.join(tempHome, '.copilot-agents', 'hooks', 'copilot-hook.js');
+      const hookPath = path.join(tempHome, '.pixel-office', 'hooks', 'copilot-hook.js');
       const entry = { type: 'command', exec: 'node', args: [hookPath], timeoutSec: 5 };
       const configPath = path.join(tempHome, '.copilot', 'hooks', 'copilotagents.json');
       fs.mkdirSync(path.dirname(configPath), { recursive: true });

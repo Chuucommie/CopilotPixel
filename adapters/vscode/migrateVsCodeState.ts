@@ -123,12 +123,12 @@ export function migrateVsCodeState(context: vscode.ExtensionContext, adapter: St
 
   if (pending.length > 0) {
     console.warn(
-      `[CopilotAgents] Migration incomplete -- ${pending.length} legacy VS Code ` +
+      `[PixelOffice] Migration incomplete -- ${pending.length} legacy VS Code ` +
         `key(s) still present. Will retry next activate. Keys: ${pending.join(', ')}`,
     );
     void vscode.window.showWarningMessage(
-      `CopilotAgents: ${pending.length} legacy setting(s) could not be migrated to ` +
-        `~/.copilot-agents/config.json. Check ~/.copilot-agents/ is writable.`,
+      `Pixel Office: ${pending.length} legacy setting(s) could not be migrated to ` +
+        `~/.pixel-office/config.json. Check ~/.pixel-office/ is writable.`,
     );
   }
 }

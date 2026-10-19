@@ -71,7 +71,7 @@ describe('FileStateAdapter', () => {
     expect(vscode.getSetting('copilot-agents.watchAllSessions', null)).toBe(true);
     expect(standalone.getSetting('copilot-agents.watchAllSessions', null)).toBe(false);
 
-    const configPath = path.join(tempHome, '.copilot-agents', 'config.json');
+    const configPath = path.join(tempHome, '.pixel-office', 'config.json');
     const parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as Record<
       string,
       Record<string, unknown>
@@ -84,7 +84,7 @@ describe('FileStateAdapter', () => {
     const adapter = new FileStateAdapter({ namespace: 'standalone' });
     expect(adapter.getSetting('copilot-agents.unknownKey', 'fallback')).toBe('fallback');
     adapter.setSetting('copilot-agents.unknownKey', 'ignored');
-    const configPath = path.join(tempHome, '.copilot-agents', 'config.json');
+    const configPath = path.join(tempHome, '.pixel-office', 'config.json');
     expect(fs.existsSync(configPath)).toBe(false);
   });
 
@@ -99,7 +99,7 @@ describe('FileStateAdapter', () => {
   it('persists settings under namespace in config.json with clean field names', () => {
     const adapter = new FileStateAdapter({ namespace: 'standalone' });
     adapter.setSetting('copilot-agents.soundEnabled', false);
-    const configPath = path.join(tempHome, '.copilot-agents', 'config.json');
+    const configPath = path.join(tempHome, '.pixel-office', 'config.json');
     const raw = fs.readFileSync(configPath, 'utf-8');
     const parsed = JSON.parse(raw) as Record<string, Record<string, unknown>>;
     expect(parsed.standalone.soundEnabled).toBe(false);
@@ -129,10 +129,10 @@ describe('FileStateAdapter', () => {
     expect(adapter.loadAgents()).toEqual(agents);
   });
 
-  it('writes state at ~/.copilot-agents/<namespace>-state.json', () => {
+  it('writes state at ~/.pixel-office/<namespace>-state.json', () => {
     const adapter = new FileStateAdapter({ namespace: 'vscode' });
     adapter.saveSeats({ '1': { palette: 2, hueShift: 45 } });
-    const stateFile = path.join(tempHome, '.copilot-agents', 'vscode-state.json');
+    const stateFile = path.join(tempHome, '.pixel-office', 'vscode-state.json');
     expect(fs.existsSync(stateFile)).toBe(true);
   });
 

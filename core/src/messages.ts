@@ -39,7 +39,8 @@ export type ServerMessage =
   | AreaMappingsLoaded
   | WorkspaceFolders
   | AgentDiagnostics
-  | AgentOrderProgress;
+  | AgentOrderProgress
+  | AgentTeamDialogue;
 
 export type ClientMessage =
   | WebviewReady
@@ -345,6 +346,19 @@ export interface AgentOrderDelegation {
   spawnedName?: string;
   task?: string;
   additionalProperties?: Record<string, any>;
+}
+
+export interface AgentTeamDialogue {
+  type: 'agentTeamDialogue';
+  fromAgentId: number;
+  fromName: string;
+  fromRole: string;
+  toAgentId?: number;
+  toName?: string;
+  toRole?: string;
+  text: string;
+  context: string;
+  aiAction?: string;
 }
 
 export interface WebviewReady {

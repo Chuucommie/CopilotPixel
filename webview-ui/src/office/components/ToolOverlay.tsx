@@ -13,9 +13,6 @@ import {
   CONTEXT_GAUGE_HEIGHT_PX,
   CONTEXT_GAUGE_WIDTH_PX,
   CONTEXT_WARN_THRESHOLD,
-  COPILOT_PIXEL_BADGE_BG,
-  COPILOT_PIXEL_BADGE_BORDER,
-  COPILOT_PIXEL_BADGE_TEXT,
   TEAM_LEAD_COLOR,
   TOOL_OVERLAY_VERTICAL_OFFSET,
 } from '../../constants.js';
@@ -126,7 +123,8 @@ export function ToolOverlay({
   const hoveredId = officeState.hoveredAgentId;
 
   // All character IDs
-  const allIds = [...agents, ...subagentCharacters.map((s) => s.id)];
+  // All character IDs (deduplicated to prevent duplicate key or stacking overlay cascades)
+  const allIds = Array.from(new Set([...agents, ...subagentCharacters.map((s) => s.id)]));
 
   return (
     <>
@@ -138,13 +136,30 @@ export function ToolOverlay({
         const isHovered = hoveredId === id;
         const isSub = ch.isSubagent;
 
-        // Only show for hovered or selected agents (unless always-show is on)
-        if (!alwaysShowOverlay && !isSelected && !isHovered) return null;
-
         // Position above character
-        const sittingOffset = ch.state === CharacterState.TYPE ? CHARACTER_SITTING_OFFSET_PX : 0;
+        const sittingOffset =
+          ch.state === CharacterState.TYPE || ch.isSitting ? CHARACTER_SITTING_OFFSET_PX : 0;
         const screenX = project.toScreenX(ch.x);
         const screenY = project.toScreenY(ch.y + sittingOffset - TOOL_OVERLAY_VERTICAL_OFFSET);
+
+        // Only show for hovered or selected agents (unless always-show is on)
+        if (!alwaysShowOverlay && !isSelected && !isHovered) {
+          if (ch.speechBubbleText && (ch.speechBubbleTimer || 0) > 0) {
+            return (
+              <div
+                key={`bubble-${id}`}
+                className="absolute flex flex-col items-center -translate-x-1/2 pointer-events-none z-50"
+                style={{ left: screenX, top: screenY - 24 }}
+              >
+                <div className="px-3 py-1.5 bg-white/95 text-slate-900 border border-slate-700 font-semibold text-2xs rounded-lg shadow-xl animate-bounce max-w-[280px] text-center whitespace-normal break-words leading-tight relative">
+                  <span>{ch.speechBubbleText}</span>
+                  <div className="absolute left-1/2 -bottom-1 -translate-x-1/2 w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[5px] border-t-white" />
+                </div>
+              </div>
+            );
+          }
+          return null;
+        }
 
         // A "Done" agent (finished turn: waiting bubble without awaitingInput)
         // shows ONLY its floating green checkmark bubble, never the label panel
@@ -170,16 +185,15 @@ export function ToolOverlay({
         const subHasPermission = isSub && ch.bubbleType === 'permission';
         let activityText: string;
         if (ch.isTakingBreak) {
-          activityText = `☕ Break (${ch.breakType || 'relax'})`;
+          activityText = ch.routineActivity
+            ? `${ch.routineIcon || '⏳'} ${ch.routineActivity}`
+            : `☕ Break (${ch.breakType || 'relax'})`;
         } else if (hasWaitingBubble && ch.waitingAwaitingInput) {
-          // Idle, waiting on the user -> dedicated label. A finished turn (Stop)
-          // shows only the checkmark and falls through to the normal idle text.
           activityText = WAITING_INPUT_ACTIVITY_TEXT;
         } else if (isSub) {
           if (subHasPermission) {
             activityText = 'Needs approval';
           } else {
-            // Show active subagent tool status if any, otherwise fall back to subtask label
             const sub = subagentCharacters.find((s) => s.id === id);
             const rows = sub ? subagentTools[sub.parentAgentId]?.[sub.parentToolId] : undefined;
             const activeRow = rows ? [...rows].reverse().find((t) => !t.done) : undefined;
@@ -193,6 +207,9 @@ export function ToolOverlay({
             ch.bubbleType,
             ch.waitingAwaitingInput ?? false,
           );
+          if (!ch.isActive && ch.routineActivity && activityText === 'Waiting for tasks') {
+            activityText = `${ch.routineIcon || '💻'} ${ch.routineActivity}`;
+          }
         }
 
         // Determine dot color
@@ -232,6 +249,12 @@ export function ToolOverlay({
             data-testid="agent-overlay"
             data-agent-id={id}
           >
+            {ch.speechBubbleText && (ch.speechBubbleTimer || 0) > 0 && (
+              <div className="mb-2 px-3 py-1.5 bg-white/95 text-slate-900 border border-slate-700 font-semibold text-2xs rounded-lg shadow-xl animate-bounce max-w-[280px] text-center whitespace-normal break-words leading-tight pointer-events-none relative z-50">
+                <span>{ch.speechBubbleText}</span>
+                <div className="absolute left-1/2 -bottom-1 -translate-x-1/2 w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[5px] border-t-white" />
+              </div>
+            )}
             <div className="flex items-center border-border px-8 pt-2 pb-4 gap-5 pixel-panel whitespace-nowrap max-w-2xs">
               {dotColor && (
                 <span
@@ -267,20 +290,6 @@ export function ToolOverlay({
                       </span>
                     );
                   })()}
-                  {ch.isCopilotPixelAgent && (
-                    <span
-                      className="text-2xs px-1.5 py-0.5 rounded border leading-none shrink-0 font-bold"
-                      style={{
-                        backgroundColor: COPILOT_PIXEL_BADGE_BG,
-                        borderColor: COPILOT_PIXEL_BADGE_BORDER,
-                        color: COPILOT_PIXEL_BADGE_TEXT,
-                        fontSize: '10px',
-                      }}
-                      title="Persistent CopilotPixel Background Agent"
-                    >
-                      👾 CPX
-                    </span>
-                  )}
                 </div>
                 <span
                   className="overflow-hidden text-ellipsis block leading-tight font-medium"

@@ -66,6 +66,14 @@ export function isReadingToolName(name: string | null | undefined): boolean {
   return FALLBACK_READING_KEYWORDS.some((kw) => lower.includes(kw));
 }
 
+const FALLBACK_SUBAGENT_NAMES = ['task', 'agent', 'invoke_subagent', 'browser_subagent', 'subtask'];
+
 export function isSubagentToolName(name: string | null | undefined): boolean {
-  return typeof name === 'string' && providerCaps.subagentToolNames.has(name);
+  if (typeof name !== 'string' || !name.trim()) return false;
+  if (providerCaps.subagentToolNames.has(name)) return true;
+  const lower = name.toLowerCase();
+  for (const tool of providerCaps.subagentToolNames) {
+    if (tool.toLowerCase() === lower) return true;
+  }
+  return FALLBACK_SUBAGENT_NAMES.some((kw) => lower.includes(kw));
 }

@@ -20,9 +20,14 @@ const HUE_SHIFT_RANGE_DEG = 271;
  *
  * @param paletteCount - Total number of available palettes (e.g., 6)
  * @param paletteCounts - Array of counts per palette (length must equal paletteCount)
+ * @param allowHueShift - Whether to permit hue shifting for rounds beyond N (false to preserve human skin tones)
  * @returns Selected palette index and hue shift in degrees
  */
-export function pickDiversePalette(paletteCount: number, paletteCounts: number[]): PalettePick {
+export function pickDiversePalette(
+  paletteCount: number,
+  paletteCounts: number[],
+  allowHueShift: boolean = true,
+): PalettePick {
   if (paletteCounts.length !== paletteCount) {
     throw new Error(
       `paletteCounts length (${paletteCounts.length}) must equal paletteCount (${paletteCount})`,
@@ -36,9 +41,8 @@ export function pickDiversePalette(paletteCount: number, paletteCounts: number[]
   }
   const palette = available[Math.floor(Math.random() * available.length)];
 
-  // First round (minCount === 0): no hue shift. Subsequent rounds: random ≥45°.
   let hueShift = 0;
-  if (minCount > 0) {
+  if (allowHueShift && minCount > 0) {
     hueShift = HUE_SHIFT_MIN_DEG + Math.floor(Math.random() * HUE_SHIFT_RANGE_DEG);
   }
 

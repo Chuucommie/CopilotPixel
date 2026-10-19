@@ -63,9 +63,9 @@ exports.run = async () => {
   if (!extension) throw new Error('Packaged extension was not discoverable: ${extensionId}');
   await extension.activate();
   if (!extension.isActive) throw new Error('Packaged extension did not activate');
-  await vscode.commands.executeCommand('copilot-agents.showPanel');
+  await vscode.commands.executeCommand('pixel-office.showPanel');
 
-  const registryDir = path.join(os.homedir(), '.copilot-agents', 'servers');
+  const registryDir = path.join(os.homedir(), '.pixel-office', 'servers');
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
     try {

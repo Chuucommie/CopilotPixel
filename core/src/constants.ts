@@ -9,9 +9,10 @@
 // ── Hook API ─────────────────────────────────────────────────
 
 export const HOOK_API_PREFIX = '/api/hooks';
-export const SERVER_JSON_DIR = '.copilot-agents';
+export const SERVER_JSON_DIR = '.pixel-office';
 export const SERVER_JSON_NAME = 'server.json';
-export const HOOK_SCRIPTS_DIR = '.copilot-agents/hooks';
+export const HOOK_SCRIPTS_DIR = '.pixel-office/hooks';
+export const LEGACY_SERVER_JSON_DIRS = ['.copilot-pixel', '.copilot-agents', '.pixel-agents'];
 
 // ── Display ──────────────────────────────────────────────────
 

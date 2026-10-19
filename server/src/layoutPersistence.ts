@@ -7,6 +7,7 @@ import {
   LAYOUT_FILE_NAME,
   LAYOUT_FILE_POLL_INTERVAL_MS,
   LAYOUT_REVISION_KEY,
+  LEGACY_LAYOUT_FILE_DIRS,
 } from './constants.js';
 
 export interface LayoutWatcher {
@@ -21,11 +22,22 @@ function getLayoutFilePath(): string {
 export function readLayoutFromFile(): Record<string, unknown> | null {
   const filePath = getLayoutFilePath();
   try {
-    if (!fs.existsSync(filePath)) return null;
+    if (!fs.existsSync(filePath)) {
+      for (const legacyDir of LEGACY_LAYOUT_FILE_DIRS) {
+        const legacyPath = path.join(os.homedir(), legacyDir, LAYOUT_FILE_NAME);
+        if (fs.existsSync(legacyPath)) {
+          const raw = fs.readFileSync(legacyPath, 'utf-8');
+          const layout = JSON.parse(raw) as Record<string, unknown>;
+          writeLayoutToFile(layout);
+          return layout;
+        }
+      }
+      return null;
+    }
     const raw = fs.readFileSync(filePath, 'utf-8');
     return JSON.parse(raw) as Record<string, unknown>;
   } catch (err) {
-    console.error('[CopilotAgents] Failed to read layout file:', err);
+    console.error('[PixelOffice] Failed to read layout file:', err);
     return null;
   }
 }
@@ -42,7 +54,7 @@ export function writeLayoutToFile(layout: Record<string, unknown>): void {
     fs.writeFileSync(tmpPath, json, 'utf-8');
     fs.renameSync(tmpPath, filePath);
   } catch (err) {
-    console.error('[CopilotAgents] Failed to write layout file:', err);
+    console.error('[PixelOffice] Failed to write layout file:', err);
   }
 }
 
@@ -73,17 +85,17 @@ export function loadLayout(
     const defaultRevision = (defaultLayout?.[LAYOUT_REVISION_KEY] as number) ?? 0;
     if (defaultRevision > fileRevision) {
       console.log(
-        `[CopilotAgents] Layout revision outdated (${fileRevision} < ${defaultRevision}), resetting to bundled default`,
+        `[PixelOffice] Layout revision outdated (${fileRevision} < ${defaultRevision}), resetting to bundled default`,
       );
       writeLayoutToFile(defaultLayout!);
       return { layout: defaultLayout!, wasReset: true };
     }
-    console.log('[CopilotAgents] Layout loaded from file');
+    console.log('[PixelOffice] Layout loaded from file');
     return { layout: fromFile, wasReset: false };
   }
 
   if (defaultLayout) {
-    console.log('[CopilotAgents] Writing bundled default layout to file');
+    console.log('[PixelOffice] Writing bundled default layout to file');
     writeLayoutToFile(defaultLayout);
     return { layout: defaultLayout, wasReset: false };
   }
@@ -129,10 +141,10 @@ export function watchLayoutFile(
 
       const raw = fs.readFileSync(filePath, 'utf-8');
       const layout = JSON.parse(raw) as Record<string, unknown>;
-      console.log('[CopilotAgents] External layout change detected');
+      console.log('[PixelOffice] External layout change detected');
       onExternalChange(layout);
     } catch (err) {
-      console.error('[CopilotAgents] Error checking layout file:', err);
+      console.error('[PixelOffice] Error checking layout file:', err);
     }
   }
 
@@ -145,7 +157,7 @@ export function watchLayoutFile(
       });
       fsWatcher.on('error', (err) => {
         // fs.watch can be unreliable on macOS (kqueue) and may hit inotify limits on Linux
-        console.log(`[CopilotAgents] Layout: fs.watch error: ${err.message}`);
+        console.log(`[PixelOffice] Layout: fs.watch error: ${err.message}`);
         fsWatcher?.close();
         fsWatcher = null;
       });

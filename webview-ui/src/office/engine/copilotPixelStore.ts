@@ -1,7 +1,11 @@
+import type { TeamDialogueMessage } from '../types.js';
 // webview-ui/src/office/engine/copilotPixelStore.ts
 // Persistent store for CopilotPixel background agents that never disappear.
 
-const STORAGE_KEY = 'copilotpixel_persistent_agents';
+const STORAGE_KEY = 'pixeloffice_persistent_agents';
+const LEGACY_STORAGE_KEY = 'copilotpixel_persistent_agents';
+const DIALOGUE_STORAGE_KEY = 'pixeloffice_team_dialogue';
+const LEGACY_DIALOGUE_STORAGE_KEY = 'copilotpixel_team_dialogue';
 
 export interface PersistentAgentData {
   id: number;
@@ -18,7 +22,13 @@ export interface PersistentAgentData {
   orderProgressMessage?: string | null;
   orderModelName?: string | null;
   isTakingBreak?: boolean;
-  breakType?: 'coffee' | 'snack' | 'steamdeck' | null;
+  isSitting?: boolean;
+  breakType?: 'coffee' | 'tea' | 'snack' | 'steamdeck' | null;
+  isTeamLead?: boolean;
+  leadAgentId?: number;
+  spawnedByName?: string;
+  breakStartTime?: number;
+  breakDuration?: number;
 }
 
 const memoryStore: Record<string, string> = {};
@@ -53,7 +63,7 @@ function getStorage(): SimpleStorage {
 export function loadCopilotPixelAgents(): PersistentAgentData[] {
   const storage = getStorage();
   try {
-    const raw = storage.getItem(STORAGE_KEY);
+    const raw = storage.getItem(STORAGE_KEY) || storage.getItem(LEGACY_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -91,4 +101,28 @@ export function removeCopilotPixelAgent(id: number): void {
 export function clearCopilotPixelAgentsStore(): void {
   const storage = getStorage();
   storage.removeItem(STORAGE_KEY);
+}
+
+export function loadTeamDialogue(): TeamDialogueMessage[] {
+  const storage = getStorage();
+  try {
+    const raw =
+      storage.getItem(DIALOGUE_STORAGE_KEY) || storage.getItem(LEGACY_DIALOGUE_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveTeamDialogue(dialogue: TeamDialogueMessage[]): void {
+  const storage = getStorage();
+  try {
+    // Keep at most 120 messages
+    const trimmed = dialogue.slice(-120);
+    storage.setItem(DIALOGUE_STORAGE_KEY, JSON.stringify(trimmed));
+  } catch {
+    // Ignore storage quota
+  }
 }

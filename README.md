@@ -1,12 +1,12 @@
-# CopilotPixel - Pixel Office for Copilot
+# Pixel Office - Virtual Office for AI Agents
 
-**CopilotPixel** is an interactive, retro pixel art virtual office for Visual Studio Code that brings your AI coding sessions to life. It visualizes the real-time activity, tool execution, background subagents, teammate delegation, and permissions of **GitHub Copilot** (CLI & agent runtime) and **Google Antigravity** agents inside a customizable office environment.
+**Pixel Office** is an interactive, retro pixel art virtual office for Visual Studio Code and Google Antigravity that brings your AI coding sessions to life. It visualizes the real-time activity, tool execution, background subagents, teammate delegation, and permissions of **GitHub Copilot** (CLI & agent runtime) and **Google Antigravity** agents inside a customizable office environment.
 
 ---
 
 > ### ⚠️ Trademark Disclaimer
 >
-> **CopilotPixel is an independent community-driven extension and is not affiliated with, endorsed by, or sponsored by GitHub, Inc. or Microsoft Corporation.**  
+> **Pixel Office is an independent community-driven extension and is not affiliated with, endorsed by, or sponsored by GitHub, Inc. or Microsoft Corporation.**  
 > GitHub, GitHub Copilot, VS Code, and Visual Studio are trademarks or registered trademarks of GitHub, Inc. or Microsoft Corporation in the United States and/or other countries.
 
 ---

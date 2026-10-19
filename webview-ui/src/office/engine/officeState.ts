@@ -38,15 +38,31 @@ import type {
   Seat,
   TileType as TileTypeVal,
 } from '../types.js';
-import { CharacterState, Direction, PetState, TILE_SIZE } from '../types.js';
+import {
+  CharacterState,
+  Direction,
+  PetState,
+  type TeamDialogueMessage,
+  TILE_SIZE,
+} from '../types.js';
+import {
+  getRandomBreakDialogue,
+  getRandomSoloThought,
+  inferWorkerRole,
+  type UsefulWorkerRole,
+  WORKER_NAMES,
+} from './breakRoomChatter.js';
 import { createCharacter, updateCharacter } from './characters.js';
 import {
   loadCopilotPixelAgents,
+  loadTeamDialogue,
   removeCopilotPixelAgent,
   saveOrUpdateCopilotPixelAgent,
+  saveTeamDialogue,
 } from './copilotPixelStore.js';
 import { advanceMatrixEffect, startMatrixEffect } from './matrixEffectState.js';
 import { createPet, updatePet } from './petEntity.js';
+import { RadiantRoutineEngine } from './routineManager.js';
 import { anchorTile, closestFreeSeat } from './seatPlacement.js';
 
 /** Internal helper: facing-tile coords for a seat. Returns null for invalid direction. */
@@ -58,6 +74,18 @@ function seatFacingOffset(direction: Direction): { dCol: number; dRow: number } 
 }
 
 export class OfficeState {
+  routineEngine: RadiantRoutineEngine = new RadiantRoutineEngine();
+  teamDialogue: TeamDialogueMessage[] = loadTeamDialogue();
+  breakSocialTimer: number = 0;
+  breakWanderTimer: number = 0;
+  activeBreakTimeouts: Set<ReturnType<typeof setTimeout>> = new Set();
+
+  clearBreakTimeouts(): void {
+    for (const id of this.activeBreakTimeouts) {
+      clearTimeout(id);
+    }
+    this.activeBreakTimeouts.clear();
+  }
   layout: OfficeLayout;
   tileMap: TileTypeVal[][];
   seats: Map<string, Seat>;
@@ -168,14 +196,17 @@ export class OfficeState {
         const seat = this.seats.get(ch.seatId)!;
         if (!seat.assigned) {
           seat.assigned = true;
-          // Snap character to seat position
-          ch.tileCol = seat.seatCol;
-          ch.tileRow = seat.seatRow;
-          const cx = seat.seatCol * TILE_SIZE + TILE_SIZE / 2;
-          const cy = seat.seatRow * TILE_SIZE + TILE_SIZE / 2;
-          ch.x = cx;
-          ch.y = cy;
-          ch.dir = seat.facingDir;
+          // Snap character to seat position only if not currently in break room
+          if (!ch.isTakingBreak) {
+            ch.tileCol = seat.seatCol;
+            ch.tileRow = seat.seatRow;
+            const cx = seat.seatCol * TILE_SIZE + TILE_SIZE / 2;
+            const cy = seat.seatRow * TILE_SIZE + TILE_SIZE / 2;
+            ch.x = cx;
+            ch.y = cy;
+            ch.dir = seat.facingDir;
+            ch.isSitting = true;
+          }
           continue;
         }
       }
@@ -190,11 +221,14 @@ export class OfficeState {
         this.seats.get(seatId)!.assigned = true;
         ch.seatId = seatId;
         const seat = this.seats.get(seatId)!;
-        ch.tileCol = seat.seatCol;
-        ch.tileRow = seat.seatRow;
-        ch.x = seat.seatCol * TILE_SIZE + TILE_SIZE / 2;
-        ch.y = seat.seatRow * TILE_SIZE + TILE_SIZE / 2;
-        ch.dir = seat.facingDir;
+        if (!ch.isTakingBreak) {
+          ch.tileCol = seat.seatCol;
+          ch.tileRow = seat.seatRow;
+          ch.x = seat.seatCol * TILE_SIZE + TILE_SIZE / 2;
+          ch.y = seat.seatRow * TILE_SIZE + TILE_SIZE / 2;
+          ch.dir = seat.facingDir;
+          ch.isSitting = true;
+        }
       }
     }
 
@@ -365,18 +399,26 @@ export class OfficeState {
    */
   private findFreeSeat(folderName?: string): string | null {
     const electronicsTiles = this.buildElectronicsTileSet();
-    const freeSeats: string[] = [];
+    const workSeats: string[] = [];
+    const allFreeSeats: string[] = [];
     for (const [uid, seat] of this.seats) {
-      if (!seat.assigned) freeSeats.push(uid);
+      if (!seat.assigned) {
+        allFreeSeats.push(uid);
+        if (!this.isBreakRoomArea(seat.seatCol, seat.seatRow)) {
+          workSeats.push(uid);
+        }
+      }
     }
-    if (freeSeats.length === 0) return null;
+    // Strongly prioritize workstation seats outside the break room
+    const candidateSeats = workSeats.length > 0 ? workSeats : allFreeSeats;
+    if (candidateSeats.length === 0) return null;
 
     const areaLabels = folderName ? this.areaMappings[folderName] : undefined;
 
     // Stage 1 — in-area seats for the folder's mapped Area labels.
     if (areaLabels && areaLabels.length > 0) {
       const wanted = new Set(areaLabels);
-      const inArea = freeSeats.filter((uid) => {
+      const inArea = candidateSeats.filter((uid) => {
         const label = this.seatZone(uid);
         return label !== null && wanted.has(label);
       });
@@ -385,12 +427,12 @@ export class OfficeState {
     }
 
     // Stage 2 — unzoned seats (no area label, or layout has no areas at all).
-    const unzoned = freeSeats.filter((uid) => this.seatZone(uid) === null);
+    const unzoned = candidateSeats.filter((uid) => this.seatZone(uid) === null);
     const pick2 = this.pickFromSeats(unzoned, electronicsTiles);
     if (pick2) return pick2;
 
-    // Stage 3 — any free seat.
-    return this.pickFromSeats(freeSeats, electronicsTiles);
+    // Stage 3 — any candidate seat.
+    return this.pickFromSeats(candidateSeats, electronicsTiles);
   }
 
   /** Closest walkable tile to (col,row) not occupied by another character, or null. */
@@ -425,7 +467,7 @@ export class OfficeState {
       if (ch.isSubagent) continue;
       if (ch.palette < paletteCount) counts[ch.palette]++;
     }
-    return pickDiversePalette(paletteCount, counts);
+    return pickDiversePalette(paletteCount, counts, false);
   }
 
   addAgent(
@@ -464,7 +506,12 @@ export class OfficeState {
       }
     }
     if (!seatId && anchorAt) {
-      seatId = closestFreeSeat(this.seats, anchorAt.col, anchorAt.row);
+      seatId = closestFreeSeat(
+        this.seats,
+        anchorAt.col,
+        anchorAt.row,
+        (s) => !this.isBreakRoomArea(s.seatCol, s.seatRow),
+      );
     }
     if (!seatId) {
       seatId = this.findFreeSeat(folderName);
@@ -497,18 +544,21 @@ export class OfficeState {
     const existingNames = Array.from(this.characters.values())
       .map((c) => c.customName || '')
       .filter(Boolean);
-    const isLeadOrFirst = this.characters.size === 0 || id === 0;
+    const existingLead = Array.from(this.characters.values()).find((c) => c.isTeamLead);
+    const isLeadOrFirst = !existingLead && (this.characters.size === 0 || id === 0);
     const profile = getAgentProfile(id, existingNames, isLeadOrFirst);
     ch.customName = profile.customName;
-    ch.role = profile.role;
+    ch.role = existingLead && profile.role === 'Lead' ? 'Coder' : profile.role;
     ch.currentOrder = profile.currentOrder;
     ch.orderHistory = profile.orderHistory;
     ch.delegatedFrom = profile.delegatedFrom;
+    ch.isTeamLead = isLeadOrFirst;
 
     if (!skipSpawnEffect) {
       startMatrixEffect(ch, 'spawn');
     }
     this.characters.set(id, ch);
+    this.sanitizeTeamHierarchy();
   }
 
   // ── Greeter ───────────────────────────────────────────────────
@@ -642,7 +692,12 @@ export class OfficeState {
     if (!teammate || !lead) return;
     const anchorAt = anchorTile(lead, this.seats);
     if (!anchorAt) return;
-    const target = closestFreeSeat(this.seats, anchorAt.col, anchorAt.row);
+    const target = closestFreeSeat(
+      this.seats,
+      anchorAt.col,
+      anchorAt.row,
+      (s) => !this.isBreakRoomArea(s.seatCol, s.seatRow),
+    );
     if (!target || target === teammate.seatId) return;
     const targetSeat = this.seats.get(target)!;
     const targetDist =
@@ -704,17 +759,85 @@ export class OfficeState {
     return true;
   }
 
-  /** Create a sub-agent character with the parent's palette. Returns the sub-agent ID. */
-  addSubagent(parentAgentId: number, parentToolId: string): number {
+  /** Create or wake a sub-agent worker, assigning dynamic role based on task action. */
+  addSubagent(
+    parentAgentId: number,
+    parentToolId: string,
+    toolName?: string | null,
+    status?: string | null,
+  ): number {
     const key = `${parentAgentId}:${parentToolId}`;
     if (this.subagentIdMap.has(key)) return this.subagentIdMap.get(key)!;
+
+    const dynamicRole = inferWorkerRole(toolName, status);
+
+    // Gather all workers belonging to this lead and pick randomly among available ones
+    const activeSubIds = new Set(this.subagentIdMap.values());
+    const allWorkers: [number, Character][] = [];
+    for (const [subId, existingCh] of this.characters.entries()) {
+      if (
+        existingCh.isSubagent &&
+        (existingCh.parentAgentId === parentAgentId || existingCh.leadAgentId === parentAgentId)
+      ) {
+        allWorkers.push([subId, existingCh]);
+      }
+    }
+
+    const freeWorkers = allWorkers.filter(([sId]) => !activeSubIds.has(sId));
+    const candidateList = freeWorkers.length > 0 ? freeWorkers : allWorkers;
+
+    if (candidateList.length > 0) {
+      // Pick a random worker from candidates
+      const [subId, existingCh] = candidateList[Math.floor(Math.random() * candidateList.length)];
+      this.subagentIdMap.set(key, subId);
+      this.subagentMeta.set(subId, { parentAgentId, parentToolId });
+      existingCh.role = dynamicRole;
+      existingCh.currentOrder = status || `Executing ${toolName || dynamicRole} task`;
+      existingCh.isTakingBreak = false;
+      existingCh.breakType = null;
+      existingCh.isActive = true;
+      if (existingCh.seatId) {
+        const seat = this.seats.get(existingCh.seatId);
+        if (seat) {
+          const path = this.withOwnSeatUnblocked(existingCh, () =>
+            findPath(
+              existingCh.tileCol,
+              existingCh.tileRow,
+              seat.seatCol,
+              seat.seatRow,
+              this.tileMap,
+              this.blockedTiles,
+            ),
+          );
+          if (path.length > 0) {
+            existingCh.path = path;
+            existingCh.moveProgress = 0;
+            existingCh.state = CharacterState.WALK;
+            existingCh.isSitting = false;
+          } else {
+            existingCh.x = seat.seatCol * TILE_SIZE + TILE_SIZE / 2;
+            existingCh.y = seat.seatRow * TILE_SIZE + TILE_SIZE / 2;
+            existingCh.tileCol = seat.seatCol;
+            existingCh.tileRow = seat.seatRow;
+            existingCh.dir = seat.facingDir;
+            existingCh.state = CharacterState.TYPE;
+            existingCh.isSitting = true;
+          }
+        } else {
+          existingCh.state = CharacterState.TYPE;
+        }
+      } else {
+        existingCh.state = CharacterState.TYPE;
+      }
+      return subId;
+    }
 
     const id = this.nextSubagentId--;
     const parentCh = this.characters.get(parentAgentId);
     const parentPalette = parentCh ? parentCh.palette : 0;
     // Guaranteed diverse palette (different from parent) and distinct hueShift
     const palette = (parentPalette + 1 + Math.floor(Math.random() * 5)) % 6;
-    const hueShift = (Math.floor(Math.random() * 11) + 1) * 30;
+    const hueShift = 0;
 
     // Try to find a free seat in the office first, or fall back to closest walkable tile to parent
     const seatId = this.findFreeSeat(parentCh?.folderName);
@@ -750,8 +873,8 @@ export class OfficeState {
       .filter(Boolean);
     const subProfile = getAgentProfile(id, existingSubNames, false);
     ch.customName = subProfile.customName;
-    ch.role = subProfile.role || 'Coder';
-    ch.currentOrder = subProfile.currentOrder;
+    ch.role = dynamicRole;
+    ch.currentOrder = status || subProfile.currentOrder;
     ch.orderHistory = subProfile.orderHistory;
     ch.delegatedFrom = subProfile.delegatedFrom;
 
@@ -837,6 +960,9 @@ export class OfficeState {
     const ch = this.characters.get(id);
     if (ch) {
       ch.isActive = active;
+      if (active && ch.isTakingBreak) {
+        this.returnAgentFromBreak(id);
+      }
       if (!active) {
         // Sentinel -1: signals turn just ended, skip next seat rest timer.
         // Prevents the WALK handler from setting a 2-4 min rest on arrival.
@@ -920,6 +1046,9 @@ export class OfficeState {
     const ch = this.characters.get(id);
     if (ch) {
       ch.currentTool = tool;
+      if (tool && ch.isTakingBreak) {
+        this.returnAgentFromBreak(id);
+      }
     }
   }
 
@@ -1096,25 +1225,41 @@ export class OfficeState {
     const ch = this.characters.get(id);
     if (!ch) return;
     const wasUnlinked = ch.leadAgentId === undefined;
-    ch.teamName = teamName;
-    ch.agentName = agentName;
-    ch.isTeamLead = isTeamLead;
-    ch.leadAgentId = leadAgentId;
+    if (teamName !== undefined) ch.teamName = teamName;
+    if (agentName !== undefined) ch.agentName = agentName;
+    if (isTeamLead !== undefined) {
+      ch.isTeamLead = isTeamLead;
+      if (isTeamLead) {
+        ch.role = 'Lead';
+        ch.isSubagent = false;
+        for (const [otherId, otherCh] of this.characters.entries()) {
+          if (otherId !== id && otherCh.isTeamLead) {
+            otherCh.isTeamLead = false;
+            if (otherCh.role === 'Lead') {
+              otherCh.role = 'Teammate';
+            }
+          }
+        }
+      }
+    }
+    if (leadAgentId !== undefined) {
+      ch.leadAgentId = leadAgentId;
+      ch.isSubagent = true;
+      ch.isTeamLead = false;
+      if (ch.role === 'Lead') {
+        ch.role = 'Teammate';
+      }
+    }
     if (teamUsesTmux !== undefined) {
       ch.teamUsesTmux = teamUsesTmux;
     }
-    // A teammate is not a headless agent: clicking it focuses its lead's terminal.
-    // Adopted sessions are marked headless at creation and only later discovered
-    // to be teammates, so drop the mark once the link lands.
     if (leadAgentId !== undefined) {
       ch.isHeadless = false;
     }
-    // A teammate discovered only after its plain external session was adopted is
-    // linked here, not at creation, so it never went through the seat-next-to-lead
-    // path addAgent runs for inline teammates. Cluster it now, once, on first link.
     if (wasUnlinked && leadAgentId !== undefined && !isTeamLead) {
       this.reseatNextToLead(id, leadAgentId);
     }
+    this.sanitizeTeamHierarchy();
   }
 
   /** Mark an agent as headless (adopted, no terminal to focus). */
@@ -1167,10 +1312,146 @@ export class OfficeState {
           ch.bubbleTimer = 0;
         }
       }
+
+      // Tick dialogue speech bubble timer
+      if (ch.speechBubbleTimer && ch.speechBubbleTimer > 0) {
+        ch.speechBubbleTimer -= dt;
+        if (ch.speechBubbleTimer <= 0) {
+          ch.speechBubbleText = null;
+          ch.speechBubbleTimer = 0;
+        }
+      }
+
+      // Track break duration
+      if (ch.isTakingBreak) {
+        ch.breakDuration = (ch.breakDuration || 0) + dt;
+      }
     }
     // Remove characters that finished despawn
     for (const id of toDelete) {
       this.characters.delete(id);
+    }
+
+    // ── Elder Scrolls Radiant AI Daily Idle Routine ─────────────
+    this.routineEngine.update(this, dt);
+
+    // ── Break Social Chatter ────────────────────────────────────
+    this.breakSocialTimer += dt;
+    if (this.breakSocialTimer >= 6) {
+      this.breakSocialTimer = 0;
+      const breakAgents = Array.from(this.characters.values()).filter(
+        (c) => c.isTakingBreak && c.path.length === 0,
+      );
+      if (breakAgents.length >= 2) {
+        // Pick two distinct random break room workers
+        const idxA = Math.floor(Math.random() * breakAgents.length);
+        let idxB = Math.floor(Math.random() * (breakAgents.length - 1));
+        if (idxB >= idxA) idxB++;
+        const a = breakAgents[idxA];
+        const b = breakAgents[idxB];
+        const pair = getRandomBreakDialogue();
+
+        this.addTeamDialogue({
+          fromAgentId: a.id,
+          fromName: a.customName || `Agent #${a.id}`,
+          fromRole: a.role || 'Teammate',
+          toAgentId: b.id,
+          toName: b.customName || `Agent #${b.id}`,
+          toRole: b.role || 'Teammate',
+          text: pair.a,
+          context: 'break_room',
+        });
+        const aId = a.id;
+        const bId = b.id;
+        const timerId = setTimeout(() => {
+          this.activeBreakTimeouts.delete(timerId);
+          const aLive = this.characters.get(aId);
+          const bLive = this.characters.get(bId);
+          if (aLive && bLive && bLive.isTakingBreak) {
+            this.addTeamDialogue({
+              fromAgentId: bLive.id,
+              fromName: bLive.customName || `Agent #${bLive.id}`,
+              fromRole: bLive.role || 'Teammate',
+              toAgentId: aLive.id,
+              toName: aLive.customName || `Agent #${aLive.id}`,
+              toRole: aLive.role || 'Teammate',
+              text: pair.b,
+              context: 'break_room',
+            });
+          }
+        }, 2200);
+        this.activeBreakTimeouts.add(timerId);
+      } else if (breakAgents.length === 1) {
+        const a = breakAgents[0];
+        const thought = getRandomSoloThought();
+        this.addTeamDialogue({
+          fromAgentId: a.id,
+          fromName: a.customName || `Agent #${a.id}`,
+          fromRole: a.role || 'Teammate',
+          text: thought,
+          context: 'break_room',
+        });
+      }
+    }
+
+    // ── Break Autonomous Movement & Spot Switching ─────────────
+    this.breakWanderTimer = (this.breakWanderTimer || 0) + dt;
+    if (this.breakWanderTimer >= 14) {
+      this.breakWanderTimer = 0;
+      const breakWorkers = Array.from(this.characters.values()).filter(
+        (workerCh) =>
+          workerCh.isTakingBreak &&
+          workerCh.path.length === 0 &&
+          (!workerCh.currentOrder || workerCh.orderStatus !== 'running') &&
+          !workerCh.matrixEffect,
+      );
+
+      if (breakWorkers.length > 0) {
+        // Pick one random idle break worker to change spots
+        const worker = breakWorkers[Math.floor(Math.random() * breakWorkers.length)];
+        const allSpots = this.getBreakRoomSpots();
+
+        // Get occupied tiles by any character
+        const occupiedTiles = new Set(
+          Array.from(this.characters.values()).map(
+            (chItem) => chItem.tileCol + ',' + chItem.tileRow,
+          ),
+        );
+        const freeSpots = allSpots.filter(
+          (s) =>
+            !occupiedTiles.has(s.col + ',' + s.row) &&
+            (s.col !== worker.tileCol || s.row !== worker.tileRow),
+        );
+
+        if (freeSpots.length > 0) {
+          const targetSpot = freeSpots[Math.floor(Math.random() * freeSpots.length)];
+          const targetKey = targetSpot.col + ',' + targetSpot.row;
+          const wasBlocked = this.blockedTiles.has(targetKey);
+          if (wasBlocked) this.blockedTiles.delete(targetKey);
+
+          const path = findPath(
+            worker.tileCol,
+            worker.tileRow,
+            targetSpot.col,
+            targetSpot.row,
+            this.tileMap,
+            this.blockedTiles,
+          );
+
+          if (wasBlocked) this.blockedTiles.add(targetKey);
+
+          if (path.length > 0) {
+            worker.path = path;
+            worker.moveProgress = 0;
+            worker.state = CharacterState.WALK;
+            worker.isSitting = false;
+            worker.breakTargetCol = targetSpot.col;
+            worker.breakTargetRow = targetSpot.row;
+            worker.breakType = targetSpot.breakType;
+            worker.pendingBreakSpot = targetSpot;
+          }
+        }
+      }
     }
 
     // ── Pet FSM ────────────────────────────────────────────────
@@ -1216,6 +1497,29 @@ export class OfficeState {
   /** Get character at pixel position (for hit testing). Returns id or null.
    *  Agents only: clicks pass straight through the consent greeter, which is
    *  a prop, not something to select or follow. */
+
+  addTeamDialogue(msg: Omit<TeamDialogueMessage, 'id' | 'timestamp'>): TeamDialogueMessage {
+    const fullMsg: TeamDialogueMessage = {
+      id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      timestamp: Date.now(),
+      ...msg,
+    };
+    this.teamDialogue.push(fullMsg);
+    if (this.teamDialogue.length > 100) {
+      this.teamDialogue = this.teamDialogue.slice(-100);
+    }
+    saveTeamDialogue(this.teamDialogue);
+
+    const sender = this.characters.get(msg.fromAgentId);
+    if (sender) {
+      // Allow full natural speech without premature truncation
+      sender.speechBubbleText = msg.text.length > 160 ? msg.text.slice(0, 157) + '...' : msg.text;
+      sender.speechBubbleTimer = Math.max(4.5, Math.min(8.5, msg.text.length * 0.08));
+    }
+
+    return fullMsg;
+  }
+
   setAgentName(id: number, name: string): void {
     const ch = this.characters.get(id);
     if (ch) {
@@ -1227,8 +1531,27 @@ export class OfficeState {
   setAgentRole(id: number, role: string): void {
     const ch = this.characters.get(id);
     if (ch) {
-      ch.role = role;
-      updateAgentProfile(id, { role });
+      if (role === 'Lead') {
+        ch.isTeamLead = true;
+        ch.role = 'Lead';
+        ch.isSubagent = false;
+        for (const [otherId, otherCh] of this.characters.entries()) {
+          if (otherId !== id && otherCh.isTeamLead) {
+            otherCh.isTeamLead = false;
+            if (otherCh.role === 'Lead') {
+              otherCh.role = 'Teammate';
+              updateAgentProfile(otherId, { role: 'Teammate' });
+            }
+          }
+        }
+      } else {
+        if (ch.isTeamLead) {
+          ch.isTeamLead = false;
+        }
+        ch.role = role;
+      }
+      updateAgentProfile(id, { role: ch.role });
+      this.sanitizeTeamHierarchy();
     }
   }
 
@@ -1303,12 +1626,13 @@ export class OfficeState {
     }
   }
 
-  startAgentBreak(id: number, breakType?: 'coffee' | 'snack' | 'steamdeck'): void {
+  startAgentBreak(id: number, breakType?: 'coffee' | 'tea' | 'snack' | 'steamdeck'): void {
     const ch = this.characters.get(id);
     if (!ch) return;
 
-    const availableBreakTypes: Array<'coffee' | 'snack' | 'steamdeck'> = [
+    const availableBreakTypes: Array<'coffee' | 'tea' | 'snack' | 'steamdeck'> = [
       'coffee',
+      'tea',
       'snack',
       'steamdeck',
     ];
@@ -1316,52 +1640,54 @@ export class OfficeState {
       breakType || availableBreakTypes[Math.floor(Math.random() * availableBreakTypes.length)];
 
     let targetTile: { col: number; row: number } | null = null;
-
-    if (chosenType === 'coffee') {
-      const coffeeItem = this.layout.furniture.find((f) => f.type.includes('COFFEE'));
-      if (coffeeItem) {
-        targetTile = this.closestFreeWalkableTile(coffeeItem.col, coffeeItem.row);
-      }
-    } else if (chosenType === 'snack') {
-      const tableItem = this.layout.furniture.find((f) => f.type.includes('TABLE'));
-      if (tableItem) {
-        targetTile = this.closestFreeWalkableTile(tableItem.col, tableItem.row);
-      }
-    } else if (chosenType === 'steamdeck') {
-      const sofaItem = this.layout.furniture.find(
-        (f) => f.type.includes('SOFA') || f.type.includes('BENCH'),
-      );
-      if (sofaItem) {
-        targetTile = this.closestFreeWalkableTile(sofaItem.col, sofaItem.row);
-      }
+    const breakSpots = this.getBreakRoomSpots();
+    const matchingSpots = breakSpots.filter((s) => s.breakType === chosenType);
+    if (matchingSpots.length > 0) {
+      targetTile = matchingSpots[Math.floor(Math.random() * matchingSpots.length)];
+    } else if (breakSpots.length > 0) {
+      targetTile = breakSpots[Math.floor(Math.random() * breakSpots.length)];
     }
 
     if (!targetTile && this.walkableTiles.length > 0) {
-      targetTile = this.walkableTiles[Math.floor(Math.random() * this.walkableTiles.length)];
+      const valid = this.walkableTiles.filter((t) => this.isBreakRoomArea(t.col, t.row));
+      targetTile =
+        valid.length > 0 ? valid[Math.floor(Math.random() * valid.length)] : this.walkableTiles[0];
     }
 
     ch.isTakingBreak = true;
     ch.breakType = chosenType;
     ch.bubbleType = null;
     ch.bubbleTimer = 0;
+    ch.speechBubbleText = null;
+    ch.speechBubbleTimer = 0;
     ch.isActive = false;
+    ch.breakStartTime = Date.now();
+    ch.breakDuration = 0;
 
     if (targetTile) {
       ch.breakTargetCol = targetTile.col;
       ch.breakTargetRow = targetTile.row;
-      const path = findPath(
-        ch.tileCol,
-        ch.tileRow,
-        targetTile.col,
-        targetTile.row,
-        this.tileMap,
-        this.blockedTiles,
+      const path = this.withOwnSeatUnblocked(ch, () =>
+        findPath(
+          ch.tileCol,
+          ch.tileRow,
+          targetTile.col,
+          targetTile.row,
+          this.tileMap,
+          this.blockedTiles,
+        ),
       );
       if (path.length > 0) {
         ch.path = path;
         ch.moveProgress = 0;
         ch.state = CharacterState.WALK;
+        ch.isSitting = false;
       } else {
+        ch.x = targetTile.col * TILE_SIZE + TILE_SIZE / 2;
+        ch.y = targetTile.row * TILE_SIZE + TILE_SIZE / 2;
+        ch.tileCol = targetTile.col;
+        ch.tileRow = targetTile.row;
+        ch.path = [];
         if (chosenType === 'coffee') ch.state = CharacterState.BREAK_COFFEE;
         else if (chosenType === 'snack') ch.state = CharacterState.BREAK_SNACK;
         else ch.state = CharacterState.BREAK_STEAMDECK;
@@ -1400,18 +1726,21 @@ export class OfficeState {
     if (ch.seatId) {
       const seat = this.seats.get(ch.seatId);
       if (seat) {
-        const path = findPath(
-          ch.tileCol,
-          ch.tileRow,
-          seat.seatCol,
-          seat.seatRow,
-          this.tileMap,
-          this.blockedTiles,
+        const path = this.withOwnSeatUnblocked(ch, () =>
+          findPath(
+            ch.tileCol,
+            ch.tileRow,
+            seat.seatCol,
+            seat.seatRow,
+            this.tileMap,
+            this.blockedTiles,
+          ),
         );
         if (path.length > 0) {
           ch.path = path;
           ch.moveProgress = 0;
           ch.state = CharacterState.WALK;
+          ch.isSitting = false;
         } else {
           ch.state = CharacterState.TYPE;
           ch.dir = seat.facingDir;
@@ -1445,7 +1774,19 @@ export class OfficeState {
   restoreCopilotPixelAgents(): number[] {
     const saved = loadCopilotPixelAgents();
     const restoredIds: number[] = [];
+    const breakSpots = this.getBreakRoomSpots();
+
+    let subCount = 0;
     for (const data of saved) {
+      if (data.isSubagent) {
+        subCount++;
+        // Prune legacy excess workers beyond 5
+        if (subCount > 5) {
+          removeCopilotPixelAgent(data.id);
+          continue;
+        }
+      }
+
       if (this.characters.has(data.id)) {
         restoredIds.push(data.id);
         continue;
@@ -1458,33 +1799,58 @@ export class OfficeState {
       }
       if (seat) seat.assigned = true;
 
-      const spawn = seat
-        ? { col: seat.seatCol, row: seat.seatRow }
-        : this.walkableTiles[0] || { col: 1, row: 1 };
+      // Human skin tones: valid palette 0-5, strictly 0 hue shift
+      const palette = Math.abs(data.palette || 0) % 6;
+      const hueShift = 0;
 
-      const ch = createCharacter(data.id, data.palette, seatId, seat, data.hueShift);
+      const spot = breakSpots[restoredIds.length % breakSpots.length] || {
+        col: 17,
+        row: 14,
+        breakType: 'coffee' as const,
+        state: CharacterState.BREAK_COFFEE,
+        dir: Direction.DOWN,
+      };
+
+      // Subagents without an active running order are strictly stationed in the break room
+      const isRunning = Boolean(data.currentOrder && data.orderStatus === 'running');
+      const isTakingBreak = data.isSubagent ? !isRunning : Boolean(data.isTakingBreak);
+
+      const spawn = isTakingBreak
+        ? { col: spot.col, row: spot.row }
+        : seat
+          ? { col: seat.seatCol, row: seat.seatRow }
+          : { col: spot.col, row: spot.row };
+
+      const ch = createCharacter(data.id, palette, seatId, seat, hueShift);
       ch.x = spawn.col * TILE_SIZE + TILE_SIZE / 2;
       ch.y = spawn.row * TILE_SIZE + TILE_SIZE / 2;
       ch.tileCol = spawn.col;
       ch.tileRow = spawn.row;
       ch.customName = data.customName;
-      ch.role = data.role;
-      ch.isSubagent = data.isSubagent;
+      ch.isSubagent = Boolean(data.isSubagent);
       ch.parentAgentId = data.parentAgentId;
+      ch.isTeamLead = !ch.isSubagent && Boolean(data.isTeamLead);
+      ch.role = ch.isSubagent ? (data.role === 'Lead' ? 'Teammate' : data.role) : data.role;
+      ch.leadAgentId = data.leadAgentId;
+      ch.spawnedByName = data.spawnedByName;
       ch.currentOrder = data.currentOrder;
       ch.delegatedFrom = data.delegatedFrom;
       ch.orderStatus = (data.orderStatus as Character['orderStatus']) ?? null;
       ch.orderProgressMessage = data.orderProgressMessage;
       ch.orderModelName = data.orderModelName;
       ch.isCopilotPixelAgent = true;
+      ch.hueShift = 0;
 
-      if (data.isTakingBreak) {
+      if (isTakingBreak) {
         ch.isTakingBreak = true;
-        ch.breakType = data.breakType;
-        if (data.breakType === 'coffee') ch.state = CharacterState.BREAK_COFFEE;
-        else if (data.breakType === 'snack') ch.state = CharacterState.BREAK_SNACK;
-        else if (data.breakType === 'steamdeck') ch.state = CharacterState.BREAK_STEAMDECK;
+        ch.isSitting = data.isSitting !== undefined ? data.isSitting : spot.isSitting;
+        ch.breakType = data.breakType || spot.breakType;
+        if (ch.breakType === 'coffee' || ch.breakType === 'tea')
+          ch.state = CharacterState.BREAK_COFFEE;
+        else if (ch.breakType === 'snack') ch.state = CharacterState.BREAK_SNACK;
+        else if (ch.breakType === 'steamdeck') ch.state = CharacterState.BREAK_STEAMDECK;
         else ch.state = CharacterState.BREAK_COFFEE;
+        ch.dir = spot.dir;
       } else {
         ch.state = seat ? CharacterState.TYPE : CharacterState.IDLE;
         if (seat) ch.dir = seat.facingDir;
@@ -1493,6 +1859,7 @@ export class OfficeState {
       this.characters.set(data.id, ch);
       restoredIds.push(data.id);
     }
+    this.sanitizeTeamHierarchy();
     return restoredIds;
   }
 
@@ -1566,6 +1933,623 @@ export class OfficeState {
     return subId;
   }
 
+  /**
+   * Ensures that the Lead agent has a dedicated squad of subagents stationed in the Break Room.
+   * If fewer than `count` subagents exist for this lead, creates them and places them on break.
+   */
+  /**
+   * Ensures the Lead agent has a dedicated squad of workers stationed in the Break Room.
+   * By default, at least 5 workers (total 6 agents minimum including 1 team leader).
+   * Can scale up if the layout provides more seats, naming each worker uniquely.
+   * In the Break Room they rest as Teammate; they take dynamic roles only when called to work.
+   */
+  /** Returns true if a tile is situated in the common Break Room / Lounge area */
+  isBreakRoomArea(col: number, row: number): boolean {
+    if (row < 10) return false;
+    if (this.layout.cols >= 18 && col >= 11) return true;
+    if (this.tileMap && this.tileMap[row] && this.tileMap[row][col] !== undefined) {
+      const tile = this.tileMap[row][col];
+      if (tile === 1 || tile === 9) return true;
+    }
+    return col >= Math.floor(this.layout.cols / 2);
+  }
+
+  /** Returns verified walkable spots located inside the Break Room. */
+  getBreakRoomSpots(): Array<{
+    col: number;
+    row: number;
+    breakType: 'coffee' | 'tea' | 'snack' | 'steamdeck';
+    state: CharacterState;
+    dir: Direction;
+    isSitting: boolean;
+  }> {
+    const spots: Array<{
+      col: number;
+      row: number;
+      breakType: 'coffee' | 'tea' | 'snack' | 'steamdeck';
+      state: CharacterState;
+      dir: Direction;
+      isSitting: boolean;
+    }> = [];
+
+    // 1. Lounge sofa front (Steam Deck, sitting)
+    const sofaFront = this.layout.furniture.find(
+      (f) => f.type === 'SOFA_FRONT' && this.isBreakRoomArea(f.col, f.row),
+    );
+    if (sofaFront) {
+      spots.push({
+        col: sofaFront.col,
+        row: sofaFront.row,
+        breakType: 'steamdeck',
+        state: CharacterState.BREAK_STEAMDECK,
+        dir: Direction.DOWN,
+        isSitting: true,
+      });
+    }
+
+    // 2. Lounge sofa side left (coffee / tea, sitting)
+    const sofaSide = this.layout.furniture.find(
+      (f) => f.type === 'SOFA_SIDE' && this.isBreakRoomArea(f.col, f.row),
+    );
+    if (sofaSide) {
+      spots.push({
+        col: sofaSide.col,
+        row: sofaSide.row,
+        breakType: 'coffee',
+        state: CharacterState.BREAK_COFFEE,
+        dir: Direction.RIGHT,
+        isSitting: true,
+      });
+    }
+
+    // 3. Lounge sofa side right (Steam Deck, sitting)
+    const sofaSide2 = this.layout.furniture.find(
+      (f) => f.type.startsWith('SOFA_SIDE:') && this.isBreakRoomArea(f.col, f.row),
+    );
+    if (sofaSide2) {
+      spots.push({
+        col: sofaSide2.col,
+        row: sofaSide2.row,
+        breakType: 'steamdeck',
+        state: CharacterState.BREAK_STEAMDECK,
+        dir: Direction.LEFT,
+        isSitting: true,
+      });
+    }
+
+    // 4. Lounge sofa back (Steam Deck, sitting)
+    const sofaBack = this.layout.furniture.find(
+      (f) => f.type === 'SOFA_BACK' && this.isBreakRoomArea(f.col, f.row),
+    );
+    if (sofaBack) {
+      spots.push({
+        col: sofaBack.col,
+        row: sofaBack.row,
+        breakType: 'steamdeck',
+        state: CharacterState.BREAK_STEAMDECK,
+        dir: Direction.UP,
+        isSitting: true,
+      });
+    }
+
+    // 5. Dining table chair right (snack, sitting)
+    const dChair = this.layout.furniture.find(
+      (f) => f.type === 'WOODEN_CHAIR_SIDE' && this.isBreakRoomArea(f.col, f.row),
+    );
+    if (dChair) {
+      spots.push({
+        col: dChair.col,
+        row: dChair.row,
+        breakType: 'snack',
+        state: CharacterState.BREAK_SNACK,
+        dir: Direction.RIGHT,
+        isSitting: true,
+      });
+    }
+
+    // 6. Dining table chair left (tea, sitting)
+    const dChair2 = this.layout.furniture.find(
+      (f) => f.type.startsWith('WOODEN_CHAIR_SIDE:') && this.isBreakRoomArea(f.col, f.row),
+    );
+    if (dChair2) {
+      spots.push({
+        col: dChair2.col,
+        row: dChair2.row,
+        breakType: 'tea',
+        state: CharacterState.BREAK_COFFEE,
+        dir: Direction.LEFT,
+        isSitting: true,
+      });
+    }
+
+    // 7. Dining cushioned chair (coffee / snack, sitting)
+    const cChair = this.layout.furniture.find(
+      (f) => f.type === 'CUSHIONED_CHAIR' && this.isBreakRoomArea(f.col, f.row),
+    );
+    if (cChair) {
+      spots.push({
+        col: cChair.col,
+        row: cChair.row,
+        breakType: 'snack',
+        state: CharacterState.BREAK_SNACK,
+        dir: Direction.UP,
+        isSitting: true,
+      });
+    }
+
+    // 8. Reading bench (tea, sitting)
+    const bench = this.layout.furniture.find(
+      (f) =>
+        (f.type.includes('BENCH') || f.type.includes('WOODEN_BENCH')) &&
+        this.isBreakRoomArea(f.col, f.row),
+    );
+    if (bench) {
+      spots.push({
+        col: bench.col,
+        row: bench.row,
+        breakType: 'tea',
+        state: CharacterState.BREAK_COFFEE,
+        dir: Direction.DOWN,
+        isSitting: true,
+      });
+    }
+
+    // 9. Kitchen Stovetop & Oven (cooking at fuochi, standing facing UP)
+    const stovetop = this.layout.furniture.find((f) => f.type === 'KITCHEN_STOVETOP');
+    if (stovetop) {
+      spots.push({
+        col: stovetop.col,
+        row: stovetop.row + 1,
+        breakType: 'snack',
+        state: CharacterState.BREAK_SNACK,
+        dir: Direction.UP,
+        isSitting: false,
+      });
+    }
+
+    // 10. Espresso Machine (brewing espresso, standing facing UP)
+    const coffeeMachine = this.layout.furniture.find((f) => f.type === 'COFFEE_MACHINE');
+    if (coffeeMachine) {
+      spots.push({
+        col: coffeeMachine.col,
+        row: coffeeMachine.row + 1,
+        breakType: 'coffee',
+        state: CharacterState.BREAK_COFFEE,
+        dir: Direction.UP,
+        isSitting: false,
+      });
+    }
+
+    // 11. Tea Station (steeping tea, standing facing UP)
+    const teaStation = this.layout.furniture.find((f) => f.type === 'TEA_STATION');
+    if (teaStation) {
+      spots.push({
+        col: teaStation.col,
+        row: teaStation.row + 1,
+        breakType: 'tea',
+        state: CharacterState.BREAK_COFFEE,
+        dir: Direction.UP,
+        isSitting: false,
+      });
+    }
+
+    // 12. Microwave (microwave snack, standing facing UP)
+    const microwave = this.layout.furniture.find((f) => f.type === 'MICROWAVE');
+    if (microwave) {
+      spots.push({
+        col: microwave.col,
+        row: microwave.row + 1,
+        breakType: 'snack',
+        state: CharacterState.BREAK_SNACK,
+        dir: Direction.UP,
+        isSitting: false,
+      });
+    }
+
+    // 13. Kitchen Snack Bar (croissant & fruit, standing facing UP)
+    const snackBar = this.layout.furniture.find((f) => f.type === 'KITCHEN_SNACK_BAR');
+    if (snackBar) {
+      spots.push({
+        col: snackBar.col,
+        row: snackBar.row + 1,
+        breakType: 'snack',
+        state: CharacterState.BREAK_SNACK,
+        dir: Direction.UP,
+        isSitting: false,
+      });
+    }
+
+    // Fallback if layout is custom or has different furniture
+    if (spots.length < 5 && this.walkableTiles.length > 0) {
+      const validWalkable = this.walkableTiles.filter((t) => this.isBreakRoomArea(t.col, t.row));
+      const pool = validWalkable.length >= 5 ? validWalkable : this.walkableTiles;
+      const bTypes: Array<'coffee' | 'tea' | 'snack' | 'steamdeck'> = [
+        'steamdeck',
+        'coffee',
+        'tea',
+        'snack',
+      ];
+      const bStates = [
+        CharacterState.BREAK_STEAMDECK,
+        CharacterState.BREAK_COFFEE,
+        CharacterState.BREAK_COFFEE,
+        CharacterState.BREAK_SNACK,
+      ];
+      for (const t of pool) {
+        if (!spots.some((s) => s.col === t.col && s.row === t.row)) {
+          const idx = spots.length % 4;
+          spots.push({
+            col: t.col,
+            row: t.row,
+            breakType: bTypes[idx],
+            state: bStates[idx],
+            dir: Direction.DOWN,
+            isSitting: false,
+          });
+        }
+        if (spots.length >= 6) break;
+      }
+    }
+
+    return spots;
+  }
+
+  /**
+   * Enforces strictly ONE Project Lead per team / office:
+   * - Finds the single designated Project Lead (prioritizing non-subagent active chat agent)
+   * - Ensures exactly that agent has isTeamLead = true and role = 'Lead'
+   * - Demotes any other agent to isTeamLead = false, and if role was 'Lead', changes to 'Teammate'
+   * - Re-links subagents to this lead
+   */
+  sanitizeTeamHierarchy(): void {
+    const chars = Array.from(this.characters.values());
+    if (chars.length === 0) return;
+
+    const lead =
+      chars.find((c) => c.isTeamLead && !c.isSubagent) ||
+      chars.find((c) => c.isTeamLead) ||
+      chars.find((c) => !c.isSubagent) ||
+      chars[0];
+
+    if (!lead) return;
+
+    lead.isTeamLead = true;
+    lead.role = 'Lead';
+    lead.isSubagent = false;
+
+    for (const [id, ch] of this.characters.entries()) {
+      if (id !== lead.id) {
+        ch.isTeamLead = false;
+        if (ch.role === 'Lead') {
+          ch.role = 'Teammate';
+          updateAgentProfile(id, { role: 'Teammate' });
+        }
+        if (ch.isSubagent) {
+          ch.leadAgentId = lead.id;
+          ch.parentAgentId = lead.id;
+          ch.spawnedByName = lead.customName || 'Project Lead';
+        }
+      }
+    }
+  }
+
+  /**
+   * Engages a random number of workers (1-2) from the team to assist the Lead with
+   * reasoning, system planning, or architecture analysis during the chat turn.
+   */
+  startTeamReasoning(leadId: number): number[] {
+    const leadCh = this.characters.get(leadId);
+    if (!leadCh) return [];
+
+    const workers = Array.from(this.characters.entries()).filter(
+      ([, ch]) => ch.isSubagent && (ch.leadAgentId === leadId || ch.parentAgentId === leadId),
+    );
+    if (workers.length === 0) return [];
+
+    const freeWorkers = workers.filter(([, ch]) => ch.isTakingBreak);
+    if (freeWorkers.length === 0) return [];
+
+    const countToEngage = Math.min(freeWorkers.length, 1 + Math.floor(Math.random() * 2));
+    const shuffled = [...freeWorkers].sort(() => Math.random() - 0.5);
+    const chosen = shuffled.slice(0, countToEngage);
+
+    const reasoningRoles: UsefulWorkerRole[] = [
+      'Software Architect',
+      'Researcher',
+      'Code Reviewer',
+    ];
+    const engagedIds: number[] = [];
+
+    for (let i = 0; i < chosen.length; i++) {
+      const [workerId, workerCh] = chosen[i];
+      const assignedRole = reasoningRoles[i % reasoningRoles.length];
+      workerCh.role = assignedRole;
+      workerCh.currentOrder = `Reasoning & planning system directives (${assignedRole})`;
+      workerCh.isTakingBreak = false;
+      workerCh.breakType = null;
+      workerCh.isActive = true;
+
+      if (workerCh.seatId) {
+        const seat = this.seats.get(workerCh.seatId);
+        if (seat) {
+          const path = this.withOwnSeatUnblocked(workerCh, () =>
+            findPath(
+              workerCh.tileCol,
+              workerCh.tileRow,
+              seat.seatCol,
+              seat.seatRow,
+              this.tileMap,
+              this.blockedTiles,
+            ),
+          );
+          if (path.length > 0) {
+            workerCh.path = path;
+            workerCh.moveProgress = 0;
+            workerCh.state = CharacterState.WALK;
+            workerCh.isSitting = false;
+          } else {
+            workerCh.x = seat.seatCol * TILE_SIZE + TILE_SIZE / 2;
+            workerCh.y = seat.seatRow * TILE_SIZE + TILE_SIZE / 2;
+            workerCh.tileCol = seat.seatCol;
+            workerCh.tileRow = seat.seatRow;
+            workerCh.dir = seat.facingDir;
+            workerCh.state = CharacterState.TYPE;
+          }
+        } else {
+          workerCh.state = CharacterState.TYPE;
+        }
+      } else {
+        workerCh.state = CharacterState.TYPE;
+      }
+
+      this.addTeamDialogue({
+        fromAgentId: leadId,
+        fromName: leadCh.customName || 'Project Lead',
+        fromRole: 'Lead',
+        toAgentId: workerId,
+        toName: workerCh.customName || `Worker #${workerId}`,
+        toRole: assignedRole,
+        text: `@${workerCh.customName}: Brainstorming implementation strategy as ${assignedRole}.`,
+        context: 'delegation',
+      });
+
+      this.addTeamDialogue({
+        fromAgentId: workerId,
+        fromName: workerCh.customName || `Worker #${workerId}`,
+        fromRole: assignedRole,
+        toAgentId: leadId,
+        toName: leadCh.customName || 'Project Lead',
+        toRole: 'Lead',
+        text: `Analyzing requirements, architectural specs, and constraints.`,
+        context: 'delegation',
+      });
+
+      engagedIds.push(workerId);
+    }
+
+    return engagedIds;
+  }
+
+  /**
+   * Returns all idle workers belonging to this lead back to the Break Room lounge.
+   */
+  returnAllTeamWorkersToBreak(leadId: number): void {
+    const activeSubIds = new Set(this.subagentIdMap.values());
+    const breakSpots = this.getBreakRoomSpots();
+    let spotIdx = 0;
+
+    for (const [id, ch] of this.characters.entries()) {
+      if (
+        ch.isSubagent &&
+        (ch.leadAgentId === leadId || ch.parentAgentId === leadId) &&
+        !activeSubIds.has(id) &&
+        !ch.isTakingBreak
+      ) {
+        const spot = breakSpots[spotIdx % breakSpots.length];
+        spotIdx++;
+        ch.isTakingBreak = true;
+        ch.isSitting = spot.isSitting;
+        ch.breakType = spot.breakType;
+        ch.state = spot.state;
+        ch.dir = spot.dir;
+        ch.role = 'Teammate';
+        ch.currentOrder = null;
+        ch.isActive = false;
+        ch.breakTargetCol = spot.col;
+        ch.breakTargetRow = spot.row;
+        const path = this.withOwnSeatUnblocked(ch, () =>
+          findPath(ch.tileCol, ch.tileRow, spot.col, spot.row, this.tileMap, this.blockedTiles),
+        );
+        if (path.length > 0) {
+          ch.path = path;
+          ch.moveProgress = 0;
+          ch.state = CharacterState.WALK;
+          ch.isSitting = false;
+          ch.pendingBreakSpot = spot;
+        } else {
+          ch.x = spot.col * TILE_SIZE + TILE_SIZE / 2;
+          ch.y = spot.row * TILE_SIZE + TILE_SIZE / 2;
+          ch.tileCol = spot.col;
+          ch.tileRow = spot.row;
+          ch.path = [];
+        }
+      }
+    }
+  }
+
+  ensureSubagentTeam(leadId: number, count = 5): number[] {
+    const leadCh = this.characters.get(leadId);
+    if (!leadCh) return [];
+
+    leadCh.isTeamLead = true;
+    leadCh.role = 'Lead';
+    leadCh.isSubagent = false;
+
+    // 1. Ensure strictly ONE Team Lead in the office — remove any old leads from past chats
+    for (const [id, ch] of this.characters.entries()) {
+      if (id !== leadId) {
+        if (!ch.isSubagent) {
+          if (ch.seatId) {
+            const seat = this.seats.get(ch.seatId);
+            if (seat) seat.assigned = false;
+          }
+          this.characters.delete(id);
+          removeCopilotPixelAgent(id);
+        } else {
+          ch.isTeamLead = false;
+          if (ch.role === 'Lead') {
+            ch.role = 'Teammate';
+          }
+        }
+      }
+    }
+
+    // 2. Position the active Team Lead at a workstation in Room 1 (NOT on break)
+    if (leadCh.seatId) {
+      const seat = this.seats.get(leadCh.seatId);
+      if (seat && !this.isBreakRoomArea(seat.seatCol, seat.seatRow)) {
+        leadCh.x = seat.seatCol * TILE_SIZE + TILE_SIZE / 2;
+        leadCh.y = seat.seatRow * TILE_SIZE + TILE_SIZE / 2;
+        leadCh.tileCol = seat.seatCol;
+        leadCh.tileRow = seat.seatRow;
+        leadCh.dir = seat.facingDir;
+        leadCh.state = CharacterState.TYPE;
+        leadCh.isTakingBreak = false;
+      }
+    }
+
+    // 3. Collect ALL existing subagents and re-link them to this active lead
+    const existingSubs: number[] = [];
+    for (const [id, ch] of this.characters.entries()) {
+      if (ch.isSubagent && id !== leadId) {
+        ch.isTeamLead = false;
+        if (ch.role === 'Lead') {
+          ch.role = 'Teammate';
+        }
+        ch.leadAgentId = leadId;
+        ch.parentAgentId = leadId;
+        ch.spawnedByName = leadCh.customName || 'Project Lead';
+        existingSubs.push(id);
+      }
+    }
+
+    // 4. Prune any excess subagents beyond count (strictly 5 workers)
+    if (existingSubs.length > count) {
+      const toRemove = existingSubs.slice(count);
+      for (const rId of toRemove) {
+        const rCh = this.characters.get(rId);
+        if (rCh && rCh.seatId) {
+          const seat = this.seats.get(rCh.seatId);
+          if (seat) seat.assigned = false;
+        }
+        this.characters.delete(rId);
+        removeCopilotPixelAgent(rId);
+      }
+      existingSubs.length = count;
+    }
+
+    const breakSpots = this.getBreakRoomSpots();
+
+    // 5. Create missing workers if fewer than count
+    const needed = count - existingSubs.length;
+    for (let i = 0; i < needed; i++) {
+      const idx = existingSubs.length + i;
+      const workerName = WORKER_NAMES[idx % WORKER_NAMES.length];
+      const subId = this.nextSubagentId--;
+
+      const palette = (leadCh.palette + 1 + idx) % 6;
+      const hueShift = 0;
+
+      // Assign a workstation seat for future work tasks (room 1)
+      const seatId = this.findFreeSeat(leadCh.folderName);
+      const seat = seatId ? (this.seats.get(seatId) ?? null) : null;
+      if (seat) seat.assigned = true;
+
+      const spot = breakSpots[idx % breakSpots.length];
+
+      const ch = createCharacter(subId, palette, seatId, seat, hueShift);
+      ch.customName = workerName;
+      ch.role = 'Teammate';
+      ch.isSubagent = true;
+      ch.leadAgentId = leadId;
+      ch.parentAgentId = leadId;
+      ch.spawnedByName = leadCh.customName || 'Project Lead';
+      ch.isCopilotPixelAgent = true;
+
+      // Position directly at break spot inside the Break Room
+      ch.x = spot.col * TILE_SIZE + TILE_SIZE / 2;
+      ch.y = spot.row * TILE_SIZE + TILE_SIZE / 2;
+      ch.tileCol = spot.col;
+      ch.tileRow = spot.row;
+      ch.dir = spot.dir;
+      ch.state = spot.state;
+      ch.isTakingBreak = true;
+      ch.isSitting = spot.isSitting;
+      ch.breakType = spot.breakType;
+      ch.breakTargetCol = spot.col;
+      ch.breakTargetRow = spot.row;
+      ch.breakStartTime = Date.now();
+      ch.breakDuration = 0;
+      ch.path = [];
+      ch.hueShift = 0;
+
+      this.characters.set(subId, ch);
+
+      saveOrUpdateCopilotPixelAgent({
+        id: subId,
+        customName: ch.customName,
+        role: ch.role,
+        palette: ch.palette,
+        hueShift: 0,
+        seatId: ch.seatId,
+        isSubagent: true,
+        parentAgentId: leadId,
+        leadAgentId: leadId,
+        isTakingBreak: true,
+        isSitting: ch.isSitting,
+        breakType: spot.breakType,
+      });
+
+      existingSubs.push(subId);
+    }
+
+    // 6. Ensure all 5 workers without an active order are situated in the Break Room!
+    for (let i = 0; i < existingSubs.length; i++) {
+      const sId = existingSubs[i];
+      const sub = this.characters.get(sId);
+      if (sub && (!sub.currentOrder || sub.orderStatus !== 'running')) {
+        const spot = breakSpots[i % breakSpots.length];
+        sub.isTakingBreak = true;
+        sub.isSitting = spot.isSitting;
+        sub.breakType = spot.breakType;
+        sub.state = spot.state;
+        sub.dir = spot.dir;
+        sub.breakTargetCol = spot.col;
+        sub.breakTargetRow = spot.row;
+        sub.x = spot.col * TILE_SIZE + TILE_SIZE / 2;
+        sub.y = spot.row * TILE_SIZE + TILE_SIZE / 2;
+        sub.tileCol = spot.col;
+        sub.tileRow = spot.row;
+        sub.path = [];
+        sub.hueShift = 0;
+      }
+    }
+
+    if (needed > 0) {
+      const names = existingSubs.map((id) => this.characters.get(id)?.customName).filter(Boolean);
+      this.addTeamDialogue({
+        fromAgentId: leadId,
+        fromName: leadCh.customName || 'Project Lead',
+        fromRole: 'Lead',
+        text: `Team of 5 workers (${names.join(', ')}) stationed in the Break Room (sofas, espresso machine, tea station).`,
+        context: 'break_room',
+      });
+    }
+
+    this.sanitizeTeamHierarchy();
+    return existingSubs;
+  }
+
   getCharacterAt(worldX: number, worldY: number): number | null {
     const chars = Array.from(this.characters.values()).sort((a, b) => b.y - a.y);
     for (const ch of chars) {
@@ -1573,7 +2557,8 @@ export class OfficeState {
       if (ch.matrixEffect === 'despawn') continue;
       // Character sprite is 16x24, anchored bottom-center
       // Apply sitting offset to match visual position
-      const sittingOffset = ch.state === CharacterState.TYPE ? CHARACTER_SITTING_OFFSET_PX : 0;
+      const sittingOffset =
+        ch.state === CharacterState.TYPE || ch.isSitting ? CHARACTER_SITTING_OFFSET_PX : 0;
       const anchorY = ch.y + sittingOffset;
       const left = ch.x - CHARACTER_HIT_HALF_WIDTH;
       const right = ch.x + CHARACTER_HIT_HALF_WIDTH;

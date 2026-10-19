@@ -65,7 +65,10 @@ export function pngToSpriteData(pngBuffer: Buffer, width: number, height: number
   try {
     const png = PNG.sync.read(sanitizePngBuffer(pngBuffer));
 
-    if (png.width !== width || png.height !== height) {
+    if (
+      (png.width !== width || png.height !== height) &&
+      (png.width % width !== 0 || png.height % height !== 0)
+    ) {
       console.warn(
         `PNG dimensions mismatch: expected ${width}×${height}, got ${png.width}×${png.height}`,
       );
@@ -73,11 +76,13 @@ export function pngToSpriteData(pngBuffer: Buffer, width: number, height: number
 
     const sprite: string[][] = [];
     const data = png.data;
+    const decodeWidth = png.width;
+    const decodeHeight = png.height;
 
-    for (let y = 0; y < height; y++) {
+    for (let y = 0; y < decodeHeight; y++) {
       const row: string[] = [];
-      for (let x = 0; x < width; x++) {
-        const pixelIndex = (y * png.width + x) * 4;
+      for (let x = 0; x < decodeWidth; x++) {
+        const pixelIndex = (y * decodeWidth + x) * 4;
         const r = data[pixelIndex];
         const g = data[pixelIndex + 1];
         const b = data[pixelIndex + 2];

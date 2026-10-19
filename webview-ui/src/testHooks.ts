@@ -5,6 +5,7 @@ import { carpetJunctionCase } from './office/sprites/carpetTiles.js';
 
 declare global {
   interface Window {
+    __pixelOfficeTestHooks?: Window['__copilotAgentsTestHooks'];
     __copilotAgentsTestHooks?: {
       playedSounds?: Array<{ kind: string; at: number }>;
       getCharacters?: () => Array<{

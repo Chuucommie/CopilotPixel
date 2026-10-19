@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.4.9
+
+### Major Rebranding to "Pixel Office", Subagent Break Room Routine & Pure Visual Architecture
+
+- **Rebranded to Pixel Office**:
+  - The application has been unified and renamed to **Pixel Office** (`pixel-office`).
+  - View container `pixel-office-panel` titled **Pixel Office** with primary view `pixel-office.panelView`.
+  - Commands updated to `pixel-office.showPanel` and `pixel-office.exportDefaultLayout` with backward-compatible aliases for `copilot-agents.*`.
+  - Settings migrated to `pixel-office.*` with automated migration from legacy configs.
+  - User state directory transitioned to `~/.pixel-office/` and workspace state to `.pixel-office/` with seamless migration from `.copilot-pixel/`, `.copilot-agents/`, and `.pixel-agents/`.
+  - Standalone binary command updated to `pixel-office` (with `copilot-pixel` and `copilot-agents` aliases).
+- **Subagent Break Room Life & Chat Summoning**:
+  - Eliminated standalone background agents in favor of a natural team dynamic: the **Chat Agent** (`👑 Project Lead`) and the **Subagents**.
+  - Subagents are permanent office members who spend their downtime in the **Break Room** enjoying 4-frame animated coffee sipping with steam, eating donuts with sprinkles and crumbs, playing on the Steam Deck, and socializing in the lounge.
+  - When the Project Lead assigns a subtask or executes tools, the called subagent wakes up from their break, heads to their workstation, and performs their task with live dialogue and speech bubbles.
+  - Upon task completion, the Project Lead thanks the subagent, and the subagent immediately heads back to the Break Room to relax.
+- **Pure Visual Roster & Live Team Dialogue**:
+  - The roster panel is strictly observational/visual, displaying the hierarchical tree of the Project Lead and subagents.
+  - Includes real-time inter-agent dialogue feed (`💬 Live Team Dialogue`) reflecting active AI tool use and completions.
+
 ## v1.4.8
 
 ### Autonomous AI Delegation, Subagent Persistence, Break System & UI Reorganization

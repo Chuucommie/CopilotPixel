@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
-import { CONFIG_FILE_NAME, LAYOUT_FILE_DIR } from './constants.js';
+import { CONFIG_FILE_NAME, LAYOUT_FILE_DIR, LEGACY_LAYOUT_FILE_DIRS } from './constants.js';
 
 export interface AdapterSettings {
   soundEnabled: boolean;
@@ -41,7 +41,17 @@ export type ConfigNamespace = 'vscode' | 'standalone';
  *  unanswered, the ask is still open. */
 export type HooksConsentState = 'granted' | 'declined';
 
-export interface CopilotAgentsConfig {
+export interface PixelOfficeConfig {
+  vscode: AdapterSettings;
+  standalone: AdapterSettings;
+  externalAssetDirectories: string[];
+  hooksConsent: Record<string, HooksConsentState>;
+  hooksEnabled: Record<string, boolean>;
+}
+
+export type CopilotAgentsConfig = PixelOfficeConfig;
+
+export interface LegacyCopilotAgentsConfig {
   vscode: AdapterSettings;
   standalone: AdapterSettings;
   externalAssetDirectories: string[];
@@ -148,10 +158,32 @@ function parseAdapterSettings(raw: unknown): AdapterSettings {
   };
 }
 
-export function readConfig(): CopilotAgentsConfig {
+export function readConfig(): PixelOfficeConfig {
   const filePath = getConfigFilePath();
   try {
     if (!fs.existsSync(filePath)) {
+      for (const legacyDir of LEGACY_LAYOUT_FILE_DIRS) {
+        const legacyPath = path.join(os.homedir(), legacyDir, CONFIG_FILE_NAME);
+        if (fs.existsSync(legacyPath)) {
+          try {
+            const raw = fs.readFileSync(legacyPath, 'utf-8');
+            const parsed = JSON.parse(raw) as Partial<PixelOfficeConfig>;
+            const cfg: PixelOfficeConfig = {
+              vscode: parseAdapterSettings(parsed.vscode),
+              standalone: parseAdapterSettings(parsed.standalone),
+              externalAssetDirectories: Array.isArray(parsed.externalAssetDirectories)
+                ? parsed.externalAssetDirectories.filter((d): d is string => typeof d === 'string')
+                : [],
+              hooksConsent: parseHooksConsent(parsed.hooksConsent),
+              hooksEnabled: parseHooksEnabled(parsed.hooksEnabled),
+            };
+            writeConfig(cfg);
+            return cfg;
+          } catch {
+            // continue checking next legacy dir
+          }
+        }
+      }
       return {
         vscode: { ...DEFAULT_ADAPTER_SETTINGS },
         standalone: { ...DEFAULT_ADAPTER_SETTINGS },
@@ -161,7 +193,7 @@ export function readConfig(): CopilotAgentsConfig {
       };
     }
     const raw = fs.readFileSync(filePath, 'utf-8');
-    const parsed = JSON.parse(raw) as Partial<CopilotAgentsConfig>;
+    const parsed = JSON.parse(raw) as Partial<PixelOfficeConfig>;
     return {
       vscode: parseAdapterSettings(parsed.vscode),
       standalone: parseAdapterSettings(parsed.standalone),
@@ -172,7 +204,7 @@ export function readConfig(): CopilotAgentsConfig {
       hooksEnabled: parseHooksEnabled(parsed.hooksEnabled),
     };
   } catch (err) {
-    console.error('[CopilotAgents] Failed to read config file:', err);
+    console.error('[PixelOffice] Failed to read config file:', err);
     return {
       vscode: { ...DEFAULT_ADAPTER_SETTINGS },
       standalone: { ...DEFAULT_ADAPTER_SETTINGS },
@@ -294,6 +326,6 @@ export function writeConfig(config: CopilotAgentsConfig): void {
     fs.writeFileSync(tmpPath, json, 'utf-8');
     fs.renameSync(tmpPath, filePath);
   } catch (err) {
-    console.error('[CopilotAgents] Failed to write config file:', err);
+    console.error('[PixelOffice] Failed to write config file:', err);
   }
 }

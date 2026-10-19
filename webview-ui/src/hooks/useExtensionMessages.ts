@@ -250,6 +250,13 @@ export function useExtensionMessages(
             return next.sort((a, b) => a - b);
           });
         }
+        for (const [chId, ch] of os.characters.entries()) {
+          if (ch.isTeamLead) {
+            const subIds = os.ensureSubagentTeam(chId, 5);
+            setAgents([chId, ...subIds].sort((a, b) => a - b));
+            break;
+          }
+        }
         layoutReadyRef.current = true;
         setLayoutReady(true);
         if (msg.wasReset) {
@@ -293,12 +300,52 @@ export function useExtensionMessages(
             ch.leadAgentId = teammateParentId;
             ch.teamName = teamName ?? parentCh?.teamName;
             ch.agentName = teammateName;
+            ch.isSubagent = true;
+            ch.isTeamLead = false;
+            ch.parentAgentId = teammateParentId;
+            ch.spawnedByName = parentCh?.customName || 'Project Lead';
+            if (ch.role === 'Lead') {
+              ch.role = 'Teammate';
+            }
+            os.addTeamDialogue({
+              fromAgentId: teammateParentId,
+              fromName: parentCh?.customName || 'Project Lead',
+              fromRole: 'Lead',
+              toAgentId: id,
+              toName: ch.customName || `Subagent #${id}`,
+              toRole: ch.role || 'Teammate',
+              text: `Spawning teammate @${ch.customName || 'Subagent'} to assist with workspace tasks.`,
+              context: 'delegation',
+            });
           }
         } else {
           const palette = msg.palette as number | undefined;
           const hueShift = msg.hueShift as number | undefined;
           os.addAgent(id, palette, hueShift, undefined, undefined, folderName);
           noteFolderName(folderName);
+          const ch = os.characters.get(id);
+          if (ch) {
+            ch.isTeamLead = true;
+            ch.role = 'Lead';
+            ch.isSubagent = false;
+            for (const [otherId, otherCh] of os.characters.entries()) {
+              if (otherId !== id) {
+                otherCh.isTeamLead = false;
+                if (otherCh.role === 'Lead') {
+                  otherCh.role = 'Teammate';
+                }
+              }
+            }
+            os.addTeamDialogue({
+              fromAgentId: id,
+              fromName: ch.customName || `Lead #${id}`,
+              fromRole: 'Lead',
+              text: 'Project Lead ready for chat directives.',
+              context: 'chat',
+            });
+            const subIds = os.ensureSubagentTeam(id, 5);
+            setAgents([id, ...subIds].sort((a, b) => a - b));
+          }
           if (isHeadlessAgent(msg.isExternal as boolean | undefined)) {
             os.setHeadless(id, true);
           }
@@ -438,15 +485,81 @@ export function useExtensionMessages(
         const isTeammateSpawn = msg.isTeammateSpawn as boolean | undefined;
         const parentChar = os.characters.get(id);
         const isTmuxTeam = !!(parentChar?.teamName && parentChar?.teamUsesTmux);
+        // Update active agent speech bubble and state in-place (never spawn duplicate bubbles)
+        const activeChar = os.characters.get(id);
+        if (activeChar) {
+          const displayLabel = status.startsWith('Subtask:')
+            ? status.slice('Subtask:'.length).trim()
+            : status;
+          activeChar.speechBubbleText = displayLabel;
+          activeChar.speechBubbleTimer = 5.0;
+        }
+
+        // ONLY delegate to a subagent character if this is an explicit subagent tool or teammate spawn!
+        // Ordinary tools (run_command, view_file, grep_search, edit_file, etc.) are executed directly by the active agent
+        // and update their status/bubble in-place.
         if (isSubagentToolName(toolName) && !isTeammateSpawn && (!runInBackground || !isTmuxTeam)) {
           const label = status.startsWith('Subtask:')
             ? status.slice('Subtask:'.length).trim()
             : status;
-          const subId = os.addSubagent(id, toolId);
+          const subId = os.addSubagent(id, toolId, toolName, label);
           setSubagentCharacters((prev) => {
             if (prev.some((s) => s.id === subId)) return prev;
             return [...prev, { id: subId, parentAgentId: id, parentToolId: toolId, label }];
           });
+          const subCh = os.characters.get(subId);
+          const leadCh = os.characters.get(id);
+          if (subCh && leadCh) {
+            subCh.isSubagent = true;
+            subCh.leadAgentId = id;
+            subCh.parentAgentId = id;
+            subCh.spawnedByName = leadCh.customName || 'Project Lead';
+            subCh.currentOrder = label;
+            os.setAgentTool(subId, toolName);
+            os.setAgentActive(subId, true);
+
+            // Register tool under subId so AgentRosterModal and ToolOverlay show active status on the worker
+            setAgentTools((prev) => {
+              const list = prev[subId] || [];
+              const existing = list.find((t) => t.toolId === toolId);
+              if (existing) return prev;
+              return {
+                ...prev,
+                [subId]: [
+                  ...list,
+                  {
+                    toolId,
+                    toolName,
+                    status: label,
+                    done: false,
+                    permissionWait: permissionActive || false,
+                  },
+                ],
+              };
+            });
+
+            os.addTeamDialogue({
+              fromAgentId: id,
+              fromName: leadCh.customName || 'Project Lead',
+              fromRole: 'Lead',
+              toAgentId: subId,
+              toName: subCh.customName || `Worker #${subId}`,
+              toRole: subCh.role || 'Teammate',
+              text: `@${subCh.customName || 'Worker'} (${subCh.role}): Assigning ${toolName || 'task'} "${label}".`,
+              context: 'delegation',
+              aiAction: toolName || undefined,
+            });
+            os.addTeamDialogue({
+              fromAgentId: subId,
+              fromName: subCh.customName || `Worker #${subId}`,
+              fromRole: subCh.role || 'Teammate',
+              toAgentId: id,
+              toName: leadCh.customName || 'Project Lead',
+              toRole: 'Lead',
+              text: `Understood, Lead! Ready as ${subCh.role} for "${label}".`,
+              context: 'delegation',
+            });
+          }
         }
       } else if (msg.type === 'agentToolDone') {
         const id = msg.id as number;
@@ -460,11 +573,69 @@ export function useExtensionMessages(
             id,
             nextActive ? (nextActive.toolName ?? extractToolName(nextActive.status)) : null,
           );
+          const activeChar = os.characters.get(id);
+          if (activeChar) {
+            if (nextActive) {
+              activeChar.speechBubbleText = nextActive.status;
+              activeChar.speechBubbleTimer = 5.0;
+            } else {
+              activeChar.speechBubbleText = 'Completed task';
+              activeChar.speechBubbleTimer = 2.5;
+            }
+          }
           return {
             ...prev,
             [id]: updated,
           };
         });
+
+        // Check if a worker handled this tool and update worker status
+        const subId = os.getSubagentId(id, toolId);
+        if (subId !== null) {
+          setSubagentCharacters((prev) => prev.filter((s) => s.parentToolId !== toolId));
+          setAgentTools((prev) => {
+            const list = prev[subId];
+            if (!list) return prev;
+            return {
+              ...prev,
+              [subId]: list.map((t) => (t.toolId === toolId ? { ...t, done: true } : t)),
+            };
+          });
+
+          setSubagentTools((prev) => {
+            const pTools = prev[id];
+            if (!pTools) return prev;
+            const rows = pTools[toolId];
+            if (!rows) return prev;
+            return {
+              ...prev,
+              [id]: {
+                ...pTools,
+                [toolId]: rows.map((r) => ({ ...r, done: true })),
+              },
+            };
+          });
+
+          const subCh = os.characters.get(subId);
+          if (subCh) {
+            os.setAgentTool(subId, null);
+            os.setAgentActive(subId, false);
+            subCh.currentOrder = null;
+            subCh.role = 'Teammate';
+            os.startAgentBreak(subId);
+            os.addTeamDialogue({
+              fromAgentId: subId,
+              fromName: subCh.customName || `Worker #${subId}`,
+              fromRole: 'Teammate',
+              toAgentId: id,
+              toName: os.characters.get(id)?.customName || 'Project Lead',
+              toRole: 'Lead',
+              text: `Completed ${subCh.currentOrder ? `"${subCh.currentOrder}"` : 'subtask'}. Returning to lounge for a break!`,
+              context: 'break_room',
+            });
+          }
+          os.subagentIdMap.delete(`${id}:${toolId}`);
+        }
       } else if (msg.type === 'agentToolsClear') {
         const id = msg.id as number;
         const bgSet = backgroundParentToolIdsRef.current[id];
@@ -496,22 +667,26 @@ export function useExtensionMessages(
         //   teammates, removed only by SubagentStop/subagentClear;
         // - live background spawns: removing + re-creating them on every turn
         //   end teleported the character (subagentClear removes them for real).
-        const clearCh = os.characters.get(id);
-        const hasInlineTeammates =
-          clearCh?.teamName && clearCh?.isTeamLead && !clearCh?.teamUsesTmux;
-        if (!hasInlineTeammates) {
-          const doomed: string[] = [];
-          for (const meta of os.subagentMeta.values()) {
-            if (meta.parentAgentId === id && !bgSet?.has(meta.parentToolId)) {
-              doomed.push(meta.parentToolId);
+        // Subagents remain in the office and head to the break room when turns conclude
+        for (const [subId, meta] of os.subagentMeta.entries()) {
+          if (meta.parentAgentId === id) {
+            const subCh = os.characters.get(subId);
+            if (subCh && !subCh.isTakingBreak) {
+              subCh.role = 'Teammate';
+              os.setAgentActive(subId, false);
+              os.setAgentTool(subId, null);
+              os.startAgentBreak(subId);
             }
           }
-          for (const parentToolId of doomed) {
-            os.removeSubagent(id, parentToolId);
-          }
-          setSubagentCharacters((prev) =>
-            prev.filter((s) => s.parentAgentId !== id || bgSet?.has(s.parentToolId)),
-          );
+        }
+        // Clean up completed subagents from subagentCharacters
+        setSubagentCharacters((prev) =>
+          prev.filter((s) => s.parentAgentId !== id || bgSet?.has(s.parentToolId)),
+        );
+        const clearActiveChar = os.characters.get(id);
+        if (clearActiveChar) {
+          clearActiveChar.speechBubbleText = null;
+          clearActiveChar.speechBubbleTimer = 0;
         }
         os.setAgentTool(id, null);
         os.clearPermissionBubble(id);
@@ -531,9 +706,26 @@ export function useExtensionMessages(
           return { ...prev, [id]: status };
         });
         os.setAgentActive(id, status === 'active');
-        if (status === 'waiting') {
+        if (status === 'active') {
+          // Model in chat reasoning / planning phase
+          const leadCh = os.characters.get(id);
+          if (leadCh) {
+            leadCh.speechBubbleText = 'Thinking...';
+            leadCh.speechBubbleTimer = 4.0;
+            if (leadCh.isTeamLead) {
+              os.startTeamReasoning(id);
+            }
+          }
+        } else if (status === 'waiting') {
           os.showWaitingBubble(id, msg.awaitingInput === true);
+          const ch = os.characters.get(id);
+          if (ch) {
+            ch.speechBubbleText = null;
+            ch.speechBubbleTimer = 0;
+          }
           playDoneSound();
+          os.startAgentBreak(id);
+          os.returnAllTeamWorkersToBreak(id);
         }
       } else if (msg.type === 'agentToolPermission') {
         const id = msg.id as number;
@@ -609,7 +801,7 @@ export function useExtensionMessages(
         // Update sub-agent character's tool and active state.
         let subId = os.getSubagentId(id, parentToolId);
         if (subId === null) {
-          subId = os.addSubagent(id, parentToolId);
+          subId = os.addSubagent(id, parentToolId, subToolName, status);
           const newSubId = subId;
           setSubagentCharacters((prev) => {
             if (prev.some((s) => s.id === newSubId)) return prev;
@@ -620,6 +812,21 @@ export function useExtensionMessages(
         }
         os.setAgentTool(subId, subToolName);
         os.setAgentActive(subId, true);
+        const subCh = os.characters.get(subId);
+        const leadCh = os.characters.get(id);
+        if (subCh) {
+          os.addTeamDialogue({
+            fromAgentId: subId,
+            fromName: subCh.customName || `Subagent #${subId}`,
+            fromRole: subCh.role || 'Coder',
+            toAgentId: id,
+            toName: leadCh?.customName || 'Project Lead',
+            toRole: 'Lead',
+            text: `Running ${subToolName || 'tool'}: ${status}`,
+            context: 'ai_progress',
+            aiAction: subToolName || undefined,
+          });
+        }
       } else if (msg.type === 'subagentToolDone') {
         const id = msg.id as number;
         const parentToolId = msg.parentToolId as string;
@@ -662,11 +869,39 @@ export function useExtensionMessages(
           }
           return { ...prev, [id]: next };
         });
-        // Remove sub-agent character
-        os.removeSubagent(id, parentToolId);
-        setSubagentCharacters((prev) =>
-          prev.filter((s) => !(s.parentAgentId === id && s.parentToolId === parentToolId)),
-        );
+        const subId = os.getSubagentId(id, parentToolId);
+        const subCh = subId !== null ? os.characters.get(subId) : null;
+        const leadCh = os.characters.get(id);
+        if (subCh) {
+          const completedRole = subCh.role || 'Teammate';
+          os.addTeamDialogue({
+            fromAgentId: subCh.id,
+            fromName: subCh.customName || `Worker #${subCh.id}`,
+            fromRole: completedRole,
+            toAgentId: id,
+            toName: leadCh?.customName || 'Project Lead',
+            toRole: 'Lead',
+            text: `Subtask completed as ${completedRole}! Handing results back to Lead.`,
+            context: 'completion',
+          });
+          if (leadCh) {
+            os.addTeamDialogue({
+              fromAgentId: leadCh.id,
+              fromName: leadCh.customName || 'Project Lead',
+              fromRole: 'Lead',
+              toAgentId: subCh.id,
+              toName: subCh.customName || `Worker #${subCh.id}`,
+              toRole: completedRole,
+              text: `Great work @${subCh.customName || 'Worker'}! Head to the lounge for a break ☕.`,
+              context: 'completion',
+            });
+          }
+          // Workers reset to Teammate while taking a break in the lounge
+          subCh.role = 'Teammate';
+          os.setAgentActive(subCh.id, false);
+          os.setAgentTool(subCh.id, null);
+          os.startAgentBreak(subCh.id);
+        }
       } else if (msg.type === 'characterSpritesLoaded') {
         const characters = msg.characters as Array<{
           down: string[][][];
@@ -711,6 +946,20 @@ export function useExtensionMessages(
       } else if (msg.type === 'workspaceFolders') {
         const folders = msg.folders as WorkspaceFolder[];
         setWorkspaceFolders(folders);
+      } else if (msg.type === 'agentTeamDialogue') {
+        const os = getOfficeState();
+        os.addTeamDialogue({
+          fromAgentId: msg.fromAgentId,
+          fromName: msg.fromName,
+          fromRole: msg.fromRole,
+          toAgentId: msg.toAgentId,
+          toName: msg.toName,
+          toRole: msg.toRole,
+          text: msg.text,
+          context: msg.context as
+            'delegation' | 'ai_progress' | 'completion' | 'break_room' | 'chat',
+          aiAction: msg.aiAction,
+        });
       } else if (msg.type === 'agentOrderProgress') {
         const id = msg.agentId;
         const os = getOfficeState();
@@ -841,6 +1090,7 @@ export function useExtensionMessages(
           msg.leadAgentId as number | undefined,
           msg.teamUsesTmux as boolean | undefined,
         );
+        os.sanitizeTeamHierarchy();
       } else if (msg.type === 'agentContextUsage') {
         const id = msg.id as number;
         os.setAgentContext(id, msg.contextTokens as number, msg.maxContextTokens as number);

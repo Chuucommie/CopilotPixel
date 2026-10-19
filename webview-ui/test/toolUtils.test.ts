@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   extractToolName,
   isReadingToolName,
+  isSubagentToolName,
   setProviderCapabilities,
 } from '../src/office/toolUtils.js';
 
@@ -36,5 +37,22 @@ describe('toolUtils', () => {
     expect(isReadingToolName('runInTerminal')).toBe(false);
     expect(isReadingToolName(null)).toBe(false);
     expect(isReadingToolName('')).toBe(false);
+  });
+
+  it('identifies subagent tools correctly with capabilities and fallback keywords', () => {
+    setProviderCapabilities({
+      readingTools: ['Read'],
+      subagentToolNames: ['Task', 'browser_subagent'],
+    });
+
+    expect(isSubagentToolName('Task')).toBe(true);
+    expect(isSubagentToolName('browser_subagent')).toBe(true);
+    expect(isSubagentToolName('invoke_subagent')).toBe(true);
+    expect(isSubagentToolName('agent')).toBe(true);
+
+    expect(isSubagentToolName('run_command')).toBe(false);
+    expect(isSubagentToolName('view_file')).toBe(false);
+    expect(isSubagentToolName('replace_file_content')).toBe(false);
+    expect(isSubagentToolName(null)).toBe(false);
   });
 });

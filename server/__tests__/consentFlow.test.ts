@@ -36,7 +36,7 @@ describe('clientMessageHandler: hooks consent flow', () => {
 
   /** Put our command on every installed event, as a real install would. */
   function seedInstalledHooks(): void {
-    const hookPath = path.join(tempHome, '.copilot-agents', 'hooks', 'copilot-hook.js');
+    const hookPath = path.join(tempHome, '.pixel-office', 'hooks', 'copilot-hook.js');
     const entry = { type: 'command', exec: 'node', args: [hookPath], timeoutSec: 5 };
     const configPath = path.join(tempHome, '.copilot', 'hooks', 'copilotagents.json');
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
@@ -56,7 +56,7 @@ describe('clientMessageHandler: hooks consent flow', () => {
   /** The strongest possible "writes nothing": the config file was never even
    *  created. */
   function configJsonExists(): boolean {
-    return fs.existsSync(path.join(tempHome, '.copilot-agents', 'config.json'));
+    return fs.existsSync(path.join(tempHome, '.pixel-office', 'config.json'));
   }
 
   function answer(choice: unknown, providerId: unknown = 'copilot'): void {

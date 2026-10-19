@@ -147,7 +147,7 @@ describe('migrateVsCodeState', () => {
     expect(showWarningMessage).not.toHaveBeenCalled();
   });
 
-  it('migrates legacy layout from workspaceState to ~/.copilot-agents/layout.json', () => {
+  it('migrates legacy layout from workspaceState to ~/.pixel-office/layout.json', () => {
     const legacyLayout = {
       version: 1,
       cols: 20,
@@ -180,7 +180,7 @@ describe('migrateVsCodeState', () => {
   });
 
   it('warns + keeps legacy keys if file write fails (simulated via read-only HOME)', () => {
-    // Make ~/.copilot-agents/ unwritable by pointing HOME at a non-writable path.
+    // Make ~/.pixel-office/ unwritable by pointing HOME at a non-writable path.
     // Simulate by replacing with a file (so mkdirSync fails on subpath).
     const blocker = path.join(tempHome, 'blocker');
     fs.writeFileSync(blocker, 'x');

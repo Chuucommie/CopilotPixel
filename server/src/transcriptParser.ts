@@ -785,11 +785,13 @@ function processAntigravityRecord(
   if (!agent.agentName) {
     agent.agentName = 'Gemini';
     agent.teamName = 'Antigravity';
+    agent.isTeamLead = true;
     agents.broadcast({
       type: 'agentTeamInfo',
       id: agentId,
       agentName: 'Gemini',
       teamName: 'Antigravity',
+      isTeamLead: true,
     });
   }
 
@@ -947,11 +949,13 @@ export function processCopilotChatRecord(
   if (!agent.agentName) {
     agent.agentName = 'Copilot';
     agent.teamName = 'GitHub Copilot';
+    agent.isTeamLead = true;
     agents.broadcast({
       type: 'agentTeamInfo',
       id: agentId,
       agentName: 'Copilot',
       teamName: 'GitHub Copilot',
+      isTeamLead: true,
     });
   }
 

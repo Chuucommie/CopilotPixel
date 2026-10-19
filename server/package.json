@@ -1,5 +1,5 @@
 {
-  "name": "copilot-agents-server",
+  "name": "pixel-office-server",
   "private": true,
   "scripts": {
     "test": "vitest run",

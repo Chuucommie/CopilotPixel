@@ -82,6 +82,8 @@ export function buildDynamicCatalog(assets: LoadedAssetData): boolean {
       return {
         type: asset.id,
         label: asset.label,
+        width: asset.width,
+        height: asset.height,
         footprintW: asset.footprintW,
         footprintH: asset.footprintH,
         sprite,

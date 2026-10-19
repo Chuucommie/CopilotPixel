@@ -73,6 +73,8 @@ import { CharacterState, TILE_SIZE, TileType } from '../types.js';
 import { getWallInstances, hasWallSprites, wallColorToHex } from '../wallTiles.js';
 import { getCharacterSprite } from './characters.js';
 import { renderMatrixEffect } from './matrixEffect.js';
+import { renderOfficeClock } from './officeClock.js';
+import { getLightingState, renderOfficeLighting } from './officeLighting.js';
 import { getPetSpriteData } from './petEntity.js';
 
 // ── Settings ────────────────────────────────────────────────────
@@ -347,6 +349,8 @@ interface ZDrawable {
   draw: (ctx: CanvasRenderingContext2D) => void;
 }
 
+const drawablesPool: ZDrawable[] = [];
+
 /** @internal */
 export function renderScene(
   ctx: CanvasRenderingContext2D,
@@ -359,29 +363,38 @@ export function renderScene(
   hoveredAgentId: number | null,
   pets: Pet[] = [],
 ): void {
-  const drawables: ZDrawable[] = [];
+  const drawables = drawablesPool;
+  drawables.length = 0;
 
   // Furniture
   for (const f of furniture) {
     const cached = getCachedSprite(f.sprite, zoom);
     const fx = offsetX + f.x * zoom;
     const fy = offsetY + f.y * zoom;
+    const targetW = (f.width ?? cached.width / zoom) * zoom;
+    const targetH = (f.height ?? cached.height / zoom) * zoom;
     if (f.mirrored) {
       drawables.push({
         zY: f.zY,
         draw: (c) => {
           c.save();
-          c.translate(fx + cached.width, fy);
+          c.translate(fx + targetW, fy);
           c.scale(-1, 1);
-          c.drawImage(cached, 0, 0);
+          c.drawImage(cached, 0, 0, targetW, targetH);
           c.restore();
+          if (f.type === 'CLOCK') {
+            renderOfficeClock(c, fx, fy, zoom);
+          }
         },
       });
     } else {
       drawables.push({
         zY: f.zY,
         draw: (c) => {
-          c.drawImage(cached, fx, fy);
+          c.drawImage(cached, fx, fy, targetW, targetH);
+          if (f.type === 'CLOCK') {
+            renderOfficeClock(c, fx, fy, zoom);
+          }
         },
       });
     }
@@ -393,7 +406,8 @@ export function renderScene(
     const spriteData = getCharacterSprite(ch, sprites);
     const cached = getCachedSprite(spriteData, zoom);
     // Sitting offset: shift character down when seated so they visually sit in the chair
-    const sittingOffset = ch.state === CharacterState.TYPE ? CHARACTER_SITTING_OFFSET_PX : 0;
+    const sittingOffset =
+      ch.state === CharacterState.TYPE || ch.isSitting ? CHARACTER_SITTING_OFFSET_PX : 0;
     // Anchor at bottom-center of character — round to integer device pixels
     const drawX = Math.round(offsetX + ch.x * zoom - cached.width / 2);
     const drawY = Math.round(offsetY + (ch.y + sittingOffset) * zoom - cached.height);
@@ -644,25 +658,29 @@ export function renderGhostPreview(
   offsetY: number,
   zoom: number,
   mirrored: boolean = false,
+  targetWidth?: number,
+  targetHeight?: number,
 ): void {
   const cached = getCachedSprite(sprite, zoom);
   const x = offsetX + col * TILE_SIZE * zoom;
   const y = offsetY + row * TILE_SIZE * zoom;
+  const targetW = (targetWidth ?? cached.width / zoom) * zoom;
+  const targetH = (targetHeight ?? cached.height / zoom) * zoom;
   ctx.save();
   ctx.globalAlpha = GHOST_PREVIEW_SPRITE_ALPHA;
   if (mirrored) {
-    ctx.translate(x + cached.width, y);
+    ctx.translate(x + targetW, y);
     ctx.scale(-1, 1);
-    ctx.drawImage(cached, 0, 0);
+    ctx.drawImage(cached, 0, 0, targetW, targetH);
   } else {
-    ctx.drawImage(cached, x, y);
+    ctx.drawImage(cached, x, y, targetW, targetH);
   }
   // Tint overlay — reset transform for correct fill position
   ctx.restore();
   ctx.save();
   ctx.globalAlpha = GHOST_PREVIEW_TINT_ALPHA;
   ctx.fillStyle = valid ? GHOST_VALID_TINT : GHOST_INVALID_TINT;
-  ctx.fillRect(x, y, cached.width, cached.height);
+  ctx.fillRect(x, y, targetW, targetH);
   ctx.restore();
 }
 
@@ -804,7 +822,8 @@ function renderBubbles(
     // Position: centered above the character's head
     // Character is anchored bottom-center at (ch.x, ch.y), sprite is 16x24
     // Place bubble above head with a small gap; follow sitting offset
-    const sittingOff = ch.state === CharacterState.TYPE ? BUBBLE_SITTING_OFFSET_PX : 0;
+    const sittingOff =
+      ch.state === CharacterState.TYPE || ch.isSitting ? BUBBLE_SITTING_OFFSET_PX : 0;
     const bubbleX = Math.round(offsetX + ch.x * zoom - cached.width / 2);
     const bubbleY = Math.round(
       offsetY + (ch.y + sittingOff - BUBBLE_VERTICAL_OFFSET_PX) * zoom - cached.height - 1 * zoom,
@@ -973,7 +992,11 @@ export function renderFrame(
     pets ?? [],
   );
 
-  // Speech bubbles (always on top of characters)
+  // Dynamic Office Lighting: Day / Evening soffuse / Night spente (dispositivi glow)
+  const lighting = getLightingState(allFurniture, characters);
+  renderOfficeLighting(ctx, canvasWidth, canvasHeight, offsetX, offsetY, zoom, lighting);
+
+  // Speech bubbles (always on top of characters and lighting)
   renderBubbles(ctx, characters, offsetX, offsetY, zoom);
   // Pet heart bubbles (same overlay pass)
   if (pets && pets.length > 0) {
