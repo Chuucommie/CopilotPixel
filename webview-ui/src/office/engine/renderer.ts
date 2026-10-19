@@ -22,7 +22,23 @@ import {
   CHARACTER_SITTING_OFFSET_PX,
   CHARACTER_Z_SORT_OFFSET,
   DELETE_BUTTON_BG,
+  ESPRESSO_CUP_COLOR,
+  ESPRESSO_CUP_SHADOW,
+  ESPRESSO_STEAM_COLOR,
+  ESPRESSO_STREAM_COLOR,
   FALLBACK_FLOOR_COLOR,
+  FRIDGE_DOOR_COLOR,
+  FRIDGE_DOOR_HANDLE,
+  FRIDGE_DOOR_SHADOW,
+  FRIDGE_ITEM_BLUE,
+  FRIDGE_ITEM_DARK,
+  FRIDGE_ITEM_GREEN,
+  FRIDGE_ITEM_ORANGE,
+  FRIDGE_ITEM_RED,
+  FRIDGE_ITEM_WHITE,
+  FRIDGE_LIGHT_GLOW,
+  FRIDGE_MIST_COLOR,
+  FRIDGE_SHELF_COLOR,
   GHOST_BORDER_HOVER_FILL,
   GHOST_BORDER_HOVER_STROKE,
   GHOST_BORDER_STROKE,
@@ -34,6 +50,11 @@ import {
   HEADLESS_CHARACTER_ALPHA,
   HOVERED_OUTLINE_ALPHA,
   OUTLINE_Z_SORT_OFFSET,
+  PLACED_MUG_BODY_COLOR,
+  PLACED_MUG_COFFEE_COLOR,
+  PLACED_MUG_EMPTY_COLOR,
+  PLACED_MUG_SHADOW_COLOR,
+  PLACED_MUG_STEAM_COLOR,
   ROTATE_BUTTON_BG,
   SEAT_AVAILABLE_COLOR,
   SEAT_BUSY_COLOR,
@@ -69,7 +90,7 @@ import type {
   SpriteData,
   TileType as TileTypeVal,
 } from '../types.js';
-import { CharacterState, TILE_SIZE, TileType } from '../types.js';
+import { CharacterState, Direction, TILE_SIZE, TileType } from '../types.js';
 import { getWallInstances, hasWallSprites, wallColorToHex } from '../wallTiles.js';
 import { getCharacterSprite } from './characters.js';
 import { renderMatrixEffect } from './matrixEffect.js';
@@ -351,6 +372,131 @@ interface ZDrawable {
 
 const drawablesPool: ZDrawable[] = [];
 
+/** Renders animated interior of an open office refrigerator when an agent interacts with it */
+function renderOpenFridgeOverlay(
+  ctx: CanvasRenderingContext2D,
+  fx: number,
+  fy: number,
+  zoom: number,
+): void {
+  ctx.save();
+  // Warm golden interior light
+  ctx.fillStyle = FRIDGE_LIGHT_GLOW;
+  ctx.fillRect(fx + 2 * zoom, fy + 2 * zoom, 12 * zoom, 12 * zoom);
+
+  // Subtle cold mist ambient glow
+  ctx.fillStyle = FRIDGE_MIST_COLOR;
+  ctx.fillRect(fx + 2 * zoom, fy + 2 * zoom, 12 * zoom, 12 * zoom);
+
+  // Interior shelves
+  ctx.fillStyle = FRIDGE_SHELF_COLOR;
+  ctx.fillRect(fx + 3 * zoom, fy + 6 * zoom, 10 * zoom, 1 * zoom);
+  ctx.fillRect(fx + 3 * zoom, fy + 10 * zoom, 10 * zoom, 1 * zoom);
+
+  // Drinks on top shelf: cold brew bottle & soda
+  ctx.fillStyle = FRIDGE_ITEM_DARK;
+  ctx.fillRect(fx + 4 * zoom, fy + 3 * zoom, 2 * zoom, 3 * zoom);
+  ctx.fillStyle = FRIDGE_ITEM_RED;
+  ctx.fillRect(fx + 7 * zoom, fy + 4 * zoom, 2 * zoom, 2 * zoom);
+  ctx.fillStyle = FRIDGE_ITEM_BLUE;
+  ctx.fillRect(fx + 10 * zoom, fy + 4 * zoom, 2 * zoom, 2 * zoom);
+
+  // Groceries on bottom shelf: milk carton & snack container
+  ctx.fillStyle = FRIDGE_ITEM_WHITE;
+  ctx.fillRect(fx + 4 * zoom, fy + 7 * zoom, 3 * zoom, 3 * zoom);
+  ctx.fillStyle = FRIDGE_ITEM_GREEN;
+  ctx.fillRect(fx + 5 * zoom, fy + 6 * zoom, 1 * zoom, 1 * zoom);
+  ctx.fillStyle = FRIDGE_ITEM_ORANGE;
+  ctx.fillRect(fx + 8 * zoom, fy + 8 * zoom, 4 * zoom, 2 * zoom);
+
+  // Open refrigerator door swung open to the right
+  ctx.fillStyle = FRIDGE_DOOR_COLOR;
+  ctx.fillRect(fx + 14 * zoom, fy + 1 * zoom, 3 * zoom, 14 * zoom);
+  ctx.fillStyle = FRIDGE_DOOR_SHADOW;
+  ctx.fillRect(fx + 15 * zoom, fy + 4 * zoom, 1 * zoom, 8 * zoom);
+  ctx.fillStyle = FRIDGE_DOOR_HANDLE;
+  ctx.fillRect(fx + 16 * zoom, fy + 6 * zoom, 1 * zoom, 4 * zoom);
+
+  ctx.restore();
+}
+
+/** Renders animated espresso extraction when an agent is brewing at the coffee machine */
+function renderEspressoBrewingOverlay(
+  ctx: CanvasRenderingContext2D,
+  fx: number,
+  fy: number,
+  zoom: number,
+): void {
+  ctx.save();
+  // Ceramic espresso cup on drip tray
+  ctx.fillStyle = ESPRESSO_CUP_COLOR;
+  ctx.fillRect(fx + 7 * zoom, fy + 11 * zoom, 3 * zoom, 3 * zoom);
+  ctx.fillStyle = ESPRESSO_CUP_SHADOW;
+  ctx.fillRect(fx + 7 * zoom, fy + 13 * zoom, 3 * zoom, 1 * zoom);
+  ctx.fillRect(fx + 10 * zoom, fy + 11 * zoom, 1 * zoom, 2 * zoom);
+
+  // Dark espresso stream pouring into cup
+  ctx.fillStyle = ESPRESSO_STREAM_COLOR;
+  ctx.fillRect(fx + 8 * zoom, fy + 7 * zoom, 1 * zoom, 4 * zoom);
+
+  // Rising steam wisps
+  const steamStep = Math.floor(performance.now() / 200) % 3;
+  ctx.fillStyle = ESPRESSO_STEAM_COLOR;
+  if (steamStep === 0) {
+    ctx.fillRect(fx + 7 * zoom, fy + 9 * zoom, 1 * zoom, 1 * zoom);
+  } else if (steamStep === 1) {
+    ctx.fillRect(fx + 8 * zoom, fy + 8 * zoom, 1 * zoom, 1 * zoom);
+  } else {
+    ctx.fillRect(fx + 9 * zoom, fy + 7 * zoom, 1 * zoom, 1 * zoom);
+  }
+  ctx.restore();
+}
+
+/** Renders a placed coffee cup on a workstation desk or break room table */
+function renderPlacedCoffeeCup(
+  ctx: CanvasRenderingContext2D,
+  cupX: number,
+  cupY: number,
+  isFull: boolean,
+  zoom: number,
+): void {
+  ctx.save();
+  // Mug body (4x4 pixels)
+  ctx.fillStyle = PLACED_MUG_BODY_COLOR;
+  ctx.fillRect(cupX, cupY, 4 * zoom, 4 * zoom);
+  // Mug base shadow
+  ctx.fillStyle = PLACED_MUG_SHADOW_COLOR;
+  ctx.fillRect(cupX, cupY + 3 * zoom, 4 * zoom, 1 * zoom);
+  // Mug handle on the right
+  ctx.fillRect(cupX + 4 * zoom, cupY + 1 * zoom, 1 * zoom, 2 * zoom);
+
+  if (isFull) {
+    // Rich dark espresso / roast coffee liquid on top
+    ctx.fillStyle = PLACED_MUG_COFFEE_COLOR;
+    ctx.fillRect(cupX + 1 * zoom, cupY + 1 * zoom, 2 * zoom, 1 * zoom);
+
+    // Dynamic rising steam wisps
+    const phase = Math.floor(performance.now() / 250) % 4;
+    ctx.fillStyle = PLACED_MUG_STEAM_COLOR;
+    if (phase === 0) {
+      ctx.fillRect(cupX + 1 * zoom, cupY - 1 * zoom, 1 * zoom, 1 * zoom);
+    } else if (phase === 1) {
+      ctx.fillRect(cupX + 2 * zoom, cupY - 2 * zoom, 1 * zoom, 1 * zoom);
+      ctx.fillRect(cupX + 1 * zoom, cupY - 1 * zoom, 1 * zoom, 1 * zoom);
+    } else if (phase === 2) {
+      ctx.fillRect(cupX + 1 * zoom, cupY - 3 * zoom, 1 * zoom, 1 * zoom);
+      ctx.fillRect(cupX + 2 * zoom, cupY - 2 * zoom, 1 * zoom, 1 * zoom);
+    } else {
+      ctx.fillRect(cupX + 2 * zoom, cupY - 3 * zoom, 1 * zoom, 1 * zoom);
+    }
+  } else {
+    // Empty mug interior
+    ctx.fillStyle = PLACED_MUG_EMPTY_COLOR;
+    ctx.fillRect(cupX + 1 * zoom, cupY + 1 * zoom, 2 * zoom, 1 * zoom);
+  }
+  ctx.restore();
+}
+
 /** @internal */
 export function renderScene(
   ctx: CanvasRenderingContext2D,
@@ -390,6 +536,26 @@ export function renderScene(
           if (isClock) {
             renderOfficeClock(c, fx, fy, zoom);
           }
+          if (f.type === 'KITCHEN_FRIDGE' || f.type?.includes('FRIDGE')) {
+            const fCol = f.col ?? Math.floor(f.x / TILE_SIZE);
+            const fRow = f.row ?? Math.floor(f.y / TILE_SIZE);
+            const inUse = characters.some(
+              (ch) =>
+                ch.kitchenAction === 'fridge' ||
+                (ch.tileCol === fCol && ch.tileRow === fRow + 1 && ch.dir === Direction.UP),
+            );
+            if (inUse) renderOpenFridgeOverlay(c, fx, fy, zoom);
+          }
+          if (f.type === 'COFFEE_MACHINE' || f.type?.includes('ESPRESSO')) {
+            const fCol = f.col ?? Math.floor(f.x / TILE_SIZE);
+            const fRow = f.row ?? Math.floor(f.y / TILE_SIZE);
+            const inUse = characters.some(
+              (ch) =>
+                ch.kitchenAction === 'espresso' ||
+                (ch.tileCol === fCol && ch.tileRow === fRow + 1 && ch.dir === Direction.UP),
+            );
+            if (inUse) renderEspressoBrewingOverlay(c, fx, fy, zoom);
+          }
         },
       });
     } else {
@@ -404,6 +570,26 @@ export function renderScene(
           );
           if (isClock) {
             renderOfficeClock(c, fx, fy, zoom);
+          }
+          if (f.type === 'KITCHEN_FRIDGE' || f.type?.includes('FRIDGE')) {
+            const fCol = f.col ?? Math.floor(f.x / TILE_SIZE);
+            const fRow = f.row ?? Math.floor(f.y / TILE_SIZE);
+            const inUse = characters.some(
+              (ch) =>
+                ch.kitchenAction === 'fridge' ||
+                (ch.tileCol === fCol && ch.tileRow === fRow + 1 && ch.dir === Direction.UP),
+            );
+            if (inUse) renderOpenFridgeOverlay(c, fx, fy, zoom);
+          }
+          if (f.type === 'COFFEE_MACHINE' || f.type?.includes('ESPRESSO')) {
+            const fCol = f.col ?? Math.floor(f.x / TILE_SIZE);
+            const fRow = f.row ?? Math.floor(f.y / TILE_SIZE);
+            const inUse = characters.some(
+              (ch) =>
+                ch.kitchenAction === 'espresso' ||
+                (ch.tileCol === fCol && ch.tileRow === fRow + 1 && ch.dir === Direction.UP),
+            );
+            if (inUse) renderEspressoBrewingOverlay(c, fx, fy, zoom);
           }
         },
       });
@@ -482,6 +668,22 @@ export function renderScene(
         c.restore();
       },
     });
+  }
+
+  // Placed coffee cups on desks and break tables
+  for (const ch of characters) {
+    if (ch.placedCoffee) {
+      const pc = ch.placedCoffee;
+      const cupX = Math.round(offsetX + (pc.col * TILE_SIZE + (pc.pixelOffsetX ?? 8)) * zoom);
+      const cupY = Math.round(offsetY + (pc.row * TILE_SIZE + (pc.pixelOffsetY ?? 8)) * zoom);
+      const cupZY = pc.row * TILE_SIZE + (pc.pixelOffsetY ?? 8) + 1;
+      drawables.push({
+        zY: cupZY,
+        draw: (c) => {
+          renderPlacedCoffeeCup(c, cupX, cupY, pc.state === 'full', zoom);
+        },
+      });
+    }
   }
 
   // ── Pets ──────────────────────────────────────────────

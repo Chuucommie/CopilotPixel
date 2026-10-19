@@ -89,6 +89,10 @@ export interface FurnitureInstance {
   mirrored?: boolean;
   /** Original furniture catalog type (e.g. CLOCK, PC_FRONT, etc.) */
   type?: string;
+  /** Tile column */
+  col?: number;
+  /** Tile row */
+  row?: number;
 }
 
 export interface ToolActivity {
@@ -198,6 +202,16 @@ export interface BreakSpot {
   state: CharacterState;
   dir: Direction;
   isSitting: boolean;
+}
+
+export interface PlacedCoffee {
+  agentId: number;
+  col: number;
+  row: number;
+  pixelOffsetX?: number;
+  pixelOffsetY?: number;
+  state: 'full' | 'empty';
+  timer: number;
 }
 
 export interface Character {
@@ -317,6 +331,16 @@ export interface Character {
   breakStartTime?: number;
   /** Accumulated break duration in seconds */
   breakDuration?: number;
+  /** True if character is carrying a cup of coffee/tea while walking or standing */
+  hasCoffeeCup?: boolean;
+  /** State of the held coffee cup ('full' steaming, or 'empty' to return to kitchen) */
+  coffeeCupState?: 'full' | 'empty';
+  /** Active coffee mug placed on desk or table */
+  placedCoffee?: PlacedCoffee | null;
+  /** Timer for kitchen interactions (seconds remaining at appliance) */
+  kitchenActionTimer?: number;
+  /** Current kitchen interaction type */
+  kitchenAction?: 'fridge' | 'espresso' | 'sink' | null;
   /** Speech bubble text for inter-agent dialogue */
   speechBubbleText?: string | null;
   /** Timer countdown for speech bubble display */

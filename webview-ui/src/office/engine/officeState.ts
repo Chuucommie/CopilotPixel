@@ -29,6 +29,7 @@ import { findPath, getWalkableTiles, isWalkable } from '../layout/tileMap.js';
 import { getPetCount, getPetName } from '../sprites/petSpriteData.js';
 import { getLoadedCharacterCount } from '../sprites/spriteData.js';
 import type {
+  BreakSpot,
   Character,
   FurnitureInstance,
   OfficeLayout,
@@ -96,6 +97,7 @@ export class OfficeState {
   pets: Pet[] = [];
   /** Accumulated time for furniture animation frame cycling */
   furnitureAnimTimer = 0;
+  private coffeeRoutineTimer = 0;
   selectedAgentId: number | null = null;
   cameraFollowId: number | null = null;
   hoveredAgentId: number | null = null;
@@ -1339,6 +1341,9 @@ export class OfficeState {
     // ── Elder Scrolls Radiant AI Daily Idle Routine ─────────────
     this.routineEngine.update(this, dt);
 
+    // ── Interactive Coffee & Kitchen Lifecycle ──────────────────
+    this.updateCoffeeAndKitchenLifecycle(dt);
+
     // ── Break Social Chatter ────────────────────────────────────
     this.breakSocialTimer += dt;
     if (this.breakSocialTimer >= 6) {
@@ -1643,7 +1648,7 @@ export class OfficeState {
     const chosenType =
       breakType || availableBreakTypes[Math.floor(Math.random() * availableBreakTypes.length)];
 
-    let targetTile: { col: number; row: number } | null = null;
+    let targetTile: BreakSpot | null = null;
     const breakSpots = this.getBreakRoomSpots();
     const matchingSpots = breakSpots.filter((s) => s.breakType === chosenType);
     if (matchingSpots.length > 0) {
@@ -1654,8 +1659,16 @@ export class OfficeState {
 
     if (!targetTile && this.walkableTiles.length > 0) {
       const valid = this.walkableTiles.filter((t) => this.isBreakRoomArea(t.col, t.row));
-      targetTile =
+      const fallback =
         valid.length > 0 ? valid[Math.floor(Math.random() * valid.length)] : this.walkableTiles[0];
+      targetTile = {
+        col: fallback.col,
+        row: fallback.row,
+        breakType: chosenType,
+        state: CharacterState.BREAK_COFFEE,
+        dir: Direction.DOWN,
+        isSitting: false,
+      };
     }
 
     ch.isTakingBreak = true;
@@ -1671,6 +1684,14 @@ export class OfficeState {
     if (targetTile) {
       ch.breakTargetCol = targetTile.col;
       ch.breakTargetRow = targetTile.row;
+      ch.pendingBreakSpot = {
+        col: targetTile.col,
+        row: targetTile.row,
+        breakType: targetTile.breakType,
+        state: targetTile.state,
+        dir: targetTile.dir,
+        isSitting: targetTile.isSitting,
+      };
       const path = this.withOwnSeatUnblocked(ch, () =>
         findPath(
           ch.tileCol,
@@ -1692,6 +1713,9 @@ export class OfficeState {
         ch.tileCol = targetTile.col;
         ch.tileRow = targetTile.row;
         ch.path = [];
+        ch.dir = targetTile.dir;
+        ch.isSitting = targetTile.isSitting;
+        ch.pendingBreakSpot = null;
         if (chosenType === 'coffee') ch.state = CharacterState.BREAK_COFFEE;
         else if (chosenType === 'snack') ch.state = CharacterState.BREAK_SNACK;
         else ch.state = CharacterState.BREAK_STEAMDECK;
@@ -1991,14 +2015,14 @@ export class OfficeState {
       });
     }
 
-    // 2. Lounge sofa side left (coffee / tea, sitting)
+    // 2. Lounge sofa side left (coffee / tea, sitting) - cushion is at row + 1
     const sofaSide = this.layout.furniture.find(
       (f) => f.type === 'SOFA_SIDE' && this.isBreakRoomArea(f.col, f.row),
     );
     if (sofaSide) {
       spots.push({
         col: sofaSide.col,
-        row: sofaSide.row,
+        row: sofaSide.row + 1,
         breakType: 'coffee',
         state: CharacterState.BREAK_COFFEE,
         dir: Direction.RIGHT,
@@ -2006,14 +2030,14 @@ export class OfficeState {
       });
     }
 
-    // 3. Lounge sofa side right (Steam Deck, sitting)
+    // 3. Lounge sofa side right (Steam Deck, sitting) - cushion is at row + 1
     const sofaSide2 = this.layout.furniture.find(
       (f) => f.type.startsWith('SOFA_SIDE:') && this.isBreakRoomArea(f.col, f.row),
     );
     if (sofaSide2) {
       spots.push({
         col: sofaSide2.col,
-        row: sofaSide2.row,
+        row: sofaSide2.row + 1,
         breakType: 'steamdeck',
         state: CharacterState.BREAK_STEAMDECK,
         dir: Direction.LEFT,
@@ -2158,6 +2182,36 @@ export class OfficeState {
         row: snackBar.row + 1,
         breakType: 'snack',
         state: CharacterState.BREAK_SNACK,
+        dir: Direction.UP,
+        isSitting: false,
+      });
+    }
+
+    // 14. Kitchen Refrigerator (cold brew & snacks, standing facing UP)
+    const fridge = this.layout.furniture.find(
+      (f) => f.type === 'KITCHEN_FRIDGE' || f.type.includes('FRIDGE'),
+    );
+    if (fridge) {
+      spots.push({
+        col: fridge.col,
+        row: fridge.row + 1,
+        breakType: 'snack',
+        state: CharacterState.BREAK_SNACK,
+        dir: Direction.UP,
+        isSitting: false,
+      });
+    }
+
+    // 15. Kitchen Sink Unit (washing and returning mugs, standing facing UP)
+    const sink = this.layout.furniture.find(
+      (f) => (f.type === 'KITCHEN_UNIT' && f.col <= 13) || f.type.includes('SINK'),
+    );
+    if (sink) {
+      spots.push({
+        col: sink.col,
+        row: sink.row + 1,
+        breakType: 'tea',
+        state: CharacterState.BREAK_COFFEE,
         dir: Direction.UP,
         isSitting: false,
       });
@@ -2677,6 +2731,186 @@ export class OfficeState {
         text: pepTalk,
         context: 'chat',
       });
+    }
+  }
+
+  /** Updates interactive kitchen appliances (fridge, espresso, sink) and coffee cup lifecycle */
+  private updateCoffeeAndKitchenLifecycle(dt: number): void {
+    const fridge = this.layout.furniture.find(
+      (f) => f.type === 'KITCHEN_FRIDGE' || f.type.includes('FRIDGE'),
+    );
+    const coffeeMachine = this.layout.furniture.find(
+      (f) => f.type === 'COFFEE_MACHINE' || f.type.includes('ESPRESSO'),
+    );
+    const sink = this.layout.furniture.find(
+      (f) => (f.type === 'KITCHEN_UNIT' && f.col <= 13) || f.type.includes('SINK'),
+    );
+
+    for (const ch of this.characters.values()) {
+      // 1. Standing in front of Kitchen Refrigerator
+      if (
+        fridge &&
+        ch.tileCol === fridge.col &&
+        ch.tileRow === fridge.row + 1 &&
+        ch.dir === Direction.UP &&
+        ch.path.length === 0
+      ) {
+        ch.kitchenAction = 'fridge';
+        ch.kitchenActionTimer = (ch.kitchenActionTimer || 0) + dt;
+        if (ch.kitchenActionTimer >= 2.0 && !ch.hasCoffeeCup) {
+          ch.hasCoffeeCup = true;
+          ch.coffeeCupState = 'full';
+          ch.kitchenAction = null;
+          ch.kitchenActionTimer = 0;
+          this.addTeamDialogue({
+            fromAgentId: ch.id,
+            fromName: ch.customName || `Agent #${ch.id}`,
+            fromRole: ch.role || 'Teammate',
+            text: 'Grabbed a cold brew and oat milk from the fridge! 🥛🧊',
+            context: 'break_room',
+          });
+        }
+      } else if (ch.kitchenAction === 'fridge') {
+        ch.kitchenAction = null;
+        ch.kitchenActionTimer = 0;
+      }
+
+      // 2. Standing in front of Espresso Coffee Machine
+      if (
+        coffeeMachine &&
+        ch.tileCol === coffeeMachine.col &&
+        ch.tileRow === coffeeMachine.row + 1 &&
+        ch.dir === Direction.UP &&
+        ch.path.length === 0
+      ) {
+        ch.kitchenAction = 'espresso';
+        ch.kitchenActionTimer = (ch.kitchenActionTimer || 0) + dt;
+        if (ch.kitchenActionTimer >= 2.2 && !ch.hasCoffeeCup) {
+          ch.hasCoffeeCup = true;
+          ch.coffeeCupState = 'full';
+          ch.kitchenAction = null;
+          ch.kitchenActionTimer = 0;
+          this.addTeamDialogue({
+            fromAgentId: ch.id,
+            fromName: ch.customName || `Agent #${ch.id}`,
+            fromRole: ch.role || 'Teammate',
+            text: 'Fresh hot espresso brewed! ☕✨',
+            context: 'break_room',
+          });
+        }
+      } else if (ch.kitchenAction === 'espresso') {
+        ch.kitchenAction = null;
+        ch.kitchenActionTimer = 0;
+      }
+
+      // 3. Standing in front of Kitchen Sink
+      if (
+        sink &&
+        ch.tileCol === sink.col &&
+        ch.tileRow === sink.row + 1 &&
+        ch.dir === Direction.UP &&
+        ch.path.length === 0
+      ) {
+        if (ch.hasCoffeeCup && ch.coffeeCupState === 'empty') {
+          ch.kitchenAction = 'sink';
+          ch.kitchenActionTimer = (ch.kitchenActionTimer || 0) + dt;
+          if (ch.kitchenActionTimer >= 1.6) {
+            ch.hasCoffeeCup = false;
+            ch.coffeeCupState = undefined;
+            ch.kitchenAction = null;
+            ch.kitchenActionTimer = 0;
+            this.addTeamDialogue({
+              fromAgentId: ch.id,
+              fromName: ch.customName || `Agent #${ch.id}`,
+              fromRole: ch.role || 'Teammate',
+              text: 'Mug washed and put back in the kitchen! 🚰✨',
+              context: 'break_room',
+            });
+          }
+        }
+      } else if (ch.kitchenAction === 'sink') {
+        ch.kitchenAction = null;
+        ch.kitchenActionTimer = 0;
+      }
+
+      // 4. Update placed coffee cup on desk/table
+      if (ch.placedCoffee) {
+        ch.placedCoffee.timer -= dt;
+        if (ch.placedCoffee.timer <= 0 && ch.placedCoffee.state === 'full') {
+          ch.placedCoffee.state = 'empty';
+        }
+        // When cup is empty and character is not busy typing/active, pick it up and return to sink
+        if (ch.placedCoffee.state === 'empty' && !ch.isActive && ch.path.length === 0 && sink) {
+          ch.hasCoffeeCup = true;
+          ch.coffeeCupState = 'empty';
+          ch.placedCoffee = null;
+          const targetCol = sink.col;
+          const targetRow = sink.row + 1;
+          const path = this.withOwnSeatUnblocked(ch, () =>
+            findPath(ch.tileCol, ch.tileRow, targetCol, targetRow, this.tileMap, this.blockedTiles),
+          );
+          if (path.length > 0) {
+            ch.path = path;
+            ch.moveProgress = 0;
+            ch.state = CharacterState.WALK;
+            ch.isSitting = false;
+            this.addTeamDialogue({
+              fromAgentId: ch.id,
+              fromName: ch.customName || `Agent #${ch.id}`,
+              fromRole: ch.role || 'Teammate',
+              text: 'Finished my coffee, taking the cup back to the kitchen ☕',
+              context: 'break_room',
+            });
+          }
+        }
+      }
+    }
+
+    // 5. Periodic spontaneous kitchen visit for idle teammates without coffee
+    this.coffeeRoutineTimer = (this.coffeeRoutineTimer || 0) + dt;
+    if (this.coffeeRoutineTimer >= 35) {
+      this.coffeeRoutineTimer = 0;
+      const candidates = Array.from(this.characters.values()).filter(
+        (c) =>
+          !c.isTeamLead &&
+          !c.isActive &&
+          !c.hasCoffeeCup &&
+          !c.placedCoffee &&
+          c.path.length === 0 &&
+          !c.matrixEffect,
+      );
+      if (candidates.length > 0) {
+        const agent = candidates[Math.floor(Math.random() * candidates.length)];
+        const visitFridge = fridge && Math.random() < 0.5;
+        const target = visitFridge ? fridge : coffeeMachine;
+        if (target) {
+          const path = this.withOwnSeatUnblocked(agent, () =>
+            findPath(
+              agent.tileCol,
+              agent.tileRow,
+              target.col,
+              target.row + 1,
+              this.tileMap,
+              this.blockedTiles,
+            ),
+          );
+          if (path.length > 0) {
+            agent.path = path;
+            agent.moveProgress = 0;
+            agent.state = CharacterState.WALK;
+            agent.isSitting = false;
+            this.addTeamDialogue({
+              fromAgentId: agent.id,
+              fromName: agent.customName || `Agent #${agent.id}`,
+              fromRole: agent.role || 'Teammate',
+              text: visitFridge
+                ? 'Heading to the kitchen to check the fridge 🥛🥪'
+                : 'Stepping over to the espresso machine for a refill ☕',
+              context: 'break_room',
+            });
+          }
+        }
+      }
     }
   }
 }

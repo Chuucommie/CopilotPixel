@@ -24,6 +24,8 @@ export interface RoutineActivity {
   icon: string;
   targetType:
     | 'workstation'
+    | 'fridge'
+    | 'kitchen_sink'
     | 'stovetop'
     | 'microwave'
     | 'espresso'
@@ -387,7 +389,11 @@ export class RadiantRoutineEngine {
         const breakSpots = os.getBreakRoomSpots();
         let chosenSpot = null;
 
-        if (routine.targetType === 'stovetop') {
+        if (routine.targetType === 'fridge') {
+          chosenSpot = breakSpots.find((s) => s.col <= 11 && s.row === 12);
+        } else if (routine.targetType === 'kitchen_sink') {
+          chosenSpot = breakSpots.find((s) => s.col === 12 && s.row === 12);
+        } else if (routine.targetType === 'stovetop') {
           chosenSpot = breakSpots.find(
             (s) => s.state === CharacterState.BREAK_SNACK && s.col >= 14 && s.col <= 16,
           );

@@ -358,6 +358,31 @@ export const BREAK_STEAMDECK_SLASH_COLOR = '#e0e7ff';
 export const BREAK_STEAMDECK_VICTORY_COLOR = '#a855f7';
 export const BREAK_HAND_COLOR = '#f5cba7';
 export const BREAK_HAND_SHADOW_COLOR = '#d5a075';
+
+// ── Kitchen & Coffee Interactive Overlays ──────────────────
+export const FRIDGE_LIGHT_GLOW = '#fffdf0';
+export const FRIDGE_MIST_COLOR = 'rgba(180, 235, 255, 0.35)';
+export const FRIDGE_SHELF_COLOR = '#b0bec5';
+export const FRIDGE_ITEM_DARK = '#37474f';
+export const FRIDGE_ITEM_RED = '#e53935';
+export const FRIDGE_ITEM_BLUE = '#1e88e5';
+export const FRIDGE_ITEM_WHITE = '#ffffff';
+export const FRIDGE_ITEM_GREEN = '#43a047';
+export const FRIDGE_ITEM_ORANGE = '#fb8c00';
+export const FRIDGE_DOOR_COLOR = '#eceff1';
+export const FRIDGE_DOOR_SHADOW = '#cfd8dc';
+export const FRIDGE_DOOR_HANDLE = '#90a4ae';
+
+export const ESPRESSO_CUP_COLOR = '#ffffff';
+export const ESPRESSO_CUP_SHADOW = '#b0bec5';
+export const ESPRESSO_STREAM_COLOR = '#3e2723';
+export const ESPRESSO_STEAM_COLOR = 'rgba(255, 255, 255, 0.7)';
+
+export const PLACED_MUG_BODY_COLOR = '#f5f5f5';
+export const PLACED_MUG_SHADOW_COLOR = '#cfd8dc';
+export const PLACED_MUG_COFFEE_COLOR = '#3e2723';
+export const PLACED_MUG_EMPTY_COLOR = '#b0bec5';
+export const PLACED_MUG_STEAM_COLOR = 'rgba(255, 255, 255, 0.75)';
 export const BREAK_COOKING_POT_COLOR = '#475569';
 export const BREAK_COOKING_FLAME_COLOR = '#f97316';
 

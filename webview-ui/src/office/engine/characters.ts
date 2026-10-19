@@ -121,6 +121,104 @@ export function createCharacter(
   };
 }
 
+/** Places held coffee cup on the adjacent workstation desk */
+export function placeCoffeeOnWorkstation(ch: Character, seat: Seat): void {
+  let deskCol = ch.tileCol;
+  let deskRow = ch.tileRow;
+  let offX = 8;
+  let offY = 8;
+  switch (seat.facingDir) {
+    case Direction.UP:
+      deskRow = ch.tileRow - 1;
+      offX = 10;
+      offY = 8;
+      break;
+    case Direction.DOWN:
+      deskRow = ch.tileRow + 1;
+      offX = 10;
+      offY = 4;
+      break;
+    case Direction.LEFT:
+      deskCol = ch.tileCol - 1;
+      offX = 10;
+      offY = 8;
+      break;
+    case Direction.RIGHT:
+      deskCol = ch.tileCol + 1;
+      offX = 4;
+      offY = 8;
+      break;
+  }
+  ch.placedCoffee = {
+    agentId: ch.id,
+    col: deskCol,
+    row: deskRow,
+    pixelOffsetX: offX,
+    pixelOffsetY: offY,
+    state: ch.coffeeCupState === 'empty' ? 'empty' : 'full',
+    timer: 45,
+  };
+  ch.hasCoffeeCup = false;
+}
+
+/** Places held coffee cup on adjacent break room table or coffee table */
+export function placeCoffeeOnBreakTable(ch: Character): void {
+  let tableCol = ch.tileCol;
+  let tableRow = ch.tileRow;
+  let offX = 8;
+  let offY = 8;
+  switch (ch.dir) {
+    case Direction.RIGHT:
+      tableCol = ch.tileCol + 1;
+      offX = 3;
+      offY = 7;
+      break;
+    case Direction.LEFT:
+      tableCol = ch.tileCol - 1;
+      offX = 9;
+      offY = 7;
+      break;
+    case Direction.DOWN:
+      tableRow = ch.tileRow + 1;
+      offX = 7;
+      offY = 3;
+      break;
+    case Direction.UP:
+      tableRow = ch.tileRow - 1;
+      offX = 7;
+      offY = 9;
+      break;
+  }
+  // Align with central coffee table at cols 16-17, rows 15-16
+  if (ch.tileCol === 14 && ch.tileRow === 16) {
+    tableCol = 16;
+    tableRow = 16;
+    offX = 3;
+    offY = 7;
+  } else if (ch.tileCol === 19 && ch.tileRow === 16) {
+    tableCol = 17;
+    tableRow = 16;
+    offX = 9;
+    offY = 7;
+  } else if (ch.tileCol === 16 && ch.tileRow === 14) {
+    tableCol = 16;
+    tableRow = 15;
+    offX = 8;
+    offY = 3;
+  }
+
+  ch.placedCoffee = {
+    agentId: ch.id,
+    col: tableCol,
+    row: tableRow,
+    pixelOffsetX: offX,
+    pixelOffsetY: offY,
+    state: ch.coffeeCupState === 'empty' ? 'empty' : 'full',
+    timer: 35,
+  };
+  ch.hasCoffeeCup = false;
+}
+
 export function updateCharacter(
   ch: Character,
   dt: number,
@@ -144,6 +242,9 @@ export function updateCharacter(
       if (seat && ch.tileCol === seat.seatCol && ch.tileRow === seat.seatRow) {
         ch.isSitting = true;
         ch.dir = seat.facingDir;
+        if (ch.hasCoffeeCup) {
+          placeCoffeeOnWorkstation(ch, seat);
+        }
       }
       if (ch.frameTimer >= TYPE_FRAME_DURATION_SEC) {
         ch.frameTimer -= TYPE_FRAME_DURATION_SEC;
@@ -186,6 +287,9 @@ export function updateCharacter(
       if (seat && ch.tileCol === seat.seatCol && ch.tileRow === seat.seatRow) {
         ch.isSitting = true;
         ch.dir = seat.facingDir;
+        if (ch.hasCoffeeCup) {
+          placeCoffeeOnWorkstation(ch, seat);
+        }
       }
       // No idle animation — static pose
       ch.frame = 0;
@@ -323,10 +427,24 @@ export function updateCharacter(
         ch.y = center.y;
 
         if (ch.isTakingBreak) {
-          if (ch.breakType === 'coffee') ch.state = CharacterState.BREAK_COFFEE;
-          else if (ch.breakType === 'snack') ch.state = CharacterState.BREAK_SNACK;
-          else if (ch.breakType === 'steamdeck') ch.state = CharacterState.BREAK_STEAMDECK;
-          else ch.state = CharacterState.BREAK_COFFEE;
+          if (ch.pendingBreakSpot) {
+            const pending = ch.pendingBreakSpot;
+            ch.state = pending.state;
+            ch.dir = pending.dir;
+            ch.breakType = pending.breakType;
+            ch.isSitting = pending.isSitting;
+            ch.breakTargetCol = pending.col;
+            ch.breakTargetRow = pending.row;
+            ch.pendingBreakSpot = null;
+            if (ch.hasCoffeeCup && ch.isSitting) {
+              placeCoffeeOnBreakTable(ch);
+            }
+          } else {
+            if (ch.breakType === 'coffee') ch.state = CharacterState.BREAK_COFFEE;
+            else if (ch.breakType === 'snack') ch.state = CharacterState.BREAK_SNACK;
+            else if (ch.breakType === 'steamdeck') ch.state = CharacterState.BREAK_STEAMDECK;
+            else ch.state = CharacterState.BREAK_COFFEE;
+          }
           ch.frame = 0;
           ch.frameTimer = 0;
           break;
@@ -342,6 +460,9 @@ export function updateCharacter(
               ch.state = CharacterState.TYPE;
               ch.dir = seat.facingDir;
               ch.isSitting = true;
+              if (ch.hasCoffeeCup) {
+                placeCoffeeOnWorkstation(ch, seat);
+              }
             } else {
               ch.state = CharacterState.IDLE;
             }
@@ -354,6 +475,9 @@ export function updateCharacter(
               ch.state = CharacterState.TYPE;
               ch.dir = seat.facingDir;
               ch.isSitting = true;
+              if (ch.hasCoffeeCup) {
+                placeCoffeeOnWorkstation(ch, seat);
+              }
               // seatTimer < 0 is a sentinel from setAgentActive(false) meaning
               // "turn just ended" — skip the long rest so idle transition is immediate
               if (ch.seatTimer < 0) {
@@ -411,6 +535,9 @@ export function updateCharacter(
             ch.breakTargetCol = pending.col;
             ch.breakTargetRow = pending.row;
             ch.pendingBreakSpot = null;
+            if (ch.hasCoffeeCup && ch.isSitting) {
+              placeCoffeeOnBreakTable(ch);
+            }
           } else {
             if (ch.breakType === 'coffee' || ch.breakType === 'tea')
               ch.state = CharacterState.BREAK_COFFEE;
@@ -506,6 +633,7 @@ function renderCoffeeBreakSprite(
   dir: Direction,
   isTea = false,
   isSitting = false,
+  isFull = true,
 ): SpriteData {
   const sprite = cloneSprite(base);
   const rows = sprite.length;
@@ -578,22 +706,37 @@ function renderCoffeeBreakSprite(
       if (sprite[mugRow + 2]) {
         sprite[mugRow + 2][mugCol + 2] = handShadow;
       }
+    } else if (dir === Direction.UP) {
+      // Up-facing: mug held at the side
+      const upMugCol = 10;
+      if (sprite[mugRow]) {
+        sprite[mugRow][upMugCol] = isFull ? liquid : BREAK_COFFEE_MUG_COLOR;
+      }
+      if (sprite[mugRow + 1]) {
+        sprite[mugRow + 1][upMugCol] = mug;
+        sprite[mugRow + 1][upMugCol - 1] = skin;
+      }
+      if (sprite[mugRow + 2]) {
+        sprite[mugRow + 2][upMugCol] = shadow;
+      }
     }
 
-    // 4-frame dynamic rising steam wisps
-    const steamPhase = frame % 4;
-    if (steamPhase === 0) {
-      if (sprite[mugRow - 1]) sprite[mugRow - 1][mugCol] = BREAK_COFFEE_STEAM_COLOR_1;
-    } else if (steamPhase === 1) {
-      if (sprite[mugRow - 1]) sprite[mugRow - 1][mugCol + 1] = BREAK_COFFEE_STEAM_COLOR_1;
-      if (sprite[mugRow - 2]) sprite[mugRow - 2][mugCol] = BREAK_COFFEE_STEAM_COLOR_2;
-    } else if (steamPhase === 2) {
-      if (sprite[mugRow - 1]) sprite[mugRow - 1][mugCol] = BREAK_COFFEE_STEAM_COLOR_2;
-      if (sprite[mugRow - 2]) sprite[mugRow - 2][mugCol + 1] = BREAK_COFFEE_STEAM_COLOR_1;
-      if (sprite[mugRow - 3]) sprite[mugRow - 3][mugCol] = BREAK_COFFEE_STEAM_COLOR_2;
-    } else {
-      if (sprite[mugRow - 2]) sprite[mugRow - 2][mugCol] = BREAK_COFFEE_STEAM_COLOR_2;
-      if (sprite[mugRow - 3]) sprite[mugRow - 3][mugCol + 1] = BREAK_COFFEE_STEAM_COLOR_1;
+    // 4-frame dynamic rising steam wisps (only when cup is full)
+    if (isFull) {
+      const steamPhase = frame % 4;
+      if (steamPhase === 0) {
+        if (sprite[mugRow - 1]) sprite[mugRow - 1][mugCol] = BREAK_COFFEE_STEAM_COLOR_1;
+      } else if (steamPhase === 1) {
+        if (sprite[mugRow - 1]) sprite[mugRow - 1][mugCol + 1] = BREAK_COFFEE_STEAM_COLOR_1;
+        if (sprite[mugRow - 2]) sprite[mugRow - 2][mugCol] = BREAK_COFFEE_STEAM_COLOR_2;
+      } else if (steamPhase === 2) {
+        if (sprite[mugRow - 1]) sprite[mugRow - 1][mugCol] = BREAK_COFFEE_STEAM_COLOR_2;
+        if (sprite[mugRow - 2]) sprite[mugRow - 2][mugCol + 1] = BREAK_COFFEE_STEAM_COLOR_1;
+        if (sprite[mugRow - 3]) sprite[mugRow - 3][mugCol] = BREAK_COFFEE_STEAM_COLOR_2;
+      } else {
+        if (sprite[mugRow - 2]) sprite[mugRow - 2][mugCol] = BREAK_COFFEE_STEAM_COLOR_2;
+        if (sprite[mugRow - 3]) sprite[mugRow - 3][mugCol + 1] = BREAK_COFFEE_STEAM_COLOR_1;
+      }
     }
   }
 
@@ -754,16 +897,22 @@ export function getCharacterSprite(ch: Character, sprites: CharacterSprites): Sp
   const baseSit = sprites.reading[ch.dir][0];
   const baseSprite = ch.isSitting ? baseSit : baseWalk;
 
+  let sprite: SpriteData;
+
   switch (ch.state) {
     case CharacterState.TYPE:
       if (isReadingTool(ch.currentTool)) {
-        return sprites.reading[ch.dir][ch.frame % 2];
+        sprite = sprites.reading[ch.dir][ch.frame % 2];
+      } else {
+        sprite = sprites.typing[ch.dir][ch.frame % 2];
       }
-      return sprites.typing[ch.dir][ch.frame % 2];
+      break;
     case CharacterState.WALK:
-      return sprites.walk[ch.dir][ch.frame % 4];
+      sprite = sprites.walk[ch.dir][ch.frame % 4];
+      break;
     case CharacterState.IDLE:
-      return baseSprite;
+      sprite = baseSprite;
+      break;
     case CharacterState.BREAK_COFFEE:
       return renderCoffeeBreakSprite(
         baseSprite,
@@ -771,14 +920,30 @@ export function getCharacterSprite(ch: Character, sprites: CharacterSprites): Sp
         ch.dir,
         ch.breakType === 'tea',
         ch.isSitting,
+        ch.coffeeCupState !== 'empty',
       );
     case CharacterState.BREAK_SNACK:
       return renderSnackBreakSprite(baseSprite, ch.frame, ch.dir, ch.isSitting);
     case CharacterState.BREAK_STEAMDECK:
       return renderSteamDeckBreakSprite(baseSprite, ch.frame, ch.isSitting);
     default:
-      return baseSprite;
+      sprite = baseSprite;
+      break;
   }
+
+  // If character is carrying a cup of coffee while walking or idle, render it in their hands!
+  if (ch.hasCoffeeCup && ch.state !== CharacterState.TYPE) {
+    return renderCoffeeBreakSprite(
+      sprite,
+      ch.frame,
+      ch.dir,
+      false,
+      ch.isSitting,
+      ch.coffeeCupState !== 'empty',
+    );
+  }
+
+  return sprite;
 }
 function randomRange(min: number, max: number): number {
   return min + Math.random() * (max - min);

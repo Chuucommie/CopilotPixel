@@ -104,6 +104,8 @@ export function layoutToFurnitureInstances(furniture: PlacedFurniture[]): Furnit
       zY,
       width,
       height,
+      col: item.col,
+      row: item.row,
       ...(mirrored ? { mirrored: true } : {}),
     });
   }
@@ -208,13 +210,26 @@ export function layoutToSeats(furniture: PlacedFurniture[]): Map<string, Seat> {
         const tileCol = item.col + dc;
         const tileRow = item.row + dr;
 
+        // For vertical sofas (SOFA_SIDE, 2 tiles high), the backrest is at dr=0.
+        // The actual seat cushion is at dr=1 facing the coffee table.
+        if (item.type.includes('SOFA_SIDE') && dr === 0 && entry.footprintH > 1) {
+          continue;
+        }
+
         // Determine facing direction:
-        // 1) Chair orientation takes priority
+        // 1) Chair orientation takes priority (accounting for horizontal mirroring like :left)
         // 2) Adjacent desk direction
         // 3) Default forward (DOWN)
         let facingDir: Direction = Direction.DOWN;
         if (entry.orientation) {
-          facingDir = orientationToFacing(entry.orientation);
+          const isMirrored = item.type.includes(':left') || item.type.includes(':mirror');
+          if (isMirrored && (entry.orientation === 'side' || entry.orientation === 'right')) {
+            facingDir = Direction.LEFT;
+          } else if (isMirrored && entry.orientation === 'left') {
+            facingDir = Direction.RIGHT;
+          } else {
+            facingDir = orientationToFacing(entry.orientation);
+          }
         } else {
           for (const d of dirs) {
             if (deskTiles.has(`${tileCol + d.dc},${tileRow + d.dr}`)) {
