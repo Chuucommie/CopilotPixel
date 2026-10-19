@@ -150,7 +150,7 @@ export function ToolOverlay({
                 key={`bubble-${id}`}
                 className="absolute flex flex-col items-center -translate-x-1/2 pointer-events-none z-50"
                 style={{ left: screenX, top: screenY - 24 }}
-                data-testid="agent-overlay"
+                data-testid="speech-bubble"
                 data-agent-id={id}
               >
                 <div className="px-3 py-1.5 bg-white/95 text-slate-900 border border-slate-700 font-semibold text-2xs rounded-lg shadow-xl animate-bounce max-w-[280px] text-center whitespace-normal break-words leading-tight relative">

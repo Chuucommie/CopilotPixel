@@ -12,6 +12,7 @@ import type {
   SetHooksEnabledSideEffect,
 } from './clientMessageHandler.js';
 import {
+  LEGACY_SERVER_JSON_DIRS,
   SERVER_JSON_DIR,
   SERVER_JSON_NAME,
   SERVER_REGISTRY_PROTOCOL_VERSION,
@@ -155,50 +156,49 @@ export class PixelOfficeServer {
     return this.config;
   }
 
-  /** Returns the absolute path to ~/.copilot-agents/server.json. */
-  private getServerJsonPath(): string {
-    return path.join(os.homedir(), SERVER_JSON_DIR, SERVER_JSON_NAME);
-  }
-
-  /** Write server.json atomically (tmp + rename) with mode 0o600. */
+  /** Write server.json atomically (tmp + rename) with mode 0o600. Writes to primary and legacy dirs. */
   private writeServerJson(config: ServerConfig): void {
-    const filePath = this.getServerJsonPath();
-    const dir = path.dirname(filePath);
-    try {
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    const writeToDir = (dirName: string) => {
+      const dir = path.join(os.homedir(), dirName);
+      const filePath = path.join(dir, SERVER_JSON_NAME);
+      try {
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+        }
+        const tmpPath = filePath + '.tmp';
+        fs.writeFileSync(tmpPath, JSON.stringify(config, null, 2), { mode: 0o600 });
+        fs.renameSync(tmpPath, filePath);
+      } catch (e) {
+        console.error(`[PixelOffice] Failed to write server.json in ${dir}: ${e}`);
       }
-      const tmpPath = filePath + '.tmp';
-      fs.writeFileSync(tmpPath, JSON.stringify(config, null, 2), { mode: 0o600 });
-      fs.renameSync(tmpPath, filePath);
-    } catch (e) {
-      console.error(`[PixelOffice] Failed to write server.json: ${e}`);
+    };
+
+    writeToDir(SERVER_JSON_DIR);
+    for (const legacyDir of LEGACY_SERVER_JSON_DIRS) {
+      writeToDir(legacyDir);
     }
   }
 
   /**
-   * Delete the legacy server.json only if the PID inside matches our process
-   * (safe for multi-window / multi-server: never removes another server's
-   * pointer). Known gap during mixed-version skew (A2): because this file is
-   * a single pointer, whichever server most recently (re)claimed it "owns"
-   * it -- if that server later stops while a DIFFERENT, still-live server
-   * coexists, this deletes the only pointer an old (pre-registry) hook
-   * script can find, even though a compatible server is still running. The
-   * registry (servers/) doesn't have this problem -- each entry is deleted
-   * strictly self-only (D6) and a new hook script always prefers it over
-   * this legacy file. Accepted: A2 already treats "an old script reaches at
-   * most one server" as the baseline degradation for this skew window.
+   * Delete server.json only if the PID inside matches our process (from primary and legacy dirs).
    */
   private deleteServerJson(): void {
-    try {
-      const filePath = this.getServerJsonPath();
-      if (!fs.existsSync(filePath)) return;
-      const existing = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as unknown;
-      if (isServerTarget(existing) && existing.pid === process.pid) {
-        fs.unlinkSync(filePath);
+    const deleteInDir = (dirName: string) => {
+      try {
+        const filePath = path.join(os.homedir(), dirName, SERVER_JSON_NAME);
+        if (!fs.existsSync(filePath)) return;
+        const existing = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as unknown;
+        if (isServerTarget(existing) && existing.pid === process.pid) {
+          fs.unlinkSync(filePath);
+        }
+      } catch {
+        // File may already be gone
       }
-    } catch {
-      // File may already be gone
+    };
+
+    deleteInDir(SERVER_JSON_DIR);
+    for (const legacyDir of LEGACY_SERVER_JSON_DIRS) {
+      deleteInDir(legacyDir);
     }
   }
 

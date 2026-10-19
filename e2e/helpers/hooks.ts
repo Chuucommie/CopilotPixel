@@ -15,6 +15,8 @@ export interface HookEventPayload {
 }
 
 function getServerJsonPath(tmpHome: string): string {
+  const pixelOffice = path.join(tmpHome, '.pixel-office', 'server.json');
+  if (fs.existsSync(pixelOffice)) return pixelOffice;
   return path.join(tmpHome, '.copilot-agents', 'server.json');
 }
 

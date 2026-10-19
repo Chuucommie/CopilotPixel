@@ -382,7 +382,12 @@ export function renderScene(
           c.scale(-1, 1);
           c.drawImage(cached, 0, 0, targetW, targetH);
           c.restore();
-          if (f.type === 'CLOCK') {
+          const isClock = Boolean(
+            f.type === 'CLOCK' ||
+            f.type?.startsWith('CLOCK:') ||
+            f.type?.toUpperCase().includes('CLOCK'),
+          );
+          if (isClock) {
             renderOfficeClock(c, fx, fy, zoom);
           }
         },
@@ -392,7 +397,12 @@ export function renderScene(
         zY: f.zY,
         draw: (c) => {
           c.drawImage(cached, fx, fy, targetW, targetH);
-          if (f.type === 'CLOCK') {
+          const isClock = Boolean(
+            f.type === 'CLOCK' ||
+            f.type?.startsWith('CLOCK:') ||
+            f.type?.toUpperCase().includes('CLOCK'),
+          );
+          if (isClock) {
             renderOfficeClock(c, fx, fy, zoom);
           }
         },

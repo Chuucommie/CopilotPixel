@@ -71,9 +71,12 @@ export function renderOfficeClock(
   zoom: number,
   now = new Date(),
 ): void {
-  const centerX = Math.round(fx + 8 * zoom);
-  const centerY = Math.round(fy + 16 * zoom);
-  const dialRadius = 3.6 * zoom;
+  // Center of the clock face in the standard 16x32 sprite is at (7.5, 15.5)
+  // CLOCK.png has static hands at 10:10; a solid dial face of radius 4.8*zoom completely
+  // blankets the static sprite hands and renders live, smoothly animated hands.
+  const centerX = fx + 7.5 * zoom;
+  const centerY = fy + 15.5 * zoom;
+  const dialRadius = 4.8 * zoom;
 
   ctx.save();
 
@@ -87,14 +90,14 @@ export function renderOfficeClock(
   ctx.beginPath();
   ctx.arc(centerX, centerY, dialRadius, 0, Math.PI * 2);
   ctx.strokeStyle = CLOCK_RIM_BORDER;
-  ctx.lineWidth = Math.max(1, 0.6 * zoom);
+  ctx.lineWidth = Math.max(1, 0.7 * zoom);
   ctx.stroke();
 
-  // 3. Hour markers (12, 3, 6, 9 ticks + dots)
+  // 3. Hour markers (12, 3, 6, 9 major ticks + 8 minor ticks)
   for (let i = 0; i < 12; i++) {
     const angle = (i / 12) * Math.PI * 2 - Math.PI / 2;
     const isMajor = i % 3 === 0;
-    const innerR = dialRadius - (isMajor ? 1.1 * zoom : 0.6 * zoom);
+    const innerR = dialRadius - (isMajor ? 1.4 * zoom : 0.8 * zoom);
     const outerR = dialRadius - 0.2 * zoom;
 
     const x1 = centerX + Math.cos(angle) * innerR;
@@ -106,49 +109,53 @@ export function renderOfficeClock(
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
     ctx.strokeStyle = isMajor ? CLOCK_TICK_PRIMARY : CLOCK_TICK_SECONDARY;
-    ctx.lineWidth = isMajor ? Math.max(1, 0.8 * zoom) : Math.max(0.6, 0.5 * zoom);
+    ctx.lineWidth = isMajor ? Math.max(1, 0.9 * zoom) : Math.max(0.6, 0.5 * zoom);
     ctx.stroke();
   }
 
   // 4. Calculate real-time hands
   const { hourAngle, minAngle, secAngle } = getClockHands(now);
 
-  // Hour hand (shorter, thick)
-  const hourLen = 1.9 * zoom;
+  // Hour hand (shorter, thick, dark)
+  const hourLen = 2.6 * zoom;
   ctx.beginPath();
   ctx.moveTo(centerX, centerY);
   ctx.lineTo(centerX + Math.cos(hourAngle) * hourLen, centerY + Math.sin(hourAngle) * hourLen);
   ctx.strokeStyle = CLOCK_HOUR_HAND;
-  ctx.lineWidth = Math.max(1.2, 1.3 * zoom);
+  ctx.lineWidth = Math.max(1.4, 1.6 * zoom);
   ctx.lineCap = 'round';
   ctx.stroke();
 
-  // Minute hand (longer, medium)
-  const minLen = 2.8 * zoom;
+  // Minute hand (longer, medium dark)
+  const minLen = 3.8 * zoom;
   ctx.beginPath();
   ctx.moveTo(centerX, centerY);
   ctx.lineTo(centerX + Math.cos(minAngle) * minLen, centerY + Math.sin(minAngle) * minLen);
   ctx.strokeStyle = CLOCK_MINUTE_HAND;
-  ctx.lineWidth = Math.max(1, 0.9 * zoom);
+  ctx.lineWidth = Math.max(1.1, 1.1 * zoom);
   ctx.lineCap = 'round';
   ctx.stroke();
 
-  // Second hand (red ticking needle)
-  const secLen = 3.1 * zoom;
+  // Second hand (vivid red, high contrast, smooth continuous sweep with counterweight tail)
+  const secLen = 4.2 * zoom;
+  const tailLen = 1.2 * zoom;
   ctx.beginPath();
-  ctx.moveTo(
-    centerX - Math.cos(secAngle) * (0.8 * zoom),
-    centerY - Math.sin(secAngle) * (0.8 * zoom),
-  );
+  ctx.moveTo(centerX - Math.cos(secAngle) * tailLen, centerY - Math.sin(secAngle) * tailLen);
   ctx.lineTo(centerX + Math.cos(secAngle) * secLen, centerY + Math.sin(secAngle) * secLen);
   ctx.strokeStyle = CLOCK_SECOND_HAND;
-  ctx.lineWidth = Math.max(0.8, 0.5 * zoom);
+  ctx.lineWidth = Math.max(0.8, 0.6 * zoom);
+  ctx.lineCap = 'round';
   ctx.stroke();
 
   // 5. Pivot center pin
   ctx.beginPath();
-  ctx.arc(centerX, centerY, Math.max(0.8, 0.7 * zoom), 0, Math.PI * 2);
+  ctx.arc(centerX, centerY, Math.max(0.9, 0.8 * zoom), 0, Math.PI * 2);
   ctx.fillStyle = CLOCK_PIVOT_PIN;
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, Math.max(0.4, 0.35 * zoom), 0, Math.PI * 2);
+  ctx.fillStyle = CLOCK_HOUR_HAND;
   ctx.fill();
 
   ctx.restore();

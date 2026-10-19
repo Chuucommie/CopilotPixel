@@ -236,25 +236,27 @@ export function useExtensionMessages(
           if (p.isHeadless) os.setHeadless(p.id, true);
         }
         pendingAgents = [];
-        const restoredIds = os.restoreCopilotPixelAgents();
-        if (restoredIds.length > 0) {
-          setAgents((prev) => {
-            const set = new Set(prev);
-            const next = [...prev];
-            for (const rId of restoredIds) {
-              if (!set.has(rId)) {
-                next.push(rId);
-                set.add(rId);
+        if (!isE2E) {
+          const restoredIds = os.restoreCopilotPixelAgents();
+          if (restoredIds.length > 0) {
+            setAgents((prev) => {
+              const set = new Set(prev);
+              const next = [...prev];
+              for (const rId of restoredIds) {
+                if (!set.has(rId)) {
+                  next.push(rId);
+                  set.add(rId);
+                }
               }
+              return next.sort((a, b) => a - b);
+            });
+          }
+          for (const [chId, ch] of os.characters.entries()) {
+            if (ch.isCopilotPixelAgent && ch.isTeamLead) {
+              const subIds = os.ensureSubagentTeam(chId, 5);
+              setAgents([chId, ...subIds].sort((a, b) => a - b));
+              break;
             }
-            return next.sort((a, b) => a - b);
-          });
-        }
-        for (const [chId, ch] of os.characters.entries()) {
-          if (ch.isTeamLead) {
-            const subIds = os.ensureSubagentTeam(chId, 5);
-            setAgents([chId, ...subIds].sort((a, b) => a - b));
-            break;
           }
         }
         layoutReadyRef.current = true;
@@ -336,15 +338,19 @@ export function useExtensionMessages(
                 }
               }
             }
-            os.addTeamDialogue({
-              fromAgentId: id,
-              fromName: ch.customName || `Lead #${id}`,
-              fromRole: 'Lead',
-              text: 'Project Lead ready for chat directives.',
-              context: 'chat',
-            });
-            const subIds = os.ensureSubagentTeam(id, 5);
-            setAgents([id, ...subIds].sort((a, b) => a - b));
+            if (!isE2E && ch.isCopilotPixelAgent) {
+              os.addTeamDialogue({
+                fromAgentId: id,
+                fromName: ch.customName || `Lead #${id}`,
+                fromRole: 'Lead',
+                text: 'Project Lead ready for chat directives.',
+                context: 'chat',
+              });
+              const subIds = os.ensureSubagentTeam(id, 5);
+              setAgents([id, ...subIds].sort((a, b) => a - b));
+            } else {
+              setAgents((prev) => (prev.includes(id) ? prev : [...prev, id]));
+            }
           }
           if (isHeadlessAgent(msg.isExternal as boolean | undefined)) {
             os.setHeadless(id, true);
