@@ -7,7 +7,7 @@ import {
   getLightingState,
 } from '../src/office/engine/officeLighting.js';
 import type { Character, FurnitureInstance } from '../src/office/types.js';
-import { CharacterState } from '../src/office/types.js';
+import { CharacterState, Direction } from '../src/office/types.js';
 
 describe('officeLighting', () => {
   it('identifies daytime correctly (07:00 - 18:00)', () => {
@@ -77,11 +77,10 @@ describe('officeLighting', () => {
         y: 110,
         tileCol: 6,
         tileRow: 6,
-        dir: 'up',
+        dir: Direction.UP,
         state: CharacterState.TYPE,
         isSitting: true,
         frame: 0,
-        animTimer: 0,
         path: [],
         moveProgress: 0,
         seatId: 'seat-1',
@@ -92,7 +91,7 @@ describe('officeLighting', () => {
         isActive: true,
         contextTokens: 0,
         maxContextTokens: 200000,
-      },
+      } as unknown as Character,
       {
         id: 2,
         palette: 1,
@@ -101,13 +100,12 @@ describe('officeLighting', () => {
         y: 120,
         tileCol: 11,
         tileRow: 7,
-        dir: 'down',
+        dir: Direction.DOWN,
         state: CharacterState.IDLE,
         isSitting: true,
         isTakingBreak: true,
         breakType: 'steamdeck',
         frame: 0,
-        animTimer: 0,
         path: [],
         moveProgress: 0,
         seatId: null,
@@ -118,7 +116,7 @@ describe('officeLighting', () => {
         isActive: false,
         contextTokens: 0,
         maxContextTokens: 200000,
-      },
+      } as unknown as Character,
     ];
 
     const nightDate = new Date(2026, 9, 19, 22, 30, 0);
