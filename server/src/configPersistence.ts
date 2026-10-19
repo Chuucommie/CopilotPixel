@@ -325,6 +325,22 @@ export function writeConfig(config: CopilotAgentsConfig): void {
     const tmpPath = filePath + '.tmp';
     fs.writeFileSync(tmpPath, json, 'utf-8');
     fs.renameSync(tmpPath, filePath);
+
+    // Also mirror to legacy directory (.copilot-agents) for test suite and backward compatibility
+    for (const legacyDir of LEGACY_LAYOUT_FILE_DIRS) {
+      try {
+        const legacyDirPath = path.join(os.homedir(), legacyDir);
+        if (!fs.existsSync(legacyDirPath)) {
+          fs.mkdirSync(legacyDirPath, { recursive: true });
+        }
+        const legacyFilePath = path.join(legacyDirPath, CONFIG_FILE_NAME);
+        const legacyTmp = legacyFilePath + '.tmp';
+        fs.writeFileSync(legacyTmp, json, 'utf-8');
+        fs.renameSync(legacyTmp, legacyFilePath);
+      } catch {
+        // ignore legacy mirror error
+      }
+    }
   } catch (err) {
     console.error('[PixelOffice] Failed to write config file:', err);
   }

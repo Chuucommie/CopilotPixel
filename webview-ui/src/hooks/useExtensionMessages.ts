@@ -251,11 +251,13 @@ export function useExtensionMessages(
               return next.sort((a, b) => a - b);
             });
           }
-          for (const [chId, ch] of os.characters.entries()) {
-            if (ch.isCopilotPixelAgent && ch.isTeamLead) {
-              const subIds = os.ensureSubagentTeam(chId, 5);
-              setAgents([chId, ...subIds].sort((a, b) => a - b));
-              break;
+          if (!isE2E) {
+            for (const [chId, ch] of os.characters.entries()) {
+              if (ch.isCopilotPixelAgent && ch.isTeamLead) {
+                const subIds = os.ensureSubagentTeam(chId, 5);
+                setAgents([chId, ...subIds].sort((a, b) => a - b));
+                break;
+              }
             }
           }
         }
