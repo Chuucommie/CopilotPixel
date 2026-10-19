@@ -133,6 +133,13 @@ export function updateCharacter(
 
   switch (ch.state) {
     case CharacterState.TYPE: {
+      // The Team Lead does NOT sit and type at a PC workstation like a regular worker!
+      // The Lead stands, walks around the workstations, instructs and gives pep talks.
+      if (ch.isTeamLead) {
+        ch.isSitting = false;
+        ch.state = CharacterState.IDLE;
+        break;
+      }
       const seat = ch.seatId ? seats.get(ch.seatId) : null;
       if (seat && ch.tileCol === seat.seatCol && ch.tileRow === seat.seatRow) {
         ch.isSitting = true;

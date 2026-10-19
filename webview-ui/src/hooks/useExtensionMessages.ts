@@ -496,15 +496,19 @@ export function useExtensionMessages(
           : status;
 
         // User requirement:
-        // Execution messages appear in random agent speech bubbles,
-        // overwriting whatever bubble was there before (no duplicate bubbles).
-        const allChars = Array.from(os.characters.values());
-        if (allChars.length > 0) {
-          const randomIndex = Math.floor(Math.random() * allChars.length);
-          const chosenChar = allChars[randomIndex];
+        // Tasks and execution messages appear randomly ONLY on teammate agents (never the lead).
+        // Teammates return to their PC workstations from breaks to execute the task.
+        const teammateChars = Array.from(os.characters.values()).filter((c) => !c.isTeamLead);
+        const pool = teammateChars.length > 0 ? teammateChars : Array.from(os.characters.values());
+        if (pool.length > 0) {
+          const randomIndex = Math.floor(Math.random() * pool.length);
+          const chosenChar = pool[randomIndex];
           if (chosenChar) {
             chosenChar.speechBubbleText = displayLabel;
             chosenChar.speechBubbleTimer = 5.0;
+            if (chosenChar.isTakingBreak) {
+              os.returnAgentFromBreak(chosenChar.id);
+            }
           }
         }
 
@@ -592,18 +596,28 @@ export function useExtensionMessages(
               const nextLabel = nextActive.status.startsWith('Subtask:')
                 ? nextActive.status.slice('Subtask:'.length).trim()
                 : nextActive.status;
-              const allChars = Array.from(os.characters.values());
-              if (allChars.length > 0) {
-                const randomIndex = Math.floor(Math.random() * allChars.length);
-                const chosenChar = allChars[randomIndex];
+              const teammateChars = Array.from(os.characters.values()).filter((c) => !c.isTeamLead);
+              const pool =
+                teammateChars.length > 0 ? teammateChars : Array.from(os.characters.values());
+              if (pool.length > 0) {
+                const randomIndex = Math.floor(Math.random() * pool.length);
+                const chosenChar = pool[randomIndex];
                 if (chosenChar) {
                   chosenChar.speechBubbleText = nextLabel;
                   chosenChar.speechBubbleTimer = 5.0;
+                  if (chosenChar.isTakingBreak) {
+                    os.returnAgentFromBreak(chosenChar.id);
+                  }
                 }
               }
             } else {
-              activeChar.speechBubbleText = 'Completed task';
-              activeChar.speechBubbleTimer = 2.5;
+              if (activeChar.isTeamLead) {
+                activeChar.speechBubbleText = 'Great job, team! 🎉';
+                activeChar.speechBubbleTimer = 3.0;
+              } else {
+                activeChar.speechBubbleText = 'Completed task';
+                activeChar.speechBubbleTimer = 2.5;
+              }
             }
           }
           return {

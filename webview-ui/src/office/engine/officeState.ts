@@ -134,6 +134,7 @@ export class OfficeState {
   /** Latched by a manual pan during the ask: the user took the camera, so the
    *  overlay's per-frame updates stop re-centering. Reset on spawn/despawn. */
   private greeterCameraCancelled = false;
+  leadMentoringTimer = 0;
 
   setAreaMappings(mappings: Record<string, string[]>): void {
     this.areaMappings = mappings;
@@ -1332,6 +1333,9 @@ export class OfficeState {
       this.characters.delete(id);
     }
 
+    // ── Lead Mentoring & Workstation Patrol ─────────────────────
+    this.updateLeadMentoring(dt);
+
     // ── Elder Scrolls Radiant AI Daily Idle Routine ─────────────
     this.routineEngine.update(this, dt);
 
@@ -2413,7 +2417,8 @@ export class OfficeState {
         leadCh.tileCol = seat.seatCol;
         leadCh.tileRow = seat.seatRow;
         leadCh.dir = seat.facingDir;
-        leadCh.state = CharacterState.TYPE;
+        leadCh.state = CharacterState.IDLE;
+        leadCh.isSitting = false;
         leadCh.isTakingBreak = false;
       }
     }
@@ -2569,5 +2574,109 @@ export class OfficeState {
       }
     }
     return null;
+  }
+
+  /**
+   * Lead Agent Mentoring Patrol & Pep Talks.
+   * When it's time to work, the lead agent doesn't sit at a desk typing.
+   * Instead, the lead walks between the PC workstations, inspecting progress,
+   * instructing teammates, and giving fun motivational pep talks in speech bubbles.
+   */
+  updateLeadMentoring(dt: number): void {
+    const lead = Array.from(this.characters.values()).find((c) => c.isTeamLead);
+    if (!lead) return;
+
+    // Is there active work happening in the office?
+    const hasActiveWork =
+      lead.isActive ||
+      Array.from(this.characters.values()).some(
+        (c) =>
+          !c.isTeamLead &&
+          (c.isActive ||
+            (c.speechBubbleText && (c.speechBubbleTimer ?? 0) > 0) ||
+            c.orderStatus === 'running'),
+      );
+
+    if (!hasActiveWork) {
+      this.leadMentoringTimer = 0;
+      return;
+    }
+
+    // Lead never sits and types while the team is working!
+    lead.isSitting = false;
+    if (lead.state === CharacterState.TYPE) {
+      lead.state = CharacterState.IDLE;
+    }
+
+    this.leadMentoringTimer = (this.leadMentoringTimer || 0) + dt;
+
+    // Periodically walk around the PC workstations and give fun pep talks
+    if (this.leadMentoringTimer >= 7 && lead.path.length === 0) {
+      this.leadMentoringTimer = 0;
+
+      // Find workstation desk seats outside the break room
+      const deskSeats = Array.from(this.seats.values()).filter(
+        (s) => !this.isBreakRoomArea(s.seatCol, s.seatRow),
+      );
+
+      if (deskSeats.length > 0) {
+        const targetSeat = deskSeats[Math.floor(Math.random() * deskSeats.length)];
+        const candidates = [
+          { col: targetSeat.seatCol + 1, row: targetSeat.seatRow },
+          { col: targetSeat.seatCol - 1, row: targetSeat.seatRow },
+          { col: targetSeat.seatCol, row: targetSeat.seatRow + 1 },
+          { col: targetSeat.seatCol, row: targetSeat.seatRow - 1 },
+        ].filter(
+          (n) =>
+            isWalkable(n.col, n.row, this.tileMap, this.blockedTiles) &&
+            !(n.col === targetSeat.seatCol && n.row === targetSeat.seatRow),
+        );
+
+        if (candidates.length > 0) {
+          const targetTile = candidates[Math.floor(Math.random() * candidates.length)];
+          const path = findPath(
+            lead.tileCol,
+            lead.tileRow,
+            targetTile.col,
+            targetTile.row,
+            this.tileMap,
+            this.blockedTiles,
+          );
+          if (path.length > 0) {
+            lead.path = path;
+            lead.moveProgress = 0;
+            lead.state = CharacterState.WALK;
+            lead.isSitting = false;
+          }
+        }
+      }
+
+      // Fun motivational pep talk
+      const LEAD_PEP_TALKS = [
+        'Keep up the momentum, team! 🚀',
+        'Loving the clean code over here! 💻',
+        'Ship it once tests are green! ✅',
+        'Great architecture on this module!',
+        'Looking sharp, team! Keep pushing! 🔥',
+        'Remember: commit early, commit clean!',
+        'That logic is looking solid! 🧠',
+        'You got this, fantastic progress!',
+        'Teamwork makes the dream work! ✨',
+        'Coffee check! Stay hydrated and energized! ☕',
+        'Excellent progress on this task!',
+        'That refactor looks super clean! 🧼',
+        "High five! Let's get this done! 🙌",
+      ];
+      const pepTalk = LEAD_PEP_TALKS[Math.floor(Math.random() * LEAD_PEP_TALKS.length)];
+      lead.speechBubbleText = pepTalk;
+      lead.speechBubbleTimer = 4.0;
+      this.addTeamDialogue({
+        fromAgentId: lead.id,
+        fromName: lead.customName || 'Dallas',
+        fromRole: 'Lead',
+        text: pepTalk,
+        context: 'chat',
+      });
+    }
   }
 }

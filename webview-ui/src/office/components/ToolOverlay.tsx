@@ -211,7 +211,7 @@ export function ToolOverlay({
             ch.waitingAwaitingInput ?? false,
           );
           if (ch.isTeamLead && ch.isActive && tools?.some((t) => !t.done) && allIds.length > 1) {
-            activityText = 'Coordinating tasks';
+            activityText = 'Coordinating & Mentoring 📢';
           }
           if (!ch.isActive && ch.routineActivity && activityText === 'Waiting for tasks') {
             activityText = `${ch.routineIcon || '💻'} ${ch.routineActivity}`;
