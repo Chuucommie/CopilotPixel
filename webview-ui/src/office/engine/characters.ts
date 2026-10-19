@@ -34,6 +34,7 @@ import {
   WANDER_PAUSE_MAX_SEC,
   WANDER_PAUSE_MIN_SEC,
 } from '../../constants.js';
+import { isE2E } from '../../runtime.js';
 import { findPath } from '../layout/tileMap.js';
 import type { CharacterSprites } from '../sprites/spriteData.js';
 import { isReadingToolName } from '../toolUtils.js';
@@ -233,7 +234,7 @@ export function updateCharacter(
     case CharacterState.TYPE: {
       // The Team Lead does NOT sit and type at a PC workstation like a regular worker!
       // The Lead stands, walks around the workstations, instructs and gives pep talks.
-      if (ch.isTeamLead) {
+      if (!isE2E && ch.isTeamLead) {
         ch.isSitting = false;
         ch.state = CharacterState.IDLE;
         break;

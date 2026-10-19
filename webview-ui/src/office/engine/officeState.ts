@@ -16,6 +16,7 @@ import {
   PET_HIT_HEIGHT,
   WAITING_BUBBLE_DURATION_SEC,
 } from '../../constants.js';
+import { isE2E } from '../../runtime.js';
 import { getAgentProfile, updateAgentProfile } from '../agentRoles.js';
 import { getAnimationFrames, getCatalogEntry, getOnStateType } from '../layout/furnitureCatalog.js';
 import {
@@ -2637,6 +2638,7 @@ export class OfficeState {
    * instructing teammates, and giving fun motivational pep talks in speech bubbles.
    */
   updateLeadMentoring(dt: number): void {
+    if (isE2E) return;
     const lead = Array.from(this.characters.values()).find((c) => c.isTeamLead);
     if (!lead) return;
 

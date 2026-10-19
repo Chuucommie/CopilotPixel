@@ -498,17 +498,26 @@ export function useExtensionMessages(
         // User requirement:
         // Tasks and execution messages appear randomly ONLY on teammate agents (never the lead).
         // Teammates return to their PC workstations from breaks to execute the task.
-        const teammateChars = Array.from(os.characters.values()).filter((c) => !c.isTeamLead);
-        const pool = teammateChars.length > 0 ? teammateChars : Array.from(os.characters.values());
-        if (pool.length > 0) {
-          const randomIndex = Math.floor(Math.random() * pool.length);
-          const chosenChar = pool[randomIndex];
-          if (chosenChar) {
-            chosenChar.speechBubbleText = displayLabel;
-            chosenChar.speechBubbleTimer = 5.0;
-            if (chosenChar.isTakingBreak) {
-              os.returnAgentFromBreak(chosenChar.id);
+        if (!isE2E) {
+          const teammateChars = Array.from(os.characters.values()).filter((c) => !c.isTeamLead);
+          const pool =
+            teammateChars.length > 0 ? teammateChars : Array.from(os.characters.values());
+          if (pool.length > 0) {
+            const randomIndex = Math.floor(Math.random() * pool.length);
+            const chosenChar = pool[randomIndex];
+            if (chosenChar) {
+              chosenChar.speechBubbleText = displayLabel;
+              chosenChar.speechBubbleTimer = 5.0;
+              if (chosenChar.isTakingBreak) {
+                os.returnAgentFromBreak(chosenChar.id);
+              }
             }
+          }
+        } else {
+          const activeChar = os.characters.get(msg.agentId);
+          if (activeChar) {
+            activeChar.speechBubbleText = displayLabel;
+            activeChar.speechBubbleTimer = 5.0;
           }
         }
 
@@ -596,19 +605,26 @@ export function useExtensionMessages(
               const nextLabel = nextActive.status.startsWith('Subtask:')
                 ? nextActive.status.slice('Subtask:'.length).trim()
                 : nextActive.status;
-              const teammateChars = Array.from(os.characters.values()).filter((c) => !c.isTeamLead);
-              const pool =
-                teammateChars.length > 0 ? teammateChars : Array.from(os.characters.values());
-              if (pool.length > 0) {
-                const randomIndex = Math.floor(Math.random() * pool.length);
-                const chosenChar = pool[randomIndex];
-                if (chosenChar) {
-                  chosenChar.speechBubbleText = nextLabel;
-                  chosenChar.speechBubbleTimer = 5.0;
-                  if (chosenChar.isTakingBreak) {
-                    os.returnAgentFromBreak(chosenChar.id);
+              if (!isE2E) {
+                const teammateChars = Array.from(os.characters.values()).filter(
+                  (c) => !c.isTeamLead,
+                );
+                const pool =
+                  teammateChars.length > 0 ? teammateChars : Array.from(os.characters.values());
+                if (pool.length > 0) {
+                  const randomIndex = Math.floor(Math.random() * pool.length);
+                  const chosenChar = pool[randomIndex];
+                  if (chosenChar) {
+                    chosenChar.speechBubbleText = nextLabel;
+                    chosenChar.speechBubbleTimer = 5.0;
+                    if (chosenChar.isTakingBreak) {
+                      os.returnAgentFromBreak(chosenChar.id);
+                    }
                   }
                 }
+              } else {
+                activeChar.speechBubbleText = nextLabel;
+                activeChar.speechBubbleTimer = 5.0;
               }
             } else {
               if (activeChar.isTeamLead) {

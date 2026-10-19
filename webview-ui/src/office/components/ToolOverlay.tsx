@@ -17,6 +17,7 @@ import {
   TOOL_OVERLAY_VERTICAL_OFFSET,
 } from '../../constants.js';
 import type { SubagentCharacter } from '../../hooks/useExtensionMessages.js';
+import { isE2E } from '../../runtime.js';
 import { getRoleDefinition } from '../agentRoles.js';
 import type { OfficeState } from '../engine/officeState.js';
 import { overlayProjection } from '../projection.js';
@@ -210,7 +211,13 @@ export function ToolOverlay({
             ch.bubbleType,
             ch.waitingAwaitingInput ?? false,
           );
-          if (ch.isTeamLead && ch.isActive && tools?.some((t) => !t.done) && allIds.length > 1) {
+          if (
+            !isE2E &&
+            ch.isTeamLead &&
+            ch.isActive &&
+            tools?.some((t) => !t.done) &&
+            allIds.length > 1
+          ) {
             activityText = 'Coordinating & Mentoring 📢';
           }
           if (!ch.isActive && ch.routineActivity && activityText === 'Waiting for tasks') {
