@@ -624,7 +624,7 @@ export class OfficeState {
   removeAgent(id: number): void {
     const ch = this.characters.get(id);
     if (!ch) return;
-    if (!isE2E && ch.isCopilotPixelAgent) return; // Persistent CopilotPixel agents never disappear
+    if (ch.isCopilotPixelAgent) return; // Persistent CopilotPixel agents never disappear
     if (ch.matrixEffect === 'despawn') return; // already despawning
     // Free seat and clear selection immediately
     if (ch.seatId) {
@@ -927,7 +927,7 @@ export class OfficeState {
       if (meta && meta.parentAgentId === parentAgentId) {
         const ch = this.characters.get(id);
         if (ch) {
-          if (!isE2E && ch.isCopilotPixelAgent) {
+          if (ch.isCopilotPixelAgent) {
             continue; // Persistent CopilotPixel agents are kept alive
           }
           if (ch.matrixEffect === 'despawn') {
@@ -2261,7 +2261,6 @@ export class OfficeState {
    * - Re-links subagents to this lead
    */
   sanitizeTeamHierarchy(): void {
-    if (isE2E) return;
     const chars = Array.from(this.characters.values());
     if (chars.length === 0) return;
 
@@ -2438,7 +2437,6 @@ export class OfficeState {
   }
 
   ensureSubagentTeam(leadId: number, count = 5): number[] {
-    if (isE2E) return [];
     const leadCh = this.characters.get(leadId);
     if (!leadCh) return [];
 
