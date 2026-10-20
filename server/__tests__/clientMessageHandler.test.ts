@@ -146,6 +146,91 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
     });
   });
 
+  // ── externalAssetDirectories ─────────────────────────────────
+
+  describe('externalAssetDirectories privilege gate', () => {
+    it('ignores addExternalAssetDirectory when client is not privileged', () => {
+      ctx.privileged = false;
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: '/untrusted/assets' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).not.toContain('/untrusted/assets');
+      expect(sent).toHaveLength(0);
+    });
+
+    it('allows addExternalAssetDirectory when client is privileged', () => {
+      ctx.privileged = true;
+      let reloaded = false;
+      ctx.onReloadAssets = () => {
+        reloaded = true;
+      };
+
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: '/trusted/assets' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).toContain('/trusted/assets');
+      expect(reloaded).toBe(true);
+      expect(sent).toContainEqual({
+        type: 'externalAssetDirectoriesUpdated',
+        dirs: cfg.externalAssetDirectories,
+      });
+    });
+
+    it('ignores removeExternalAssetDirectory when client is not privileged', () => {
+      // First seed a directory as privileged
+      ctx.privileged = true;
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: '/trusted/assets' },
+        (m) => sent.push(m),
+        ctx,
+      );
+      sent = [];
+
+      // Try to remove as unprivileged
+      ctx.privileged = false;
+      handleClientMessage(
+        { type: 'removeExternalAssetDirectory', path: '/trusted/assets' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).toContain('/trusted/assets');
+      expect(sent).toHaveLength(0);
+    });
+
+    it('allows removeExternalAssetDirectory when client is privileged', () => {
+      ctx.privileged = true;
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: '/trusted/assets' },
+        (m) => sent.push(m),
+        ctx,
+      );
+      sent = [];
+
+      handleClientMessage(
+        { type: 'removeExternalAssetDirectory', path: '/trusted/assets' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).not.toContain('/trusted/assets');
+      expect(sent).toContainEqual({
+        type: 'externalAssetDirectoriesUpdated',
+        dirs: cfg.externalAssetDirectories,
+      });
+    });
+  });
+
   // ── hooksStatus (actual install state, not the hooksEnabled setting) ──
 
   describe('hooksStatus', () => {
