@@ -1136,6 +1136,7 @@ export function useExtensionMessages(
           console.log(`📦 Webview: Loaded ${catalog.length} furniture assets`);
           // Build dynamic catalog immediately so getCatalogEntry() works when layoutLoaded arrives next
           buildDynamicCatalog({ catalog, sprites });
+          os.rebuildFromLayout(os.getLayout());
           setLoadedAssets({ catalog, sprites });
         } catch (err) {
           console.error(`❌ Webview: Error processing furnitureAssetsLoaded:`, err);

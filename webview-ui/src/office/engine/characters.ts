@@ -102,6 +102,7 @@ export function createCharacter(
     wanderCount: 0,
     wanderLimit: randomInt(WANDER_MOVES_BEFORE_REST_MIN, WANDER_MOVES_BEFORE_REST_MAX),
     isActive: true,
+    isSitting: seat !== null,
     seatId,
     bubbleType: null,
     bubbleTimer: 0,
@@ -234,18 +235,19 @@ export function updateCharacter(
 
   switch (ch.state) {
     case CharacterState.TYPE: {
-      // The Team Lead does NOT sit and type at a PC workstation like a regular worker!
-      // The Lead stands, walks around the workstations, instructs and gives pep talks.
+      const seatAtTile = Array.from(seats.values()).find(
+        (s) => s.seatCol === ch.tileCol && s.seatRow === ch.tileRow,
+      );
+      if (seatAtTile) {
+        ch.isSitting = true;
+        ch.dir = seatAtTile.facingDir;
+      }
+      // The Team Lead does NOT type at a workstation like a regular worker
       if (!isE2E && ch.isTeamLead) {
-        ch.isSitting = false;
         ch.state = CharacterState.IDLE;
         break;
       }
-      const seat =
-        (ch.seatId ? seats.get(ch.seatId) : null) ??
-        Array.from(seats.values()).find(
-          (s) => s.seatCol === ch.tileCol && s.seatRow === ch.tileRow,
-        );
+      const seat = seatAtTile ?? (ch.seatId ? seats.get(ch.seatId) : null);
       if (seat && ch.tileCol === seat.seatCol && ch.tileRow === seat.seatRow) {
         ch.isSitting = true;
         ch.dir = seat.facingDir;
@@ -290,11 +292,10 @@ export function updateCharacter(
     }
 
     case CharacterState.IDLE: {
-      const seat =
-        (ch.seatId ? seats.get(ch.seatId) : null) ??
-        Array.from(seats.values()).find(
-          (s) => s.seatCol === ch.tileCol && s.seatRow === ch.tileRow,
-        );
+      const seatAtTile = Array.from(seats.values()).find(
+        (s) => s.seatCol === ch.tileCol && s.seatRow === ch.tileRow,
+      );
+      const seat = seatAtTile ?? (ch.seatId ? seats.get(ch.seatId) : null);
       if (seat && ch.tileCol === seat.seatCol && ch.tileRow === seat.seatRow) {
         ch.isSitting = true;
         ch.dir = seat.facingDir;
@@ -311,38 +312,46 @@ export function updateCharacter(
       if (ch.seatTimer < 0) ch.seatTimer = 0; // clear turn-end sentinel
       // If became active, pathfind to seat
       if (ch.isActive) {
-        if (!ch.seatId) {
+        if (!isE2E && ch.isTeamLead) {
+          if (seatAtTile) {
+            ch.isSitting = true;
+            ch.dir = seatAtTile.facingDir;
+          }
+          // Team lead observes from seat/spot without locking into TYPE loop
+        } else if (!ch.seatId) {
           // No seat assigned — type in place
           ch.state = CharacterState.TYPE;
           ch.frame = 0;
           ch.frameTimer = 0;
           break;
-        }
-        const seat = seats.get(ch.seatId);
-        if (seat) {
-          const path = findPath(
-            ch.tileCol,
-            ch.tileRow,
-            seat.seatCol,
-            seat.seatRow,
-            tileMap,
-            blockedTiles,
-          );
-          if (path.length > 0) {
-            ch.path = path;
-            ch.moveProgress = 0;
-            ch.state = CharacterState.WALK;
-            ch.frame = 0;
-            ch.frameTimer = 0;
-          } else {
-            // Already at seat or no path — sit down
-            ch.state = CharacterState.TYPE;
-            ch.dir = seat.facingDir;
-            ch.frame = 0;
-            ch.frameTimer = 0;
+        } else {
+          const seat = seats.get(ch.seatId);
+          if (seat) {
+            const path = findPath(
+              ch.tileCol,
+              ch.tileRow,
+              seat.seatCol,
+              seat.seatRow,
+              tileMap,
+              blockedTiles,
+            );
+            if (path.length > 0) {
+              ch.path = path;
+              ch.moveProgress = 0;
+              ch.state = CharacterState.WALK;
+              ch.frame = 0;
+              ch.frameTimer = 0;
+            } else {
+              // Already at seat or no path — sit down
+              ch.state = CharacterState.TYPE;
+              ch.dir = seat.facingDir;
+              ch.isSitting = true;
+              ch.frame = 0;
+              ch.frameTimer = 0;
+            }
           }
+          break;
         }
-        break;
       }
       // Countdown wander timer
       ch.wanderTimer -= dt;
@@ -472,51 +481,45 @@ export function updateCharacter(
           break;
         }
 
+        const seatAtTile = Array.from(seats.values()).find(
+          (s) => s.seatCol === ch.tileCol && s.seatRow === ch.tileRow,
+        );
         if (ch.isActive) {
           if (!ch.seatId) {
             // No seat — type in place
             ch.state = CharacterState.TYPE;
-          } else {
-            const seat = seats.get(ch.seatId);
-            if (seat && ch.tileCol === seat.seatCol && ch.tileRow === seat.seatRow) {
-              ch.state = CharacterState.TYPE;
-              ch.dir = seat.facingDir;
-              ch.isSitting = true;
-              if (ch.hasCoffeeCup) {
-                placeCoffeeOnWorkstation(ch, seat);
-              }
-            } else {
-              ch.state = CharacterState.IDLE;
+          } else if (seatAtTile) {
+            ch.state = !isE2E && ch.isTeamLead ? CharacterState.IDLE : CharacterState.TYPE;
+            ch.dir = seatAtTile.facingDir;
+            ch.isSitting = true;
+            if (ch.hasCoffeeCup) {
+              placeCoffeeOnWorkstation(ch, seatAtTile);
             }
+          } else {
+            ch.isSitting = false;
+            ch.state = CharacterState.IDLE;
           }
         } else {
-          // Check if arrived at assigned seat — sit down for a rest before wandering again
-          if (ch.seatId) {
-            const seat = seats.get(ch.seatId);
-            if (seat && ch.tileCol === seat.seatCol && ch.tileRow === seat.seatRow) {
-              ch.state = CharacterState.TYPE;
-              ch.dir = seat.facingDir;
-              ch.isSitting = true;
-              if (ch.hasCoffeeCup) {
-                placeCoffeeOnWorkstation(ch, seat);
-              }
-              // seatTimer < 0 is a sentinel from setAgentActive(false) meaning
-              // "turn just ended" — skip the long rest so idle transition is immediate
-              if (ch.seatTimer < 0) {
-                ch.seatTimer = 0;
-              } else {
-                ch.seatTimer = randomRange(SEAT_REST_MIN_SEC, SEAT_REST_MAX_SEC);
-              }
-              ch.wanderCount = 0;
-              ch.wanderLimit = randomInt(
-                WANDER_MOVES_BEFORE_REST_MIN,
-                WANDER_MOVES_BEFORE_REST_MAX,
-              );
-              ch.frame = 0;
-              ch.frameTimer = 0;
-              break;
+          // Check if arrived at any seat — sit down for a rest before wandering again
+          if (seatAtTile) {
+            ch.state = !isE2E && ch.isTeamLead ? CharacterState.IDLE : CharacterState.TYPE;
+            ch.dir = seatAtTile.facingDir;
+            ch.isSitting = true;
+            if (ch.hasCoffeeCup) {
+              placeCoffeeOnWorkstation(ch, seatAtTile);
             }
+            if (ch.seatTimer < 0) {
+              ch.seatTimer = 0;
+            } else {
+              ch.seatTimer = randomRange(SEAT_REST_MIN_SEC, SEAT_REST_MAX_SEC);
+            }
+            ch.wanderCount = 0;
+            ch.wanderLimit = randomInt(WANDER_MOVES_BEFORE_REST_MIN, WANDER_MOVES_BEFORE_REST_MAX);
+            ch.frame = 0;
+            ch.frameTimer = 0;
+            break;
           }
+          ch.isSitting = false;
           ch.state = CharacterState.IDLE;
           ch.wanderTimer = randomRange(WANDER_PAUSE_MIN_SEC, WANDER_PAUSE_MAX_SEC);
         }
@@ -578,7 +581,9 @@ export function updateCharacter(
       }
 
       // If became active while wandering, repath to seat
-      if (ch.isActive && ch.seatId) {
+      if (!isE2E && ch.isTeamLead) {
+        // Team lead does not interrupt mentoring/patrolling walk to rush back to seat!
+      } else if (ch.isActive && ch.seatId) {
         const seat = seats.get(ch.seatId);
         if (seat) {
           const lastStep = ch.path[ch.path.length - 1];

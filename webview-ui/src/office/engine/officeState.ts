@@ -302,13 +302,20 @@ export class OfficeState {
     return `${seat.seatCol},${seat.seatRow}`;
   }
 
-  /** Temporarily unblock a character's own seat, run fn, then re-block */
+  /** Temporarily unblock a character's own seat AND current tile, run fn, then re-block */
   private withOwnSeatUnblocked<T>(ch: Character, fn: () => T): T {
-    const key = this.ownSeatKey(ch);
-    if (key) this.blockedTiles.delete(key);
-    const result = fn();
-    if (key) this.blockedTiles.add(key);
-    return result;
+    const seatKey = this.ownSeatKey(ch);
+    const currentTileKey = ch.tileCol + ',' + ch.tileRow;
+    const seatWasBlocked = seatKey ? this.blockedTiles.has(seatKey) : false;
+    const currentWasBlocked = this.blockedTiles.has(currentTileKey);
+    if (seatKey) this.blockedTiles.delete(seatKey);
+    this.blockedTiles.delete(currentTileKey);
+    try {
+      return fn();
+    } finally {
+      if (seatWasBlocked && seatKey) this.blockedTiles.add(seatKey);
+      if (currentWasBlocked) this.blockedTiles.add(currentTileKey);
+    }
   }
 
   /** Collect every tile occupied by electronics furniture (PCs, monitors, etc.). */
@@ -1330,6 +1337,17 @@ export class OfficeState {
       if (ch.isTakingBreak) {
         ch.breakDuration = (ch.breakDuration || 0) + dt;
       }
+
+      // Universal seating posture invariant: if stationary on any seat, character is sitting
+      if (ch.path.length === 0 && ch.state !== CharacterState.WALK) {
+        const seatAtTile = Array.from(this.seats.values()).find(
+          (s) => s.seatCol === ch.tileCol && s.seatRow === ch.tileRow,
+        );
+        if (seatAtTile) {
+          ch.isSitting = true;
+          ch.dir = seatAtTile.facingDir;
+        }
+      }
     }
     // Remove characters that finished despawn
     for (const id of toDelete) {
@@ -1435,30 +1453,64 @@ export class OfficeState {
 
         if (freeSpots.length > 0) {
           const targetSpot = freeSpots[Math.floor(Math.random() * freeSpots.length)];
-          const targetKey = targetSpot.col + ',' + targetSpot.row;
-          const wasBlocked = this.blockedTiles.has(targetKey);
-          if (wasBlocked) this.blockedTiles.delete(targetKey);
+          // 35% chance to take a casual stroll ("farsi un giro") across the break room lounge floor
+          const takeAStroll = Math.random() < 0.35 && this.walkableTiles.length > 0;
+          if (takeAStroll) {
+            const breakWalkables = this.walkableTiles.filter(
+              (t) =>
+                this.isBreakRoomArea(t.col, t.row) &&
+                !occupiedTiles.has(`${t.col},${t.row}`) &&
+                (t.col !== worker.tileCol || t.row !== worker.tileRow),
+            );
+            if (breakWalkables.length > 0) {
+              const strollTarget =
+                breakWalkables[Math.floor(Math.random() * breakWalkables.length)];
+              const path = this.withOwnSeatUnblocked(worker, () =>
+                findPath(
+                  worker.tileCol,
+                  worker.tileRow,
+                  strollTarget.col,
+                  strollTarget.row,
+                  this.tileMap,
+                  this.blockedTiles,
+                ),
+              );
+              if (path.length > 0) {
+                worker.path = path;
+                worker.moveProgress = 0;
+                worker.state = CharacterState.WALK;
+                worker.isSitting = false;
+                worker.pendingBreakSpot = null;
+              }
+            }
+          } else {
+            const targetKey = targetSpot.col + ',' + targetSpot.row;
+            const wasBlocked = this.blockedTiles.has(targetKey);
+            if (wasBlocked) this.blockedTiles.delete(targetKey);
 
-          const path = findPath(
-            worker.tileCol,
-            worker.tileRow,
-            targetSpot.col,
-            targetSpot.row,
-            this.tileMap,
-            this.blockedTiles,
-          );
+            const path = this.withOwnSeatUnblocked(worker, () =>
+              findPath(
+                worker.tileCol,
+                worker.tileRow,
+                targetSpot.col,
+                targetSpot.row,
+                this.tileMap,
+                this.blockedTiles,
+              ),
+            );
 
-          if (wasBlocked) this.blockedTiles.add(targetKey);
+            if (wasBlocked) this.blockedTiles.add(targetKey);
 
-          if (path.length > 0) {
-            worker.path = path;
-            worker.moveProgress = 0;
-            worker.state = CharacterState.WALK;
-            worker.isSitting = false;
-            worker.breakTargetCol = targetSpot.col;
-            worker.breakTargetRow = targetSpot.row;
-            worker.breakType = targetSpot.breakType;
-            worker.pendingBreakSpot = targetSpot;
+            if (path.length > 0) {
+              worker.path = path;
+              worker.moveProgress = 0;
+              worker.state = CharacterState.WALK;
+              worker.isSitting = false;
+              worker.breakTargetCol = targetSpot.col;
+              worker.breakTargetRow = targetSpot.row;
+              worker.breakType = targetSpot.breakType;
+              worker.pendingBreakSpot = targetSpot;
+            }
           }
         }
       }
@@ -1788,6 +1840,7 @@ export class OfficeState {
         } else if (ch.tileCol === seat.seatCol && ch.tileRow === seat.seatRow) {
           ch.state = CharacterState.TYPE;
           ch.dir = seat.facingDir;
+          ch.isSitting = true;
         } else {
           ch.state = CharacterState.IDLE;
         }
@@ -1993,10 +2046,45 @@ export class OfficeState {
    * Can scale up if the layout provides more seats, naming each worker uniquely.
    * In the Break Room they rest as Teammate; they take dynamic roles only when called to work.
    */
+  private isWorkstationDeskSeat(seat: Seat): boolean {
+    const electronics = this.buildElectronicsTileSet();
+    const dirs = [
+      { dc: 0, dr: -1 },
+      { dc: 0, dr: 1 },
+      { dc: -1, dr: 0 },
+      { dc: 1, dr: 0 },
+    ];
+    for (const d of dirs) {
+      if (electronics.has(`${seat.seatCol + d.dc},${seat.seatRow + d.dr}`)) return true;
+    }
+    for (const item of this.layout.furniture) {
+      const entry = getCatalogEntry(item.type);
+      if (!entry?.isDesk) continue;
+      for (let dr = 0; dr < entry.footprintH; dr++) {
+        for (let dc = 0; dc < entry.footprintW; dc++) {
+          const dCol = item.col + dc;
+          const dRow = item.row + dr;
+          if (Math.abs(seat.seatCol - dCol) + Math.abs(seat.seatRow - dRow) <= 1) return true;
+        }
+      }
+    }
+    return false;
+  }
+
   /** Returns true if a tile is situated in the common Break Room / Lounge area */
   isBreakRoomArea(col: number, row: number): boolean {
     if (row < 10) return false;
-    if (this.getSeatAtTile(col, row) !== null) return false;
+    const seatId = this.getSeatAtTile(col, row);
+    if (seatId) {
+      const seat = this.seats.get(seatId);
+      if (
+        seatId.toLowerCase().includes('desk') ||
+        seatId.startsWith('f-w-') ||
+        (seat && this.isWorkstationDeskSeat(seat))
+      ) {
+        return false;
+      }
+    }
     if (this.tileMap && this.tileMap[row] && this.tileMap[row][col] !== undefined) {
       const tile = this.tileMap[row][col];
       if (tile === 9) return true;
@@ -2687,8 +2775,20 @@ export class OfficeState {
       return;
     }
 
-    // Lead never sits and types while the team is working!
-    lead.isSitting = false;
+    // Lead never types at a workstation, but sits if at a seat or stands if walking/patrolling
+    if (lead.path.length > 0) {
+      lead.isSitting = false;
+    } else {
+      const seatAtTile = Array.from(this.seats.values()).find(
+        (s) => s.seatCol === lead.tileCol && s.seatRow === lead.tileRow,
+      );
+      if (seatAtTile) {
+        lead.isSitting = true;
+        lead.dir = seatAtTile.facingDir;
+      } else {
+        lead.isSitting = false;
+      }
+    }
     if (lead.state === CharacterState.TYPE) {
       lead.state = CharacterState.IDLE;
     }
@@ -2701,7 +2801,7 @@ export class OfficeState {
 
       // Find workstation desk seats outside the break room
       const deskSeats = Array.from(this.seats.values()).filter(
-        (s) => !this.isBreakRoomArea(s.seatCol, s.seatRow),
+        (s) => !this.isBreakRoomArea(s.seatCol, s.seatRow) && this.isWorkstationDeskSeat(s),
       );
 
       if (deskSeats.length > 0) {
@@ -2719,13 +2819,15 @@ export class OfficeState {
 
         if (candidates.length > 0) {
           const targetTile = candidates[Math.floor(Math.random() * candidates.length)];
-          const path = findPath(
-            lead.tileCol,
-            lead.tileRow,
-            targetTile.col,
-            targetTile.row,
-            this.tileMap,
-            this.blockedTiles,
+          const path = this.withOwnSeatUnblocked(lead, () =>
+            findPath(
+              lead.tileCol,
+              lead.tileRow,
+              targetTile.col,
+              targetTile.row,
+              this.tileMap,
+              this.blockedTiles,
+            ),
           );
           if (path.length > 0) {
             lead.path = path;
