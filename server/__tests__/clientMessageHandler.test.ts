@@ -132,6 +132,73 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
     });
   });
 
+  // ── addExternalAssetDirectory ─────────────────────────────────
+
+  describe('addExternalAssetDirectory', () => {
+    it('adds a valid existing directory and normalizes/resolves the path', () => {
+      const validDir = fs.mkdtempSync(path.join(tempHome, 'valid-assets-'));
+
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: validDir },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).toContain(path.resolve(validDir));
+      expect(sent).toContainEqual({
+        type: 'externalAssetDirectoriesUpdated',
+        dirs: cfg.externalAssetDirectories,
+      });
+    });
+
+    it('ignores non-existent directory paths', () => {
+      const nonExistentPath = path.join(tempHome, 'non-existent-dir');
+
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: nonExistentPath },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).not.toContain(path.resolve(nonExistentPath));
+      expect(sent).toHaveLength(0);
+    });
+
+    it('ignores paths that point to a regular file instead of a directory', () => {
+      const filePath = path.join(tempHome, 'some-file.txt');
+      fs.writeFileSync(filePath, 'hello');
+
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: filePath },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).not.toContain(path.resolve(filePath));
+      expect(sent).toHaveLength(0);
+    });
+
+    it('ignores invalid or empty path inputs', () => {
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: '' },
+        (m) => sent.push(m),
+        ctx,
+      );
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: 123 },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).toEqual([]);
+      expect(sent).toHaveLength(0);
+    });
+  });
+
   // ── setShowAreas ─────────────────────────────────────────────
 
   describe('setShowAreas', () => {

@@ -916,17 +916,39 @@ export class CopilotAgentsViewProvider implements vscode.WebviewViewProvider {
           vscode.window.showInformationMessage('CopilotAgents: Layout exported successfully.');
         }
       } else if (message.type === 'addExternalAssetDirectory') {
-        const uris = await vscode.window.showOpenDialog({
-          canSelectFolders: true,
-          canSelectFiles: false,
-          canSelectMany: false,
-          openLabel: 'Select Asset Directory',
-        });
-        if (!uris || uris.length === 0) return;
-        const newPath = uris[0].fsPath;
+        let newPath: string | undefined;
+        if (typeof message.path === 'string' && message.path.trim()) {
+          newPath = message.path;
+        } else {
+          const uris = await vscode.window.showOpenDialog({
+            canSelectFolders: true,
+            canSelectFiles: false,
+            canSelectMany: false,
+            openLabel: 'Select Asset Directory',
+          });
+          if (!uris || uris.length === 0) return;
+          newPath = uris[0].fsPath;
+        }
+
+        if (!newPath) return;
+        const resolvedPath = path.resolve(newPath);
+        try {
+          if (!fs.existsSync(resolvedPath) || !fs.statSync(resolvedPath).isDirectory()) {
+            vscode.window.showErrorMessage(
+              `CopilotAgents: Selected path is not a valid directory: ${newPath}`,
+            );
+            return;
+          }
+        } catch {
+          vscode.window.showErrorMessage(
+            `CopilotAgents: Could not access asset directory: ${newPath}`,
+          );
+          return;
+        }
+
         const cfg = readConfig();
-        if (!cfg.externalAssetDirectories.includes(newPath)) {
-          cfg.externalAssetDirectories.push(newPath);
+        if (!cfg.externalAssetDirectories.includes(resolvedPath)) {
+          cfg.externalAssetDirectories.push(resolvedPath);
           writeConfig(cfg);
         }
         await this.reloadAndSendCharacters();
