@@ -1,13 +1,13 @@
 # External Asset Directories
 
-CopilotAgents supports loading furniture assets from directories outside the extension. This lets you use custom or third-party pixel art asset packs alongside the built-in furniture.
+Pixel Office supports loading furniture assets from directories outside the extension. This lets you use custom or third-party pixel art asset packs alongside the built-in furniture.
 
 ## Adding an External Directory
 
-1. Open the CopilotAgents panel and click **Settings**
+1. Open the Pixel Office panel and click **Settings**
 2. Click **Add Asset Directory** and pick a folder
 3. Your custom assets will appear in the furniture palette immediately, merged with the built-ins
-4. The directory path is saved to `~/.copilot-agents/config.json` and reloaded automatically on restart
+4. The directory path is saved to `~/.pixel-office/config.json` (with backward-compatible migration from `~/.copilot-agents/config.json`) and reloaded automatically on restart
 
 To remove a directory, open Settings and click the **X** next to it.
 

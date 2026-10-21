@@ -1,4 +1,4 @@
-# CopilotAgents
+# Pixel Office E2E Tests
 
 <!-- BEGIN:E2E-INVENTORY -->
 

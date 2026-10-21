@@ -1,6 +1,6 @@
 # Deep Architectural Analysis, Pixel Agent System & Flow Bug Report
 
-**Repository:** CopilotPixel / Pixel Office (v1.4.9)  
+**Repository:** CopilotPixel / Pixel Office (v1.4.10)  
 **Date:** 2026-10-21  
 **Author:** Antigravity Reverse-Engineering & Simulation Agent  
 **Artifact:** `research.md`
@@ -14,7 +14,7 @@
 The project is architected as a modular, dual-mode application:
 
 1. **VS Code Extension Webview:** Runs embedded inside a VS Code panel or editor tab, interfacing directly with the VS Code Extension Host via `vscode.postMessage` to observe active Copilot chat agents, language model tool invocations, and workspace file changes.
-2. **Standalone Web Server:** A lightweight Node.js/Express and WebSocket server (`server/src/server.ts`) that runs outside VS Code. It monitors terminal sessions, CLI hooks, log directories, and transcript files (e.g., Antigravity brain transcripts, Claude Code logs), streaming normalized state to browser clients.
+2. **Standalone Web Server:** A lightweight Node.js/Fastify and WebSocket server (`server/src/server.ts`) that runs outside VS Code. It monitors terminal sessions, CLI hooks, log directories, and transcript files (e.g., Antigravity brain transcripts, Claude Code logs), streaming normalized state to browser clients.
 
 ### Key Metrics & Codebase Statistics
 
@@ -26,7 +26,7 @@ The project is architected as a modular, dual-mode application:
   - `webview-ui/src/office/engine/renderer.ts` (~1,295 lines): 2.5D isometric-depth canvas renderer, lighting, weather, dynamic office clock, and matrix rain.
   - `webview-ui/src/office/engine/routineManager.ts` (~350 lines): Elder Scrolls Radiant AI-inspired daily schedule and archetype routine engine.
   - `webview-ui/src/office/layout/layoutSerializer.ts` & `furnitureCatalog.ts` (~800 lines): Layout deserialization, dynamic furniture bounding boxes, sitting points, and interaction tags.
-- **Test Suite Status:** 45 tests across 27 server test suites, and 130 tests across 18 webview test suites (100% passing).
+- **Test Suite Status:** 403 tests across 27 server test suites, 130 tests across 18 webview test suites, and 7 package contract tests (100% passing).
 
 ---
 
@@ -38,7 +38,7 @@ The project is architected as a modular, dual-mode application:
 +-----------------------------------------------------------------------------------+
 |                                                                                   |
 |  [VS Code Extension Host]                    [Standalone Node.js Server]         |
-|  - CopilotAgentsViewProvider                 - Express HTTP Server (:3000)        |
+|  - CopilotAgentsViewProvider                 - Fastify HTTP/WS Server (:3000)        |
 |  - AgentManager (Copilot LM API)             - WebSocket Server (/ws)             |
 |  - AutonomousAgentRunner                     - HookEventHandler (CLI Hooks)       |
 |  - Extension-to-Webview Bridge               - TranscriptParser (Antigravity/JSONL)|
@@ -46,7 +46,7 @@ The project is architected as a modular, dual-mode application:
 |         +-----------------------+----------------------+                          |
 |                                 |                                                 |
 |                                 v                                                 |
-|  [Webview Frontend (React 18 + Vite + TypeScript)]                                |
+|  [Webview Frontend (React 19 + Vite + TypeScript)]                                |
 |  - useExtensionMessages Hook (Wire Protocol Normalizer)                           |
 |  - OfficeEngine Component (HTML5 Canvas 2D)                                       |
 |                                                                                   |
