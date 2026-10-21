@@ -14,8 +14,10 @@ import assert from 'node:assert/strict';
 import { test } from 'vitest';
 
 import type { ColorValue } from '../src/components/ui/types.js';
-import { migrateLayoutColors } from '../src/office/layout/layoutSerializer.js';
+import { buildDynamicCatalog } from '../src/office/layout/furnitureCatalog.js';
+import { layoutToSeats, migrateLayoutColors } from '../src/office/layout/layoutSerializer.js';
 import type { OfficeLayout, PlacedFurniture, PlacedPet } from '../src/office/types.js';
+import { Direction } from '../src/office/types.js';
 import { TileType } from '../src/office/types.js';
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -146,4 +148,132 @@ test('migrateLayoutColors is idempotent (running twice produces equivalent outpu
   assert.deepEqual(twice.pets, once.pets);
   assert.deepEqual(twice.tiles, once.tiles);
   assert.deepEqual(twice.tileColors, once.tileColors);
+});
+
+// ── Chair facing direction in layoutToSeats ─────────────────
+
+test('layoutToSeats assigns correct facing direction to chairs (including mirrored :left chairs)', () => {
+  // Mock minimal dynamic catalog with chairs
+  buildDynamicCatalog({
+    catalog: [
+      {
+        id: 'WOODEN_CHAIR_SIDE',
+        label: 'Wooden Chair Side',
+        category: 'chairs',
+        width: 16,
+        height: 32,
+        footprintW: 1,
+        footprintH: 2,
+        isDesk: false,
+        orientation: 'side',
+        mirrorSide: true,
+        backgroundTiles: 1,
+      },
+      {
+        id: 'SOFA_FRONT',
+        label: 'Sofa Front',
+        category: 'chairs',
+        width: 32,
+        height: 16,
+        footprintW: 2,
+        footprintH: 1,
+        isDesk: false,
+        orientation: 'front',
+      },
+      {
+        id: 'SOFA_BACK',
+        label: 'Sofa Back',
+        category: 'chairs',
+        width: 32,
+        height: 16,
+        footprintW: 2,
+        footprintH: 1,
+        isDesk: false,
+        orientation: 'back',
+      },
+      {
+        id: 'SOFA_SIDE',
+        label: 'Sofa Side',
+        category: 'chairs',
+        width: 16,
+        height: 32,
+        footprintW: 1,
+        footprintH: 2,
+        isDesk: false,
+        orientation: 'side',
+        mirrorSide: true,
+      },
+      {
+        id: 'CUSHIONED_CHAIR_BACK',
+        label: 'Cushioned Chair Back',
+        category: 'chairs',
+        width: 16,
+        height: 16,
+        footprintW: 1,
+        footprintH: 1,
+        isDesk: false,
+        orientation: 'back',
+      },
+    ],
+    sprites: {
+      WOODEN_CHAIR_SIDE: [['#fff']],
+      SOFA_FRONT: [['#fff']],
+      SOFA_BACK: [['#fff']],
+      SOFA_SIDE: [['#fff']],
+      CUSHIONED_CHAIR_BACK: [['#fff']],
+    },
+  });
+
+  const furniture: PlacedFurniture[] = [
+    { uid: 'chair-right', type: 'WOODEN_CHAIR_SIDE', col: 3, row: 16 },
+    { uid: 'chair-left', type: 'WOODEN_CHAIR_SIDE:left', col: 7, row: 16 },
+    { uid: 'sofa-f', type: 'SOFA_FRONT', col: 16, row: 14 },
+    { uid: 'sofa-b', type: 'SOFA_BACK', col: 16, row: 17 },
+    { uid: 'sofa-s-right', type: 'SOFA_SIDE', col: 14, row: 15 },
+    { uid: 'sofa-s-left', type: 'SOFA_SIDE:left', col: 19, row: 15 },
+    { uid: 'cchair-b', type: 'CUSHIONED_CHAIR_BACK', col: 23, row: 17 },
+  ];
+
+  const seats = layoutToSeats(furniture);
+
+  // WOODEN_CHAIR_SIDE should face RIGHT (toward table on right)
+  const seatRight = seats.get('chair-right');
+  assert.ok(seatRight, 'chair-right seat should exist');
+  assert.equal(seatRight.seatCol, 3);
+  assert.equal(seatRight.seatRow, 17); // row + backgroundTiles (1)
+  assert.equal(seatRight.facingDir, Direction.RIGHT, 'WOODEN_CHAIR_SIDE must face RIGHT');
+
+  // WOODEN_CHAIR_SIDE:left should face LEFT (toward table on left) - regression test!
+  const seatLeft = seats.get('chair-left');
+  assert.ok(seatLeft, 'chair-left seat should exist');
+  assert.equal(seatLeft.seatCol, 7);
+  assert.equal(seatLeft.seatRow, 17); // row + backgroundTiles (1)
+  assert.equal(
+    seatLeft.facingDir,
+    Direction.LEFT,
+    'WOODEN_CHAIR_SIDE:left must face LEFT, not inverted to RIGHT',
+  );
+
+  // SOFA_FRONT should face DOWN (toward coffee table)
+  const sofaF = seats.get('sofa-f');
+  assert.ok(sofaF);
+  assert.equal(sofaF.facingDir, Direction.DOWN);
+
+  // SOFA_BACK should face UP (toward coffee table)
+  const sofaB = seats.get('sofa-b');
+  assert.ok(sofaB);
+  assert.equal(sofaB.facingDir, Direction.UP);
+
+  // SOFA_SIDE:left should face LEFT (toward coffee table) - regression test!
+  const sofaSLeft = seats.get('sofa-s-left');
+  assert.ok(sofaSLeft);
+  assert.equal(sofaSLeft.seatRow, 16); // row + 1 (cushion)
+  assert.equal(sofaSLeft.facingDir, Direction.LEFT, 'SOFA_SIDE:left must face LEFT');
+
+  // CUSHIONED_CHAIR_BACK should face UP (toward dining table)
+  const cchairB = seats.get('cchair-b');
+  assert.ok(cchairB);
+  assert.equal(cchairB.seatCol, 23);
+  assert.equal(cchairB.seatRow, 17);
+  assert.equal(cchairB.facingDir, Direction.UP);
 });

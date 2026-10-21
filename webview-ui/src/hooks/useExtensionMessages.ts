@@ -514,7 +514,9 @@ export function useExtensionMessages(
             }
           }
         } else {
-          const activeChar = os.characters.get(msg.agentId);
+          const targetAgentId =
+            'agentId' in msg && typeof msg.agentId === 'number' ? msg.agentId : id;
+          const activeChar = os.characters.get(targetAgentId);
           if (activeChar) {
             activeChar.speechBubbleText = displayLabel;
             activeChar.speechBubbleTimer = 5.0;
@@ -671,6 +673,7 @@ export function useExtensionMessages(
 
           const subCh = os.characters.get(subId);
           if (subCh) {
+            const completedOrderText = subCh.currentOrder;
             os.setAgentTool(subId, null);
             os.setAgentActive(subId, false);
             subCh.currentOrder = null;
@@ -683,11 +686,10 @@ export function useExtensionMessages(
               toAgentId: id,
               toName: os.characters.get(id)?.customName || 'Project Lead',
               toRole: 'Lead',
-              text: `Completed ${subCh.currentOrder ? `"${subCh.currentOrder}"` : 'subtask'}. Returning to lounge for a break!`,
+              text: `Completed ${completedOrderText ? `"${completedOrderText}"` : 'subtask'}. Returning to lounge for a break!`,
               context: 'break_room',
             });
           }
-          os.subagentIdMap.delete(`${id}:${toolId}`);
         }
       } else if (msg.type === 'agentToolsClear') {
         const id = msg.id as number;
@@ -724,7 +726,11 @@ export function useExtensionMessages(
         for (const [subId, meta] of os.subagentMeta.entries()) {
           if (meta.parentAgentId === id) {
             const subCh = os.characters.get(subId);
-            if (subCh && !subCh.isTakingBreak) {
+            const isBackgroundTool = bgSet?.has(meta.parentToolId) ?? false;
+            const isRunningAutonomous = Boolean(
+              subCh?.currentOrder && subCh?.orderStatus === 'running',
+            );
+            if (subCh && !subCh.isTakingBreak && !isBackgroundTool && !isRunningAutonomous) {
               subCh.role = 'Teammate';
               os.setAgentActive(subId, false);
               os.setAgentTool(subId, null);
@@ -955,6 +961,7 @@ export function useExtensionMessages(
           os.setAgentTool(subCh.id, null);
           os.startAgentBreak(subCh.id);
         }
+        os.subagentIdMap.delete(`${id}:${parentToolId}`);
       } else if (msg.type === 'characterSpritesLoaded') {
         const characters = msg.characters as Array<{
           down: string[][][];

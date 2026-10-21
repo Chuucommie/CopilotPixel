@@ -50,3 +50,5 @@ agent-orchestrator.yaml
 tasks/
 # Chat backups & history
 backup chat/
+.gemini/
+.Jules/

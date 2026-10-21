@@ -888,6 +888,13 @@ function processAntigravityRecord(
       record.type === 'BROWSER_SUBAGENT' ||
       record.type === 'READ_URL_CONTENT' ||
       record.type === 'ASK_QUESTION' ||
+      record.type === 'VIEW_FILE' ||
+      record.type === 'WRITE_TO_FILE' ||
+      record.type === 'REPLACE_FILE_CONTENT' ||
+      record.type === 'MULTI_REPLACE_FILE_CONTENT' ||
+      record.type === 'GREP_SEARCH' ||
+      record.type === 'LIST_DIR' ||
+      record.type === 'INVOKE_SUBAGENT' ||
       record.type === 'GENERIC')
   ) {
     const typeToTool: Record<string, string> = {
@@ -896,8 +903,15 @@ function processAntigravityRecord(
       BROWSER_SUBAGENT: 'browser_subagent',
       READ_URL_CONTENT: 'read_url_content',
       ASK_QUESTION: 'ask_question',
+      VIEW_FILE: 'view_file',
+      WRITE_TO_FILE: 'write_to_file',
+      REPLACE_FILE_CONTENT: 'replace_file_content',
+      MULTI_REPLACE_FILE_CONTENT: 'multi_replace_file_content',
+      GREP_SEARCH: 'grep_search',
+      LIST_DIR: 'list_dir',
+      INVOKE_SUBAGENT: 'invoke_subagent',
     };
-    const targetTool = typeToTool[record.type as string];
+    const targetTool = typeof record.type === 'string' ? typeToTool[record.type] : undefined;
 
     let foundToolId: string | null = null;
     if (targetTool) {

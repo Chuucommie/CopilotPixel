@@ -2,7 +2,7 @@
   "name": "pixel-office",
   "displayName": "Pixel Office",
   "description": "Pixel-art office visualizing Copilot and Antigravity/Gemini autonomous agents collaborating in real-time.",
-  "version": "1.4.9",
+  "version": "1.4.10",
   "publisher": "Chuucommie",
   "repository": {
     "type": "git",

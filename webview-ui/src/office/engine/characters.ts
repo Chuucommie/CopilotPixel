@@ -24,6 +24,8 @@ import {
   BREAK_TEA_SHADOW_COLOR,
   BREAK_TEA_TAG_COLOR,
   DEFAULT_MAX_CONTEXT_TOKENS,
+  KITCHEN_SINK_WATER_FOAM,
+  KITCHEN_SINK_WATER_SPLASH,
   SEAT_REST_MAX_SEC,
   SEAT_REST_MIN_SEC,
   TYPE_FRAME_DURATION_SEC,
@@ -239,7 +241,11 @@ export function updateCharacter(
         ch.state = CharacterState.IDLE;
         break;
       }
-      const seat = ch.seatId ? seats.get(ch.seatId) : null;
+      const seat =
+        (ch.seatId ? seats.get(ch.seatId) : null) ??
+        Array.from(seats.values()).find(
+          (s) => s.seatCol === ch.tileCol && s.seatRow === ch.tileRow,
+        );
       if (seat && ch.tileCol === seat.seatCol && ch.tileRow === seat.seatRow) {
         ch.isSitting = true;
         ch.dir = seat.facingDir;
@@ -284,12 +290,20 @@ export function updateCharacter(
     }
 
     case CharacterState.IDLE: {
-      const seat = ch.seatId ? seats.get(ch.seatId) : null;
+      const seat =
+        (ch.seatId ? seats.get(ch.seatId) : null) ??
+        Array.from(seats.values()).find(
+          (s) => s.seatCol === ch.tileCol && s.seatRow === ch.tileRow,
+        );
       if (seat && ch.tileCol === seat.seatCol && ch.tileRow === seat.seatRow) {
         ch.isSitting = true;
         ch.dir = seat.facingDir;
         if (ch.hasCoffeeCup) {
-          placeCoffeeOnWorkstation(ch, seat);
+          if (ch.isTakingBreak) {
+            placeCoffeeOnBreakTable(ch);
+          } else {
+            placeCoffeeOnWorkstation(ch, seat);
+          }
         }
       }
       // No idle animation — static pose
@@ -441,6 +455,13 @@ export function updateCharacter(
               placeCoffeeOnBreakTable(ch);
             }
           } else {
+            const seatAtTile = Array.from(seats.values()).find(
+              (s) => s.seatCol === ch.tileCol && s.seatRow === ch.tileRow,
+            );
+            if (seatAtTile) {
+              ch.isSitting = true;
+              ch.dir = seatAtTile.facingDir;
+            }
             if (ch.breakType === 'coffee') ch.state = CharacterState.BREAK_COFFEE;
             else if (ch.breakType === 'snack') ch.state = CharacterState.BREAK_SNACK;
             else if (ch.breakType === 'steamdeck') ch.state = CharacterState.BREAK_STEAMDECK;
@@ -540,6 +561,13 @@ export function updateCharacter(
               placeCoffeeOnBreakTable(ch);
             }
           } else {
+            const seatAtTile = Array.from(seats.values()).find(
+              (s) => s.seatCol === ch.tileCol && s.seatRow === ch.tileRow,
+            );
+            if (seatAtTile) {
+              ch.isSitting = true;
+              ch.dir = seatAtTile.facingDir;
+            }
             if (ch.breakType === 'coffee' || ch.breakType === 'tea')
               ch.state = CharacterState.BREAK_COFFEE;
             else if (ch.breakType === 'snack') ch.state = CharacterState.BREAK_SNACK;
@@ -611,23 +639,39 @@ function cloneSprite(sprite: SpriteData): SpriteData {
   return sprite.map((row) => [...row]);
 }
 
-/** Helper to extract character skin tones from face pixels for natural hands */
-function getSkinTones(base: SpriteData): { skin: string; shadow: string } {
-  for (let r = 11; r <= 13; r++) {
-    const row = base[r];
-    if (row && row[7] && row[7] !== '') {
-      const skin = row[7];
-      const shadow =
-        base[r + 1] && base[r + 1][7] && base[r + 1][7] !== ''
-          ? base[r + 1][7]
-          : BREAK_HAND_SHADOW_COLOR;
-      return { skin, shadow };
-    }
-  }
-  return { skin: BREAK_HAND_COLOR, shadow: BREAK_HAND_SHADOW_COLOR };
+function flipSpriteHorizontal(sprite: SpriteData): SpriteData {
+  return sprite.map((row) => [...row].reverse());
 }
 
-/** Render a steaming coffee/tea mug in character's hands with animated sipping */
+export interface CharacterColors {
+  skin: string;
+  shadow: string;
+  sleeve: string;
+  torso: string;
+  pants: string;
+}
+
+/** Helper to extract dynamic character palette colors (skin, sleeve, torso, pants) */
+export function extractCharacterColors(downStandSprite: SpriteData): CharacterColors {
+  const skin =
+    downStandSprite[14]?.[8] ||
+    downStandSprite[13]?.[7] ||
+    downStandSprite[14]?.[7] ||
+    BREAK_HAND_COLOR;
+  const shadow = downStandSprite[15]?.[8] || downStandSprite[15]?.[7] || BREAK_HAND_SHADOW_COLOR;
+  const sleeve =
+    downStandSprite[20]?.[3] ||
+    downStandSprite[20]?.[12] ||
+    downStandSprite[21]?.[2] ||
+    downStandSprite[21]?.[13] ||
+    skin;
+  const torso = downStandSprite[20]?.[7] || downStandSprite[19]?.[7] || sleeve;
+  const pants = downStandSprite[26]?.[7] || downStandSprite[27]?.[7] || torso;
+
+  return { skin, shadow, sleeve, torso, pants };
+}
+
+/** Render a steaming coffee/tea mug with fully animated arms, sleeves, and sipping cycles */
 function renderCoffeeBreakSprite(
   base: SpriteData,
   frame: number,
@@ -635,108 +679,293 @@ function renderCoffeeBreakSprite(
   isTea = false,
   isSitting = false,
   isFull = true,
+  colors: CharacterColors = {
+    skin: BREAK_HAND_COLOR,
+    shadow: BREAK_HAND_SHADOW_COLOR,
+    sleeve: BREAK_HAND_COLOR,
+    torso: BREAK_HAND_COLOR,
+    pants: BREAK_HAND_COLOR,
+  },
 ): SpriteData {
+  if (dir === Direction.LEFT) {
+    const flippedBase = flipSpriteHorizontal(base);
+    const renderedRight = renderCoffeeBreakSprite(
+      flippedBase,
+      frame,
+      Direction.RIGHT,
+      isTea,
+      isSitting,
+      isFull,
+      colors,
+    );
+    return flipSpriteHorizontal(renderedRight);
+  }
+
   const sprite = cloneSprite(base);
   const rows = sprite.length;
   const cols = sprite[0]?.length ?? 0;
   if (rows < 24 || cols < 16) return sprite;
 
-  const { skin, shadow: handShadow } = getSkinTones(base);
-  const isRight = dir === Direction.RIGHT;
-  const isLeft = dir === Direction.LEFT;
-  const isSip = frame % 4 === 2;
+  const rowOffset = isSitting ? 1 : 0;
+  const animPhase = frame % 4;
+  const liquid = isTea ? BREAK_TEA_LIQUID_COLOR : BREAK_COFFEE_LIQUID_COLOR;
+  const mug = isTea ? BREAK_TEA_CUP_COLOR : BREAK_COFFEE_MUG_COLOR;
+  const shadow = isTea ? BREAK_TEA_SHADOW_COLOR : BREAK_COFFEE_MUG_SHADOW;
+  const tag = isTea ? BREAK_TEA_TAG_COLOR : mug;
 
-  const baseRow = isSitting ? 19 : 18;
-  const mugRow = isSip ? baseRow - 2 : baseRow;
-  const mugCol = isRight ? 9 : isLeft ? 5 : 7;
-
-  if (sprite[mugRow] && sprite[mugRow + 1] && sprite[mugRow + 2]) {
-    const liquid = isTea ? BREAK_TEA_LIQUID_COLOR : BREAK_COFFEE_LIQUID_COLOR;
-    const mug = isTea ? BREAK_TEA_CUP_COLOR : BREAK_COFFEE_MUG_COLOR;
-    const shadow = isTea ? BREAK_TEA_SHADOW_COLOR : BREAK_COFFEE_MUG_SHADOW;
-
-    // Draw Mug
-    sprite[mugRow][mugCol] = liquid;
-    sprite[mugRow][mugCol + 1] = liquid;
-    sprite[mugRow + 1][mugCol] = mug;
-    sprite[mugRow + 1][mugCol + 1] = mug;
-    if (mugCol + 2 < cols) {
-      sprite[mugRow + 1][mugCol + 2] = isTea ? BREAK_TEA_TAG_COLOR : mug;
-    }
-    sprite[mugRow + 2][mugCol] = shadow;
-    sprite[mugRow + 2][mugCol + 1] = shadow;
-
-    // Animated hands holding / sipping
-    if (dir === Direction.DOWN) {
-      if (isSip) {
-        // Hands lifted up near mouth holding the warm cup
-        if (sprite[mugRow]) {
-          sprite[mugRow][mugCol - 1] = skin;
-          sprite[mugRow][mugCol + 2] = skin;
-        }
-        if (sprite[mugRow + 1]) {
-          sprite[mugRow + 1][mugCol - 1] = handShadow;
-          sprite[mugRow + 1][mugCol + 2] = handShadow;
-        }
-      } else {
-        // Hands cupping both sides of the mug
-        if (sprite[mugRow + 1]) {
-          sprite[mugRow + 1][mugCol - 1] = skin;
-          sprite[mugRow + 1][mugCol + 2] = skin;
-        }
-        if (sprite[mugRow + 2]) {
-          sprite[mugRow + 2][mugCol - 1] = handShadow;
-          sprite[mugRow + 2][mugCol + 2] = handShadow;
-        }
-      }
-    } else if (isRight) {
-      // Right-facing: hands holding mug out in front
-      if (sprite[mugRow + 1]) {
-        sprite[mugRow + 1][mugCol - 1] = skin;
-        sprite[mugRow + 1][mugCol] = skin;
-      }
-      if (sprite[mugRow + 2]) {
-        sprite[mugRow + 2][mugCol - 1] = handShadow;
-      }
-    } else if (isLeft) {
-      // Left-facing: hands holding mug out in front
-      if (sprite[mugRow + 1]) {
-        sprite[mugRow + 1][mugCol + 1] = skin;
-        sprite[mugRow + 1][mugCol + 2] = skin;
-      }
-      if (sprite[mugRow + 2]) {
-        sprite[mugRow + 2][mugCol + 2] = handShadow;
-      }
-    } else if (dir === Direction.UP) {
-      // Up-facing: mug held at the side
-      const upMugCol = 10;
-      if (sprite[mugRow]) {
-        sprite[mugRow][upMugCol] = isFull ? liquid : BREAK_COFFEE_MUG_COLOR;
-      }
-      if (sprite[mugRow + 1]) {
-        sprite[mugRow + 1][upMugCol] = mug;
-        sprite[mugRow + 1][upMugCol - 1] = skin;
-      }
-      if (sprite[mugRow + 2]) {
-        sprite[mugRow + 2][upMugCol] = shadow;
+  if (dir === Direction.DOWN) {
+    // 1. Clear static hanging arms/hands from base sprite sides so arms bend naturally
+    for (let r = 21 + rowOffset; r <= 24 + rowOffset; r++) {
+      if (sprite[r]) {
+        sprite[r][1] = '';
+        sprite[r][2] = '';
+        sprite[r][3] = '';
+        sprite[r][12] = '';
+        sprite[r][13] = '';
+        sprite[r][14] = '';
       }
     }
+    if (sprite[23 + rowOffset]) {
+      sprite[23 + rowOffset][3] = colors.torso;
+      sprite[23 + rowOffset][12] = colors.torso;
+    }
 
-    // 4-frame dynamic rising steam wisps (only when cup is full)
-    if (isFull) {
-      const steamPhase = frame % 4;
-      if (steamPhase === 0) {
-        if (sprite[mugRow - 1]) sprite[mugRow - 1][mugCol] = BREAK_COFFEE_STEAM_COLOR_1;
-      } else if (steamPhase === 1) {
-        if (sprite[mugRow - 1]) sprite[mugRow - 1][mugCol + 1] = BREAK_COFFEE_STEAM_COLOR_1;
-        if (sprite[mugRow - 2]) sprite[mugRow - 2][mugCol] = BREAK_COFFEE_STEAM_COLOR_2;
-      } else if (steamPhase === 2) {
-        if (sprite[mugRow - 1]) sprite[mugRow - 1][mugCol] = BREAK_COFFEE_STEAM_COLOR_2;
-        if (sprite[mugRow - 2]) sprite[mugRow - 2][mugCol + 1] = BREAK_COFFEE_STEAM_COLOR_1;
-        if (sprite[mugRow - 3]) sprite[mugRow - 3][mugCol] = BREAK_COFFEE_STEAM_COLOR_2;
-      } else {
-        if (sprite[mugRow - 2]) sprite[mugRow - 2][mugCol] = BREAK_COFFEE_STEAM_COLOR_2;
-        if (sprite[mugRow - 3]) sprite[mugRow - 3][mugCol + 1] = BREAK_COFFEE_STEAM_COLOR_1;
+    if (animPhase === 0) {
+      // Phase 0: Holding cup comfortably at chest
+      const mugRow = 18 + rowOffset;
+      if (sprite[mugRow] && sprite[mugRow + 1] && sprite[mugRow + 2]) {
+        sprite[mugRow][7] = liquid;
+        sprite[mugRow][8] = liquid;
+        sprite[mugRow + 1][7] = mug;
+        sprite[mugRow + 1][8] = mug;
+        sprite[mugRow + 1][9] = tag;
+        sprite[mugRow + 2][7] = shadow;
+        sprite[mugRow + 2][8] = shadow;
+
+        // Left arm: sleeve angles down-inward to hold cup
+        sprite[20 + rowOffset][3] = colors.sleeve;
+        sprite[21 + rowOffset][3] = colors.sleeve;
+        sprite[21 + rowOffset][4] = colors.sleeve;
+        sprite[21 + rowOffset][5] = colors.sleeve;
+        sprite[20 + rowOffset][5] = colors.sleeve;
+        sprite[19 + rowOffset][6] = colors.skin;
+        sprite[20 + rowOffset][6] = colors.skin;
+
+        // Right arm: sleeve angles down-inward to hold cup
+        sprite[20 + rowOffset][12] = colors.sleeve;
+        sprite[21 + rowOffset][12] = colors.sleeve;
+        sprite[21 + rowOffset][11] = colors.sleeve;
+        sprite[21 + rowOffset][10] = colors.sleeve;
+        sprite[20 + rowOffset][10] = colors.sleeve;
+        sprite[19 + rowOffset][9] = colors.skin;
+        sprite[20 + rowOffset][9] = colors.skin;
+
+        if (isFull && sprite[mugRow - 1]) {
+          sprite[mugRow - 1][7] = BREAK_COFFEE_STEAM_COLOR_1;
+        }
+      }
+    } else if (animPhase === 1 || animPhase === 3) {
+      // Phase 1 & 3: Raising / Lowering cup - Transition
+      const mugRow = 17 + rowOffset;
+      if (sprite[mugRow] && sprite[mugRow + 1] && sprite[mugRow + 2]) {
+        sprite[mugRow][7] = liquid;
+        sprite[mugRow][8] = liquid;
+        sprite[mugRow + 1][7] = mug;
+        sprite[mugRow + 1][8] = mug;
+        sprite[mugRow + 1][9] = tag;
+        sprite[mugRow + 2][7] = shadow;
+        sprite[mugRow + 2][8] = shadow;
+
+        // Left arm: elbow bends up
+        sprite[21 + rowOffset][3] = colors.sleeve;
+        sprite[20 + rowOffset][3] = colors.sleeve;
+        sprite[20 + rowOffset][4] = colors.sleeve;
+        sprite[19 + rowOffset][4] = colors.sleeve;
+        sprite[19 + rowOffset][5] = colors.sleeve;
+        sprite[18 + rowOffset][6] = colors.skin;
+        sprite[19 + rowOffset][6] = colors.shadow;
+
+        // Right arm: elbow bends up
+        sprite[21 + rowOffset][12] = colors.sleeve;
+        sprite[20 + rowOffset][12] = colors.sleeve;
+        sprite[20 + rowOffset][11] = colors.sleeve;
+        sprite[19 + rowOffset][11] = colors.sleeve;
+        sprite[19 + rowOffset][10] = colors.sleeve;
+        sprite[18 + rowOffset][9] = colors.skin;
+        sprite[19 + rowOffset][9] = colors.shadow;
+
+        if (isFull) {
+          if (sprite[mugRow - 1]) sprite[mugRow - 1][8] = BREAK_COFFEE_STEAM_COLOR_1;
+          if (sprite[mugRow - 2]) sprite[mugRow - 2][7] = BREAK_COFFEE_STEAM_COLOR_2;
+        }
+      }
+    } else {
+      // Phase 2: Sipping! Cup raised right up to lips
+      const mugRow = 16 + rowOffset;
+      if (sprite[mugRow] && sprite[mugRow + 1] && sprite[mugRow + 2]) {
+        sprite[mugRow][7] = liquid;
+        sprite[mugRow][8] = liquid;
+        sprite[mugRow + 1][7] = mug;
+        sprite[mugRow + 1][8] = mug;
+        sprite[mugRow + 1][9] = tag;
+        sprite[mugRow + 2][7] = shadow;
+        sprite[mugRow + 2][8] = shadow;
+
+        // Left arm: sleeve raised high to support cup at mouth
+        sprite[21 + rowOffset][3] = colors.sleeve;
+        sprite[20 + rowOffset][3] = colors.sleeve;
+        sprite[19 + rowOffset][4] = colors.sleeve;
+        sprite[19 + rowOffset][5] = colors.sleeve;
+        sprite[18 + rowOffset][5] = colors.sleeve;
+        sprite[16 + rowOffset][6] = colors.skin;
+        sprite[17 + rowOffset][6] = colors.skin;
+
+        // Right arm: sleeve raised high to support cup at mouth
+        sprite[21 + rowOffset][12] = colors.sleeve;
+        sprite[20 + rowOffset][12] = colors.sleeve;
+        sprite[19 + rowOffset][11] = colors.sleeve;
+        sprite[19 + rowOffset][10] = colors.sleeve;
+        sprite[18 + rowOffset][10] = colors.sleeve;
+        sprite[16 + rowOffset][9] = colors.skin;
+        sprite[17 + rowOffset][9] = colors.skin;
+
+        // Content eyes closed while enjoying sip
+        if (sprite[14 + rowOffset]) {
+          sprite[14 + rowOffset][6] = colors.skin;
+          sprite[14 + rowOffset][9] = colors.skin;
+        }
+
+        if (isFull) {
+          if (sprite[mugRow - 1]) sprite[mugRow - 1][6] = BREAK_COFFEE_STEAM_COLOR_2;
+          if (sprite[mugRow - 1]) sprite[mugRow - 1][9] = BREAK_COFFEE_STEAM_COLOR_1;
+          if (sprite[mugRow - 2]) sprite[mugRow - 2][7] = BREAK_COFFEE_STEAM_COLOR_2;
+        }
+      }
+    }
+  } else if (dir === Direction.RIGHT) {
+    // Clear front hanging arm from base sprite
+    for (let r = 21 + rowOffset; r <= 24 + rowOffset; r++) {
+      if (sprite[r]) {
+        sprite[r][6] = colors.torso;
+        sprite[r][7] = colors.torso;
+        sprite[r][8] = '';
+      }
+    }
+
+    if (animPhase === 0) {
+      // Phase 0: Holding at chest
+      const mugRow = 18 + rowOffset;
+      if (sprite[mugRow] && sprite[mugRow + 1] && sprite[mugRow + 2]) {
+        sprite[mugRow][10] = liquid;
+        sprite[mugRow][11] = liquid;
+        sprite[mugRow + 1][10] = mug;
+        sprite[mugRow + 1][11] = mug;
+        sprite[mugRow + 1][12] = tag;
+        sprite[mugRow + 2][10] = shadow;
+        sprite[mugRow + 2][11] = shadow;
+
+        sprite[20 + rowOffset][6] = colors.sleeve;
+        sprite[20 + rowOffset][7] = colors.sleeve;
+        sprite[21 + rowOffset][7] = colors.sleeve;
+        sprite[21 + rowOffset][8] = colors.sleeve;
+        sprite[19 + rowOffset][9] = colors.skin;
+        sprite[20 + rowOffset][9] = colors.skin;
+
+        if (isFull && sprite[mugRow - 1]) {
+          sprite[mugRow - 1][10] = BREAK_COFFEE_STEAM_COLOR_1;
+        }
+      }
+    } else if (animPhase === 1 || animPhase === 3) {
+      // Phase 1 & 3: Raising / Lowering
+      const mugRow = 17 + rowOffset;
+      if (sprite[mugRow] && sprite[mugRow + 1] && sprite[mugRow + 2]) {
+        sprite[mugRow][10] = liquid;
+        sprite[mugRow][11] = liquid;
+        sprite[mugRow + 1][10] = mug;
+        sprite[mugRow + 1][11] = mug;
+        sprite[mugRow + 1][12] = tag;
+        sprite[mugRow + 2][10] = shadow;
+        sprite[mugRow + 2][11] = shadow;
+
+        sprite[20 + rowOffset][6] = colors.sleeve;
+        sprite[19 + rowOffset][7] = colors.sleeve;
+        sprite[19 + rowOffset][8] = colors.sleeve;
+        sprite[17 + rowOffset][9] = colors.skin;
+        sprite[18 + rowOffset][9] = colors.shadow;
+
+        if (isFull && sprite[mugRow - 1]) {
+          sprite[mugRow - 1][11] = BREAK_COFFEE_STEAM_COLOR_1;
+        }
+      }
+    } else {
+      // Phase 2: Sipping at lips
+      const mugRow = 15 + rowOffset;
+      if (sprite[mugRow] && sprite[mugRow + 1] && sprite[mugRow + 2]) {
+        sprite[mugRow][10] = liquid;
+        sprite[mugRow][11] = liquid;
+        sprite[mugRow + 1][10] = mug;
+        sprite[mugRow + 1][11] = mug;
+        sprite[mugRow + 1][12] = tag;
+        sprite[mugRow + 2][10] = shadow;
+        sprite[mugRow + 2][11] = shadow;
+
+        sprite[20 + rowOffset][6] = colors.sleeve;
+        sprite[19 + rowOffset][7] = colors.sleeve;
+        sprite[18 + rowOffset][8] = colors.sleeve;
+        sprite[15 + rowOffset][9] = colors.skin;
+        sprite[16 + rowOffset][9] = colors.skin;
+
+        if (isFull) {
+          if (sprite[mugRow - 1]) sprite[mugRow - 1][10] = BREAK_COFFEE_STEAM_COLOR_2;
+          if (sprite[mugRow - 2]) sprite[mugRow - 2][11] = BREAK_COFFEE_STEAM_COLOR_1;
+        }
+      }
+    }
+  } else if (dir === Direction.UP) {
+    // Clear hanging arms visible from rear
+    for (let r = 21 + rowOffset; r <= 24 + rowOffset; r++) {
+      if (sprite[r]) {
+        sprite[r][1] = '';
+        sprite[r][2] = '';
+        sprite[r][13] = '';
+        sprite[r][14] = '';
+      }
+    }
+
+    if (animPhase === 0 || animPhase === 3) {
+      // Elbows bent forward holding cup in front
+      sprite[20 + rowOffset][2] = colors.sleeve;
+      sprite[21 + rowOffset][3] = colors.sleeve;
+      sprite[20 + rowOffset][13] = colors.sleeve;
+      sprite[21 + rowOffset][12] = colors.sleeve;
+
+      if (isFull && sprite[16 + rowOffset]) {
+        sprite[16 + rowOffset][7] = BREAK_COFFEE_STEAM_COLOR_1;
+      }
+    } else if (animPhase === 1) {
+      // Elbows raising
+      sprite[19 + rowOffset][2] = colors.sleeve;
+      sprite[20 + rowOffset][3] = colors.sleeve;
+      sprite[19 + rowOffset][13] = colors.sleeve;
+      sprite[20 + rowOffset][12] = colors.sleeve;
+
+      if (isFull && sprite[15 + rowOffset]) {
+        sprite[15 + rowOffset][8] = BREAK_COFFEE_STEAM_COLOR_1;
+      }
+    } else {
+      // Sipping: elbows flare higher, rim of cup & steam visible over head
+      sprite[19 + rowOffset][2] = colors.sleeve;
+      sprite[19 + rowOffset][3] = colors.sleeve;
+      sprite[19 + rowOffset][12] = colors.sleeve;
+      sprite[19 + rowOffset][13] = colors.sleeve;
+
+      if (sprite[15 + rowOffset]) {
+        sprite[15 + rowOffset][7] = isFull ? liquid : mug;
+        sprite[15 + rowOffset][8] = mug;
+      }
+      if (isFull) {
+        if (sprite[14 + rowOffset]) sprite[14 + rowOffset][7] = BREAK_COFFEE_STEAM_COLOR_1;
+        if (sprite[13 + rowOffset]) sprite[13 + rowOffset][8] = BREAK_COFFEE_STEAM_COLOR_2;
       }
     }
   }
@@ -744,84 +973,257 @@ function renderCoffeeBreakSprite(
   return sprite;
 }
 
-/** Render a snack/donut with animated hands holding and bringing it to mouth */
+/** Render a snack/donut with animated arms, sleeves, and nibbling cycle */
 function renderSnackBreakSprite(
   base: SpriteData,
   frame: number,
   dir: Direction,
   isSitting = false,
+  colors: CharacterColors = {
+    skin: BREAK_HAND_COLOR,
+    shadow: BREAK_HAND_SHADOW_COLOR,
+    sleeve: BREAK_HAND_COLOR,
+    torso: BREAK_HAND_COLOR,
+    pants: BREAK_HAND_COLOR,
+  },
 ): SpriteData {
+  if (dir === Direction.LEFT) {
+    const flippedBase = flipSpriteHorizontal(base);
+    const renderedRight = renderSnackBreakSprite(
+      flippedBase,
+      frame,
+      Direction.RIGHT,
+      isSitting,
+      colors,
+    );
+    return flipSpriteHorizontal(renderedRight);
+  }
+
   const sprite = cloneSprite(base);
   const rows = sprite.length;
   const cols = sprite[0]?.length ?? 0;
   if (rows < 24 || cols < 16) return sprite;
 
-  const { skin, shadow: handShadow } = getSkinTones(base);
-  const isRight = dir === Direction.RIGHT;
-  const isLeft = dir === Direction.LEFT;
-  const snackCol = isRight ? 9 : isLeft ? 5 : 7;
+  const rowOffset = isSitting ? 1 : 0;
   const animPhase = frame % 4;
-  const isNibble = animPhase === 1 || animPhase === 2;
 
-  const baseRow = isSitting ? 19 : 18;
-  const snackRow = isNibble ? baseRow - 2 : baseRow;
-
-  if (sprite[snackRow] && sprite[snackRow + 1]) {
-    // Frosting with rainbow sprinkle details
-    sprite[snackRow][snackCol] = BREAK_SNACK_FROSTING_COLOR;
-    sprite[snackRow][snackCol + 1] =
-      animPhase === 0 ? BREAK_SNACK_SPRINKLE_COLOR : BREAK_SNACK_FROSTING_COLOR;
-    sprite[snackRow + 1][snackCol] = BREAK_SNACK_BASE_COLOR;
-    sprite[snackRow + 1][snackCol + 1] = BREAK_SNACK_BASE_COLOR;
-
-    // Hands holding the snack!
-    if (isNibble) {
-      // Hand holding snack right up to mouth
-      if (sprite[snackRow + 1]) {
-        sprite[snackRow + 1][snackCol - 1] = skin;
-      }
-      if (sprite[snackRow + 2]) {
-        sprite[snackRow + 2][snackCol] = skin;
-        sprite[snackRow + 2][snackCol + 1] = handShadow;
-      }
-      // Drifting crumbs
-      if (sprite[snackRow + 2]) {
-        sprite[snackRow + 2][snackCol - 1] = BREAK_SNACK_CRUMB_COLOR;
-      }
-      if (animPhase === 2 && sprite[snackRow + 3]) {
-        sprite[snackRow + 3][snackCol - 1] = BREAK_SNACK_CRUMB_COLOR;
-      }
-    } else {
-      // Hands holding snack comfortably
-      if (sprite[snackRow + 1]) {
-        sprite[snackRow + 1][snackCol - 1] = skin;
-        sprite[snackRow + 1][snackCol + 2] = skin;
-      }
-      if (sprite[snackRow + 2]) {
-        sprite[snackRow + 2][snackCol] = handShadow;
-        sprite[snackRow + 2][snackCol + 1] = handShadow;
+  if (dir === Direction.DOWN) {
+    // Clear hanging arms
+    for (let r = 21 + rowOffset; r <= 24 + rowOffset; r++) {
+      if (sprite[r]) {
+        sprite[r][1] = '';
+        sprite[r][2] = '';
+        sprite[r][3] = '';
+        sprite[r][12] = '';
+        sprite[r][13] = '';
+        sprite[r][14] = '';
       }
     }
+    if (sprite[23 + rowOffset]) {
+      sprite[23 + rowOffset][3] = colors.torso;
+      sprite[23 + rowOffset][12] = colors.torso;
+    }
+
+    if (animPhase === 0 || animPhase === 3) {
+      // Holding snack comfortably at chest
+      const snackRow = 18 + rowOffset;
+      if (sprite[snackRow] && sprite[snackRow + 1]) {
+        sprite[snackRow][7] = BREAK_SNACK_FROSTING_COLOR;
+        sprite[snackRow][8] = BREAK_SNACK_SPRINKLE_COLOR;
+        sprite[snackRow + 1][7] = BREAK_SNACK_BASE_COLOR;
+        sprite[snackRow + 1][8] = BREAK_SNACK_BASE_COLOR;
+
+        // Arms cupping snack
+        sprite[20 + rowOffset][3] = colors.sleeve;
+        sprite[21 + rowOffset][4] = colors.sleeve;
+        sprite[20 + rowOffset][5] = colors.sleeve;
+        sprite[19 + rowOffset][6] = colors.skin;
+
+        sprite[20 + rowOffset][12] = colors.sleeve;
+        sprite[21 + rowOffset][11] = colors.sleeve;
+        sprite[20 + rowOffset][10] = colors.sleeve;
+        sprite[19 + rowOffset][9] = colors.skin;
+      }
+    } else if (animPhase === 1) {
+      // Raising snack toward mouth
+      const snackRow = 17 + rowOffset;
+      if (sprite[snackRow] && sprite[snackRow + 1]) {
+        sprite[snackRow][7] = BREAK_SNACK_FROSTING_COLOR;
+        sprite[snackRow][8] = BREAK_SNACK_FROSTING_COLOR;
+        sprite[snackRow + 1][7] = BREAK_SNACK_BASE_COLOR;
+        sprite[snackRow + 1][8] = BREAK_SNACK_BASE_COLOR;
+
+        sprite[21 + rowOffset][3] = colors.sleeve;
+        sprite[20 + rowOffset][4] = colors.sleeve;
+        sprite[19 + rowOffset][5] = colors.sleeve;
+        sprite[18 + rowOffset][6] = colors.skin;
+
+        sprite[21 + rowOffset][12] = colors.sleeve;
+        sprite[20 + rowOffset][11] = colors.sleeve;
+        sprite[19 + rowOffset][10] = colors.sleeve;
+        sprite[18 + rowOffset][9] = colors.skin;
+      }
+    } else {
+      // Phase 2: Nibbling! Snack right at mouth, crumbs falling
+      const snackRow = 16 + rowOffset;
+      if (sprite[snackRow] && sprite[snackRow + 1]) {
+        sprite[snackRow][7] = BREAK_SNACK_FROSTING_COLOR;
+        sprite[snackRow][8] = BREAK_SNACK_SPRINKLE_COLOR;
+        sprite[snackRow + 1][7] = BREAK_SNACK_BASE_COLOR;
+        sprite[snackRow + 1][8] = BREAK_SNACK_BASE_COLOR;
+
+        sprite[21 + rowOffset][3] = colors.sleeve;
+        sprite[20 + rowOffset][3] = colors.sleeve;
+        sprite[19 + rowOffset][4] = colors.sleeve;
+        sprite[18 + rowOffset][5] = colors.sleeve;
+        sprite[16 + rowOffset][6] = colors.skin;
+        sprite[17 + rowOffset][6] = colors.skin;
+
+        sprite[21 + rowOffset][12] = colors.sleeve;
+        sprite[20 + rowOffset][12] = colors.sleeve;
+        sprite[19 + rowOffset][11] = colors.sleeve;
+        sprite[18 + rowOffset][10] = colors.sleeve;
+        sprite[16 + rowOffset][9] = colors.skin;
+        sprite[17 + rowOffset][9] = colors.skin;
+
+        // Falling crumbs
+        if (sprite[snackRow + 2]) sprite[snackRow + 2][6] = BREAK_SNACK_CRUMB_COLOR;
+        if (sprite[snackRow + 3]) sprite[snackRow + 3][8] = BREAK_SNACK_CRUMB_COLOR;
+      }
+    }
+  } else if (dir === Direction.RIGHT) {
+    // Clear front hanging arm
+    for (let r = 21 + rowOffset; r <= 24 + rowOffset; r++) {
+      if (sprite[r]) {
+        sprite[r][6] = colors.torso;
+        sprite[r][7] = colors.torso;
+        sprite[r][8] = '';
+      }
+    }
+
+    if (animPhase === 0 || animPhase === 3) {
+      const snackRow = 18 + rowOffset;
+      if (sprite[snackRow] && sprite[snackRow + 1]) {
+        sprite[snackRow][10] = BREAK_SNACK_FROSTING_COLOR;
+        sprite[snackRow][11] = BREAK_SNACK_SPRINKLE_COLOR;
+        sprite[snackRow + 1][10] = BREAK_SNACK_BASE_COLOR;
+        sprite[snackRow + 1][11] = BREAK_SNACK_BASE_COLOR;
+
+        sprite[20 + rowOffset][6] = colors.sleeve;
+        sprite[21 + rowOffset][7] = colors.sleeve;
+        sprite[20 + rowOffset][8] = colors.sleeve;
+        sprite[19 + rowOffset][9] = colors.skin;
+      }
+    } else if (animPhase === 1) {
+      const snackRow = 17 + rowOffset;
+      if (sprite[snackRow] && sprite[snackRow + 1]) {
+        sprite[snackRow][10] = BREAK_SNACK_FROSTING_COLOR;
+        sprite[snackRow][11] = BREAK_SNACK_FROSTING_COLOR;
+        sprite[snackRow + 1][10] = BREAK_SNACK_BASE_COLOR;
+        sprite[snackRow + 1][11] = BREAK_SNACK_BASE_COLOR;
+
+        sprite[20 + rowOffset][6] = colors.sleeve;
+        sprite[19 + rowOffset][7] = colors.sleeve;
+        sprite[18 + rowOffset][8] = colors.sleeve;
+        sprite[17 + rowOffset][9] = colors.skin;
+      }
+    } else {
+      const snackRow = 15 + rowOffset;
+      if (sprite[snackRow] && sprite[snackRow + 1]) {
+        sprite[snackRow][10] = BREAK_SNACK_FROSTING_COLOR;
+        sprite[snackRow][11] = BREAK_SNACK_SPRINKLE_COLOR;
+        sprite[snackRow + 1][10] = BREAK_SNACK_BASE_COLOR;
+        sprite[snackRow + 1][11] = BREAK_SNACK_BASE_COLOR;
+
+        sprite[20 + rowOffset][6] = colors.sleeve;
+        sprite[19 + rowOffset][7] = colors.sleeve;
+        sprite[18 + rowOffset][8] = colors.sleeve;
+        sprite[15 + rowOffset][9] = colors.skin;
+        sprite[16 + rowOffset][9] = colors.skin;
+
+        if (sprite[snackRow + 2]) sprite[snackRow + 2][9] = BREAK_SNACK_CRUMB_COLOR;
+      }
+    }
+  } else if (dir === Direction.UP) {
+    for (let r = 21 + rowOffset; r <= 24 + rowOffset; r++) {
+      if (sprite[r]) {
+        sprite[r][1] = '';
+        sprite[r][2] = '';
+        sprite[r][13] = '';
+        sprite[r][14] = '';
+      }
+    }
+    sprite[20 + rowOffset][2] = colors.sleeve;
+    sprite[21 + rowOffset][3] = colors.sleeve;
+    sprite[20 + rowOffset][13] = colors.sleeve;
+    sprite[21 + rowOffset][12] = colors.sleeve;
   }
 
   return sprite;
 }
 
-/** Render handheld Steam Deck console with animated hands gripping sides and clicking buttons */
+/** Render handheld Steam Deck console with animated sleeves and hands gripping sides */
 function renderSteamDeckBreakSprite(
   base: SpriteData,
   frame: number,
+  dir: Direction = Direction.DOWN,
   isSitting = false,
+  colors: CharacterColors = {
+    skin: BREAK_HAND_COLOR,
+    shadow: BREAK_HAND_SHADOW_COLOR,
+    sleeve: BREAK_HAND_COLOR,
+    torso: BREAK_HAND_COLOR,
+    pants: BREAK_HAND_COLOR,
+  },
 ): SpriteData {
   const sprite = cloneSprite(base);
   const rows = sprite.length;
   const cols = sprite[0]?.length ?? 0;
   if (rows < 24 || cols < 16) return sprite;
 
-  const { skin, shadow: handShadow } = getSkinTones(base);
-  const deckRow = isSitting ? 20 : 19;
+  const rowOffset = isSitting ? 1 : 0;
+  const deckRow = 19 + rowOffset;
   const deckStartCol = 3;
 
+  // Clear hanging outer arms
+  for (let r = 21 + rowOffset; r <= 24 + rowOffset; r++) {
+    if (sprite[r]) {
+      sprite[r][1] = '';
+      sprite[r][2] = '';
+      sprite[r][13] = '';
+      sprite[r][14] = '';
+    }
+  }
+
+  if (dir === Direction.UP) {
+    // Rear matte backplate and hands on grips
+    for (let r = 0; r < 2; r++) {
+      const curRow = deckRow + r;
+      if (!sprite[curRow]) continue;
+      for (let c = deckStartCol; c <= deckStartCol + 9; c++) {
+        sprite[curRow][c] = BREAK_STEAMDECK_BODY_COLOR;
+      }
+    }
+    if (sprite[deckRow]) {
+      sprite[deckRow][deckStartCol + 1] = BREAK_STEAMDECK_BUTTON_COLOR;
+      sprite[deckRow][deckStartCol + 2] = BREAK_STEAMDECK_BUTTON_COLOR;
+      sprite[deckRow][deckStartCol + 7] = BREAK_STEAMDECK_BUTTON_COLOR;
+      sprite[deckRow][deckStartCol + 8] = BREAK_STEAMDECK_BUTTON_COLOR;
+    }
+    const leftGripCol = deckStartCol - 1;
+    const rightGripCol = deckStartCol + 10;
+    if (sprite[deckRow] && sprite[deckRow + 1]) {
+      sprite[deckRow][leftGripCol] = colors.skin;
+      sprite[deckRow + 1][leftGripCol] = colors.shadow;
+      sprite[deckRow][rightGripCol] = colors.skin;
+      sprite[deckRow + 1][rightGripCol] = colors.shadow;
+    }
+    sprite[20 + rowOffset][2] = colors.sleeve;
+    sprite[20 + rowOffset][13] = colors.sleeve;
+    return sprite;
+  }
+
+  // Draw console body
   for (let r = 0; r < 3; r++) {
     const curRow = deckRow + r;
     if (!sprite[curRow]) continue;
@@ -830,26 +1232,24 @@ function renderSteamDeckBreakSprite(
     }
   }
 
+  // Screen and controls
   if (sprite[deckRow] && sprite[deckRow + 1]) {
     sprite[deckRow][deckStartCol + 1] = BREAK_STEAMDECK_BUTTON_COLOR;
-    sprite[deckRow + 1][deckStartCol] = BREAK_STEAMDECK_BUTTON_COLOR;
+    sprite[deckRow + 1][deckStartCol + 1] = BREAK_STEAMDECK_BUTTON_COLOR;
     sprite[deckRow][deckStartCol + 8] = BREAK_STEAMDECK_BUTTON_COLOR;
-    sprite[deckRow + 1][deckStartCol + 9] = BREAK_STEAMDECK_BUTTON_COLOR;
-  }
+    sprite[deckRow + 1][deckStartCol + 8] = BREAK_STEAMDECK_BUTTON_COLOR;
 
-  // 4-frame dynamic 8-bit game scene on the Steam Deck screen
-  const gameFrame = frame % 4;
-  const screenRows = [deckRow, deckRow + 1];
-  for (const r of screenRows) {
-    if (!sprite[r]) continue;
-    for (let c = deckStartCol + 2; c <= deckStartCol + 7; c++) {
-      sprite[r][c] = BREAK_STEAMDECK_SCREEN_ON_1;
+    const screenColStart = deckStartCol + 3;
+    for (let sc = screenColStart; sc <= screenColStart + 3; sc++) {
+      sprite[deckRow][sc] = BREAK_STEAMDECK_SCREEN_ON_1;
+      sprite[deckRow + 1][sc] = BREAK_STEAMDECK_SCREEN_ON_2;
     }
   }
 
+  // Active game gameplay animations on the Steam Deck screen
+  const gameFrame = frame % 4;
   if (gameFrame === 0) {
-    sprite[deckRow][deckStartCol + 2] = BREAK_STEAMDECK_SCREEN_ON_2;
-    sprite[deckRow + 1][deckStartCol + 2] = BREAK_STEAMDECK_HERO_COLOR;
+    sprite[deckRow][deckStartCol + 3] = BREAK_STEAMDECK_HERO_COLOR;
     sprite[deckRow + 1][deckStartCol + 6] = BREAK_STEAMDECK_COIN_COLOR;
   } else if (gameFrame === 1) {
     sprite[deckRow][deckStartCol + 4] = BREAK_STEAMDECK_HERO_COLOR;
@@ -862,30 +1262,107 @@ function renderSteamDeckBreakSprite(
     sprite[deckRow + 1][deckStartCol + 5] = BREAK_STEAMDECK_HERO_COLOR;
   }
 
+  // Connect sleeves from shoulders down to grips!
+  sprite[20 + rowOffset][3] = colors.sleeve;
+  sprite[20 + rowOffset][12] = colors.sleeve;
+
   // Hands gripping left and right grips + animated thumbs clicking buttons!
   const leftGripCol = deckStartCol - 1; // col 2
   const rightGripCol = deckStartCol + 10; // col 13
 
   if (sprite[deckRow] && sprite[deckRow + 1] && sprite[deckRow + 2]) {
-    // Left hand gripping
-    sprite[deckRow][leftGripCol] = skin;
-    sprite[deckRow + 1][leftGripCol] = skin;
-    sprite[deckRow + 2][leftGripCol] = handShadow;
-    sprite[deckRow + 2][leftGripCol + 1] = handShadow;
+    sprite[deckRow][leftGripCol] = colors.skin;
+    sprite[deckRow + 1][leftGripCol] = colors.skin;
+    sprite[deckRow + 2][leftGripCol] = colors.shadow;
+    sprite[deckRow + 2][leftGripCol + 1] = colors.shadow;
 
-    // Right hand gripping
-    sprite[deckRow][rightGripCol] = skin;
-    sprite[deckRow + 1][rightGripCol] = skin;
-    sprite[deckRow + 2][rightGripCol] = handShadow;
-    sprite[deckRow + 2][rightGripCol - 1] = handShadow;
+    sprite[deckRow][rightGripCol] = colors.skin;
+    sprite[deckRow + 1][rightGripCol] = colors.skin;
+    sprite[deckRow + 2][rightGripCol] = colors.shadow;
+    sprite[deckRow + 2][rightGripCol - 1] = colors.shadow;
 
-    // Animated active thumbs clicking buttons!
     if (frame % 2 === 0) {
-      sprite[deckRow][deckStartCol + 1] = skin;
-      sprite[deckRow][deckStartCol + 8] = skin;
+      sprite[deckRow][deckStartCol + 1] = colors.skin;
+      sprite[deckRow][deckStartCol + 8] = colors.skin;
     } else {
-      sprite[deckRow + 1][deckStartCol + 1] = skin;
-      sprite[deckRow + 1][deckStartCol + 8] = skin;
+      sprite[deckRow + 1][deckStartCol + 1] = colors.skin;
+      sprite[deckRow + 1][deckStartCol + 8] = colors.skin;
+    }
+  }
+
+  return sprite;
+}
+
+/** Render operating arms when agent interacts with kitchen appliances (espresso, fridge, sink) */
+function renderKitchenActionSprite(
+  base: SpriteData,
+  action: 'espresso' | 'fridge' | 'sink',
+  frame: number,
+  colors: CharacterColors,
+): SpriteData {
+  const sprite = cloneSprite(base);
+  const rows = sprite.length;
+  const cols = sprite[0]?.length ?? 0;
+  if (rows < 24 || cols < 16) return sprite;
+
+  // Clear static hanging lower arms
+  for (let r = 21; r <= 24; r++) {
+    if (sprite[r]) {
+      sprite[r][1] = '';
+      sprite[r][2] = '';
+      sprite[r][13] = '';
+      sprite[r][14] = '';
+    }
+  }
+
+  if (action === 'espresso') {
+    // Arms reach up and forward to espresso machine buttons and portafilter
+    sprite[20][3] = colors.sleeve;
+    sprite[19][3] = colors.sleeve;
+    sprite[18][4] = colors.sleeve;
+    sprite[17][5] = colors.skin;
+
+    sprite[20][12] = colors.sleeve;
+    sprite[19][12] = colors.sleeve;
+    sprite[18][11] = colors.sleeve;
+    sprite[17][10] = colors.skin;
+
+    if (frame % 2 === 0) {
+      sprite[16][5] = colors.skin; // pressing button
+    } else {
+      sprite[16][10] = colors.skin; // adjusting group head
+    }
+  } else if (action === 'fridge') {
+    // Right arm reaches into fridge, left arm on door
+    sprite[20][3] = colors.sleeve;
+    sprite[19][3] = colors.sleeve;
+    sprite[18][2] = colors.skin; // holding door
+
+    sprite[20][12] = colors.sleeve;
+    sprite[19][11] = colors.sleeve;
+    sprite[18][10] = colors.sleeve;
+    sprite[17][9] = colors.skin;
+    if (frame % 2 === 0) {
+      sprite[16][9] = colors.skin; // reaching in
+    }
+  } else if (action === 'sink') {
+    // Both arms reaching down into the basin, washing the mug
+    sprite[20][3] = colors.sleeve;
+    sprite[21][4] = colors.sleeve;
+    sprite[21][5] = colors.sleeve;
+    sprite[20][6] = colors.skin;
+
+    sprite[20][12] = colors.sleeve;
+    sprite[21][11] = colors.sleeve;
+    sprite[21][10] = colors.sleeve;
+    sprite[20][9] = colors.skin;
+
+    // Ceramic mug in basin under tap
+    sprite[19][7] = BREAK_COFFEE_MUG_COLOR;
+    sprite[19][8] = BREAK_COFFEE_MUG_COLOR;
+    sprite[18][7] = KITCHEN_SINK_WATER_SPLASH; // water splash
+    if (frame % 2 === 1) {
+      sprite[18][8] = KITCHEN_SINK_WATER_FOAM;
     }
   }
 
@@ -894,9 +1371,17 @@ function renderSteamDeckBreakSprite(
 
 /** Get the correct sprite frame for a character's current state and direction */
 export function getCharacterSprite(ch: Character, sprites: CharacterSprites): SpriteData {
+  const downStand = sprites.walk[Direction.DOWN][1];
+  const colors = extractCharacterColors(downStand);
+
   const baseWalk = sprites.walk[ch.dir][1];
   const baseSit = sprites.reading[ch.dir][0];
   const baseSprite = ch.isSitting ? baseSit : baseWalk;
+
+  // 1. Kitchen interactive actions (espresso brewing, fridge grabbing, sink washing)
+  if (ch.kitchenAction && ch.dir === Direction.UP) {
+    return renderKitchenActionSprite(baseSprite, ch.kitchenAction, ch.frame, colors);
+  }
 
   let sprite: SpriteData;
 
@@ -922,11 +1407,12 @@ export function getCharacterSprite(ch: Character, sprites: CharacterSprites): Sp
         ch.breakType === 'tea',
         ch.isSitting,
         ch.coffeeCupState !== 'empty',
+        colors,
       );
     case CharacterState.BREAK_SNACK:
-      return renderSnackBreakSprite(baseSprite, ch.frame, ch.dir, ch.isSitting);
+      return renderSnackBreakSprite(baseSprite, ch.frame, ch.dir, ch.isSitting, colors);
     case CharacterState.BREAK_STEAMDECK:
-      return renderSteamDeckBreakSprite(baseSprite, ch.frame, ch.isSitting);
+      return renderSteamDeckBreakSprite(baseSprite, ch.frame, ch.dir, ch.isSitting, colors);
     default:
       sprite = baseSprite;
       break;
@@ -934,18 +1420,22 @@ export function getCharacterSprite(ch: Character, sprites: CharacterSprites): Sp
 
   // If character is carrying a cup of coffee while walking or idle, render it in their hands!
   if (ch.hasCoffeeCup && ch.state !== CharacterState.TYPE) {
+    // When walking, keep cup stably held in hands (Phase 0) while legs walk
+    const carryFrame = ch.state === CharacterState.WALK ? 0 : ch.frame;
     return renderCoffeeBreakSprite(
       sprite,
-      ch.frame,
+      carryFrame,
       ch.dir,
       false,
       ch.isSitting,
       ch.coffeeCupState !== 'empty',
+      colors,
     );
   }
 
   return sprite;
 }
+
 function randomRange(min: number, max: number): number {
   return min + Math.random() * (max - min);
 }

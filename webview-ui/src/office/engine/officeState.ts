@@ -650,14 +650,12 @@ export class OfficeState {
   reassignSeat(agentId: number, seatId: string): void {
     const ch = this.characters.get(agentId);
     if (!ch) return;
-    // Unassign old seat
+    const seat = this.seats.get(seatId);
+    if (!seat || seat.assigned) return;
     if (ch.seatId) {
       const old = this.seats.get(ch.seatId);
       if (old) old.assigned = false;
     }
-    // Assign new seat
-    const seat = this.seats.get(seatId);
-    if (!seat || seat.assigned) return;
     seat.assigned = true;
     ch.seatId = seatId;
     // Pathfind to new seat (unblock own seat tile for this query)
@@ -730,8 +728,7 @@ export class OfficeState {
       ch.state = CharacterState.WALK;
       ch.frame = 0;
       ch.frameTimer = 0;
-    } else {
-      // Already at seat — sit down
+    } else if (ch.tileCol === seat.seatCol && ch.tileRow === seat.seatRow) {
       ch.state = CharacterState.TYPE;
       ch.dir = seat.facingDir;
       ch.frame = 0;
@@ -739,6 +736,9 @@ export class OfficeState {
       if (!ch.isActive) {
         ch.seatTimer = INACTIVE_SEAT_TIMER_MIN_SEC + Math.random() * INACTIVE_SEAT_TIMER_RANGE_SEC;
       }
+    } else {
+      ch.state = CharacterState.IDLE;
+      ch.seatTimer = 2.0;
     }
   }
 
@@ -1636,9 +1636,22 @@ export class OfficeState {
     }
   }
 
-  startAgentBreak(id: number, breakType?: 'coffee' | 'tea' | 'snack' | 'steamdeck'): void {
+  startAgentBreak(
+    id: number,
+    breakType?: 'coffee' | 'tea' | 'snack' | 'steamdeck',
+    explicitSpot?: BreakSpot,
+  ): void {
     const ch = this.characters.get(id);
     if (!ch) return;
+
+    if (
+      explicitSpot &&
+      ch.tileCol === explicitSpot.col &&
+      ch.tileRow === explicitSpot.row &&
+      ch.isTakingBreak
+    ) {
+      return;
+    }
 
     const availableBreakTypes: Array<'coffee' | 'tea' | 'snack' | 'steamdeck'> = [
       'coffee',
@@ -1649,13 +1662,15 @@ export class OfficeState {
     const chosenType =
       breakType || availableBreakTypes[Math.floor(Math.random() * availableBreakTypes.length)];
 
-    let targetTile: BreakSpot | null = null;
-    const breakSpots = this.getBreakRoomSpots();
-    const matchingSpots = breakSpots.filter((s) => s.breakType === chosenType);
-    if (matchingSpots.length > 0) {
-      targetTile = matchingSpots[Math.floor(Math.random() * matchingSpots.length)];
-    } else if (breakSpots.length > 0) {
-      targetTile = breakSpots[Math.floor(Math.random() * breakSpots.length)];
+    let targetTile: BreakSpot | null = explicitSpot ?? null;
+    if (!targetTile) {
+      const breakSpots = this.getBreakRoomSpots();
+      const matchingSpots = breakSpots.filter((s) => s.breakType === chosenType);
+      if (matchingSpots.length > 0) {
+        targetTile = matchingSpots[Math.floor(Math.random() * matchingSpots.length)];
+      } else if (breakSpots.length > 0) {
+        targetTile = breakSpots[Math.floor(Math.random() * breakSpots.length)];
+      }
     }
 
     if (!targetTile && this.walkableTiles.length > 0) {
@@ -1770,9 +1785,11 @@ export class OfficeState {
           ch.moveProgress = 0;
           ch.state = CharacterState.WALK;
           ch.isSitting = false;
-        } else {
+        } else if (ch.tileCol === seat.seatCol && ch.tileRow === seat.seatRow) {
           ch.state = CharacterState.TYPE;
           ch.dir = seat.facingDir;
+        } else {
+          ch.state = CharacterState.IDLE;
         }
       }
     } else {
@@ -1838,6 +1855,7 @@ export class OfficeState {
         breakType: 'coffee' as const,
         state: CharacterState.BREAK_COFFEE,
         dir: Direction.DOWN,
+        isSitting: true,
       };
 
       // Subagents without an active running order are strictly stationed in the break room
@@ -1882,7 +1900,10 @@ export class OfficeState {
         ch.dir = spot.dir;
       } else {
         ch.state = seat ? CharacterState.TYPE : CharacterState.IDLE;
-        if (seat) ch.dir = seat.facingDir;
+        if (seat) {
+          ch.dir = seat.facingDir;
+          ch.isSitting = true;
+        }
       }
 
       this.characters.set(data.id, ch);
@@ -1975,11 +1996,12 @@ export class OfficeState {
   /** Returns true if a tile is situated in the common Break Room / Lounge area */
   isBreakRoomArea(col: number, row: number): boolean {
     if (row < 10) return false;
-    if (this.layout.cols >= 18 && col >= 11) return true;
+    if (this.getSeatAtTile(col, row) !== null) return false;
     if (this.tileMap && this.tileMap[row] && this.tileMap[row][col] !== undefined) {
       const tile = this.tileMap[row][col];
-      if (tile === 1 || tile === 9) return true;
+      if (tile === 9) return true;
     }
+    if (this.layout.cols >= 18 && col >= 11) return true;
     return col >= Math.floor(this.layout.cols / 2);
   }
 
@@ -2046,7 +2068,7 @@ export class OfficeState {
       });
     }
 
-    // 4. Lounge sofa back (Steam Deck, sitting)
+    // 4. Lounge sofa back (tea / coffee, sitting facing UP toward coffee table)
     const sofaBack = this.layout.furniture.find(
       (f) => f.type === 'SOFA_BACK' && this.isBreakRoomArea(f.col, f.row),
     );
@@ -2054,21 +2076,23 @@ export class OfficeState {
       spots.push({
         col: sofaBack.col,
         row: sofaBack.row,
-        breakType: 'steamdeck',
-        state: CharacterState.BREAK_STEAMDECK,
+        breakType: 'tea',
+        state: CharacterState.BREAK_COFFEE,
         dir: Direction.UP,
         isSitting: true,
       });
     }
 
-    // 5. Dining table chair right (snack, sitting)
+    // 5. Dining table chair left (snack, sitting facing RIGHT toward table) - cushion at row + bgRows
     const dChair = this.layout.furniture.find(
       (f) => f.type === 'WOODEN_CHAIR_SIDE' && this.isBreakRoomArea(f.col, f.row),
     );
     if (dChair) {
+      const dEntry = getCatalogEntry(dChair.type);
+      const bgRows = dEntry?.backgroundTiles ?? (dChair.type.includes('WOODEN_CHAIR') ? 1 : 0);
       spots.push({
         col: dChair.col,
-        row: dChair.row,
+        row: dChair.row + bgRows,
         breakType: 'snack',
         state: CharacterState.BREAK_SNACK,
         dir: Direction.RIGHT,
@@ -2076,14 +2100,16 @@ export class OfficeState {
       });
     }
 
-    // 6. Dining table chair left (tea, sitting)
+    // 6. Dining table chair right (tea, sitting facing LEFT toward table) - cushion at row + bgRows
     const dChair2 = this.layout.furniture.find(
       (f) => f.type.startsWith('WOODEN_CHAIR_SIDE:') && this.isBreakRoomArea(f.col, f.row),
     );
     if (dChair2) {
+      const d2Entry = getCatalogEntry(dChair2.type);
+      const bgRows = d2Entry?.backgroundTiles ?? (dChair2.type.includes('WOODEN_CHAIR') ? 1 : 0);
       spots.push({
         col: dChair2.col,
-        row: dChair2.row,
+        row: dChair2.row + bgRows,
         breakType: 'tea',
         state: CharacterState.BREAK_COFFEE,
         dir: Direction.LEFT,
@@ -2091,14 +2117,20 @@ export class OfficeState {
       });
     }
 
-    // 7. Dining cushioned chair (coffee / snack, sitting)
+    // 7. Dining cushioned chair (coffee / snack, sitting facing UP toward table)
     const cChair = this.layout.furniture.find(
-      (f) => f.type === 'CUSHIONED_CHAIR' && this.isBreakRoomArea(f.col, f.row),
+      (f) =>
+        (f.type.includes('CUSHIONED_CHAIR') ||
+          f.type.includes('CHAIR_BACK') ||
+          f.type === 'CUSHIONED_CHAIR') &&
+        this.isBreakRoomArea(f.col, f.row),
     );
     if (cChair) {
+      const cEntry = getCatalogEntry(cChair.type);
+      const bgRows = cEntry?.backgroundTiles ?? 0;
       spots.push({
         col: cChair.col,
-        row: cChair.row,
+        row: cChair.row + bgRows,
         breakType: 'snack',
         state: CharacterState.BREAK_SNACK,
         dir: Direction.UP,
@@ -2447,18 +2479,15 @@ export class OfficeState {
     // 1. Ensure strictly ONE Team Lead in the office — remove any old leads from past chats
     for (const [id, ch] of this.characters.entries()) {
       if (id !== leadId) {
-        if (!ch.isSubagent) {
+        if (ch.isTeamLead) {
           if (ch.seatId) {
             const seat = this.seats.get(ch.seatId);
             if (seat) seat.assigned = false;
           }
           this.characters.delete(id);
           removeCopilotPixelAgent(id);
-        } else {
-          ch.isTeamLead = false;
-          if (ch.role === 'Lead') {
-            ch.role = 'Teammate';
-          }
+        } else if (ch.role === 'Lead') {
+          ch.role = 'Teammate';
         }
       }
     }
@@ -2828,6 +2857,29 @@ export class OfficeState {
               text: 'Mug washed and put back in the kitchen! 🚰✨',
               context: 'break_room',
             });
+            if (!ch.isTakingBreak && ch.seatId) {
+              const seat = this.seats.get(ch.seatId);
+              if (seat) {
+                const returnPath = this.withOwnSeatUnblocked(ch, () =>
+                  findPath(
+                    ch.tileCol,
+                    ch.tileRow,
+                    seat.seatCol,
+                    seat.seatRow,
+                    this.tileMap,
+                    this.blockedTiles,
+                  ),
+                );
+                if (returnPath.length > 0) {
+                  ch.path = returnPath;
+                  ch.moveProgress = 0;
+                  ch.state = CharacterState.WALK;
+                  ch.isSitting = false;
+                }
+              }
+            } else if (ch.isTakingBreak) {
+              this.startAgentBreak(ch.id);
+            }
           }
         }
       } else if (ch.kitchenAction === 'sink') {

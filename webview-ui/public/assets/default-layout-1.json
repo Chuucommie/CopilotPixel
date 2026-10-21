@@ -1536,9 +1536,9 @@
     },
     {
       "uid": "f-b-dchair-3",
-      "type": "CUSHIONED_CHAIR",
+      "type": "CUSHIONED_CHAIR_BACK",
       "col": 23,
-      "row": 16
+      "row": 17
     },
     {
       "uid": "f-b-coffee-2",

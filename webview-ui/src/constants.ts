@@ -334,6 +334,8 @@ export const BREAK_COFFEE_MUG_SHADOW = '#9ca3af';
 export const BREAK_COFFEE_LIQUID_COLOR = '#451a03';
 export const BREAK_COFFEE_STEAM_COLOR_1 = '#e2e8f0';
 export const BREAK_COFFEE_STEAM_COLOR_2 = '#93c5fd';
+export const KITCHEN_SINK_WATER_SPLASH = '#bae6fd';
+export const KITCHEN_SINK_WATER_FOAM = '#e0f2fe';
 
 export const BREAK_TEA_LIQUID_COLOR = '#aed581';
 export const BREAK_TEA_CUP_COLOR = '#ffffff';

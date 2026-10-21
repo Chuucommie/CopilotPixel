@@ -424,13 +424,9 @@ export class RadiantRoutineEngine {
         }
 
         if (chosenSpot) {
-          // If not currently at this spot, transition to it
-          if (
-            !ch.isTakingBreak ||
-            ch.breakTargetCol !== chosenSpot.col ||
-            ch.breakTargetRow !== chosenSpot.row
-          ) {
-            os.startAgentBreak(ch.id, routine.breakType || chosenSpot.breakType);
+          const isAtSpot = ch.tileCol === chosenSpot.col && ch.tileRow === chosenSpot.row;
+          if (!ch.isTakingBreak || !isAtSpot) {
+            os.startAgentBreak(ch.id, routine.breakType || chosenSpot.breakType, chosenSpot);
           }
         }
       }

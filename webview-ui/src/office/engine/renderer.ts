@@ -676,7 +676,7 @@ export function renderScene(
       const pc = ch.placedCoffee;
       const cupX = Math.round(offsetX + (pc.col * TILE_SIZE + (pc.pixelOffsetX ?? 8)) * zoom);
       const cupY = Math.round(offsetY + (pc.row * TILE_SIZE + (pc.pixelOffsetY ?? 8)) * zoom);
-      const cupZY = pc.row * TILE_SIZE + (pc.pixelOffsetY ?? 8) + 1;
+      const cupZY = (pc.row + 1) * TILE_SIZE + (pc.pixelOffsetY ?? 8) + 2;
       drawables.push({
         zY: cupZY,
         draw: (c) => {

@@ -223,10 +223,10 @@ export function layoutToSeats(furniture: PlacedFurniture[]): Map<string, Seat> {
         let facingDir: Direction = Direction.DOWN;
         if (entry.orientation) {
           const isMirrored = item.type.includes(':left') || item.type.includes(':mirror');
-          if (isMirrored && (entry.orientation === 'side' || entry.orientation === 'right')) {
+          if (entry.orientation === 'left') {
             facingDir = Direction.LEFT;
-          } else if (isMirrored && entry.orientation === 'left') {
-            facingDir = Direction.RIGHT;
+          } else if (entry.orientation === 'side' || entry.orientation === 'right') {
+            facingDir = isMirrored ? Direction.LEFT : Direction.RIGHT;
           } else {
             facingDir = orientationToFacing(entry.orientation);
           }
