@@ -1,3 +1,6 @@
+import * as fs from 'fs';
+import * as path from 'path';
+
 import type { HookProvider } from '../../core/src/provider.js';
 import { resendAgentActivity } from './agentActivityResend.js';
 import { buildAgentDiagnostics } from './agentDiagnostics.js';
@@ -230,11 +233,21 @@ export function handleClientMessage(
       break;
 
     case 'addExternalAssetDirectory': {
-      const newPath = msg.path as string | undefined;
-      if (!newPath) break;
+      const rawPath = msg.path;
+      if (typeof rawPath !== 'string' || !rawPath.trim()) break;
+      const resolvedPath = path.resolve(rawPath);
+      try {
+        if (!fs.existsSync(resolvedPath) || !fs.statSync(resolvedPath).isDirectory()) {
+          console.warn(`[CopilotAgents] Skipping invalid external asset directory: ${rawPath}`);
+          break;
+        }
+      } catch {
+        console.warn(`[CopilotAgents] Error checking external asset directory: ${rawPath}`);
+        break;
+      }
       const cfg = readConfig();
-      if (!cfg.externalAssetDirectories.includes(newPath)) {
-        cfg.externalAssetDirectories.push(newPath);
+      if (!cfg.externalAssetDirectories.includes(resolvedPath)) {
+        cfg.externalAssetDirectories.push(resolvedPath);
         writeConfig(cfg);
       }
       send({ type: 'externalAssetDirectoriesUpdated', dirs: cfg.externalAssetDirectories });
