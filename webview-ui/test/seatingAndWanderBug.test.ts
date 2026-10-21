@@ -156,7 +156,12 @@ describe('Seating Posture and Wander ("Farsi un giro") Regression Suite', () => 
     assert.ok(os.blockedTiles.has(chairTile), 'Chair tile should normally be in blockedTiles');
 
     // When wandering begins, an open destination is reachable from the chair
+    lead.matrixEffect = null;
+    lead.seatTimer = 0;
     lead.wanderTimer = 0;
+    lead.wanderCount = 0;
+    lead.wanderLimit = 5;
+    lead.state = CharacterState.IDLE;
     os.update(1 / 60);
 
     assert.equal(lead.state, CharacterState.WALK, 'Lead successfully pathfound out of chair');
