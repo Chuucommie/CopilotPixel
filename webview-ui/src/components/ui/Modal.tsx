@@ -52,7 +52,7 @@ export function Modal({
         className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-bg border-2 border-border rounded-none shadow-pixel p-4 min-w-xs ${className}`}
         style={{ zIndex: zIndex + 1 }}
       >
-        <div className="flex items-center justify-between py-4 px-10 border-b border-border mb-4">
+        <div className="flex items-center justify-between pb-3 border-b border-border mb-3">
           <span id={titleId} className="text-accent-bright text-2xl">
             {title}
           </span>

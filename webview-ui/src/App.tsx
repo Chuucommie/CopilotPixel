@@ -553,7 +553,10 @@ function App() {
         workspaceFolders={workspaceFolders}
         isRosterOpen={isRosterOpen}
         onToggleRoster={() => setIsRosterOpen((v) => !v)}
-        agentCount={agents.length + subagentCharacters.length}
+        agentCount={Math.max(
+          officeState.characters.size,
+          agents.length + subagentCharacters.length,
+        )}
       />
 
       <VersionIndicator

@@ -3,7 +3,9 @@ import { useEffect, useRef, useState } from 'react';
 import { AGENT_STATUS_ACTIVE_DOT_COLOR, AGENT_STATUS_IDLE_DOT_COLOR } from '../constants.js';
 import { getAllRoles, getRandomEnglishName, getRoleDefinition } from '../office/agentRoles.js';
 import type { OfficeState } from '../office/engine/officeState.js';
+import { getCharacterSprites } from '../office/sprites/spriteData.js';
 import type { Character, ToolActivity } from '../office/types.js';
+import { Direction as Dir } from '../office/types.js';
 import { Button } from './ui/Button.js';
 import { Modal } from './ui/Modal.js';
 
@@ -21,6 +23,52 @@ function formatDuration(sec: number): string {
   const s = Math.floor(sec % 60);
   if (m === 0) return `${s}s`;
   return `${m}m ${s}s`;
+}
+
+function AgentAvatar({
+  palette,
+  hueShift = 0,
+  scale = 2,
+  className = '',
+}: {
+  palette: number;
+  hueShift?: number;
+  scale?: number;
+  className?: string;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const charSprites = getCharacterSprites(palette, hueShift);
+    const sprite = charSprites.walk[Dir.DOWN][0];
+    if (!sprite || sprite.length === 0) return;
+
+    for (let r = 0; r < sprite.length; r++) {
+      for (let c = 0; c < sprite[r].length; c++) {
+        const color = sprite[r][c];
+        if (color) {
+          ctx.fillStyle = color;
+          ctx.fillRect(c * scale, r * scale, scale, scale);
+        }
+      }
+    }
+  }, [palette, hueShift, scale]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={16 * scale}
+      height={32 * scale}
+      className={`pixelated shrink-0 ${className}`}
+      style={{ imageRendering: 'pixelated' }}
+    />
+  );
 }
 
 function formatTime(timestamp: number): string {
@@ -105,6 +153,25 @@ export function AgentRosterModal({
     showFeedback(`Role updated to ${newRole}`);
   };
 
+  const getToolsForAgent = (ch: Character): ToolActivity[] => {
+    const directTools = agentTools[ch.id];
+    if (directTools && directTools.length > 0) return directTools;
+    if (ch.isSubagent) {
+      const meta = officeState.subagentMeta.get(ch.id);
+      const parentId = meta?.parentAgentId ?? ch.parentAgentId ?? ch.leadAgentId;
+      if (parentId !== null && parentId !== undefined && subagentTools[parentId]) {
+        if (meta?.parentToolId && subagentTools[parentId][meta.parentToolId]) {
+          return subagentTools[parentId][meta.parentToolId];
+        }
+        const allLists = Object.values(subagentTools[parentId]);
+        if (allLists.length > 0) {
+          return allLists.flat();
+        }
+      }
+    }
+    return [];
+  };
+
   const getAgentStatusText = (ch: Character): string => {
     if (ch.isTakingBreak) {
       return `☕ Break (${ch.breakType || 'relax'} • ${formatDuration(ch.breakDuration || 0)})`;
@@ -120,7 +187,7 @@ export function AgentRosterModal({
       return ch.isActive ? 'Executing subtask...' : 'Subtask finished';
     }
 
-    const tools = agentTools[ch.id];
+    const tools = getToolsForAgent(ch);
     if (tools && tools.length > 0) {
       const active = [...tools].reverse().find((t) => !t.done);
       if (active) return active.status;
@@ -159,7 +226,7 @@ export function AgentRosterModal({
               }`}
             >
               <span>👥 Team Hierarchy & Status</span>
-              <span className="px-1.5 py-0.2 rounded-full text-2xs bg-black/40">
+              <span className="px-1.5 py-0.5 rounded-full text-2xs bg-black/40">
                 {characters.length}
               </span>
             </button>
@@ -172,7 +239,7 @@ export function AgentRosterModal({
               }`}
             >
               <span>💬 Live Team Dialogue</span>
-              <span className="px-1.5 py-0.2 rounded-full text-2xs bg-black/40 font-mono">
+              <span className="px-1.5 py-0.5 rounded-full text-2xs bg-black/40 font-mono">
                 {officeState.teamDialogue.length}
               </span>
             </button>
@@ -224,6 +291,12 @@ export function AgentRosterModal({
                     >
                       <div className="flex items-center justify-between gap-1.5">
                         <div className="flex items-center gap-1.5 truncate">
+                          <AgentAvatar
+                            palette={leadAgent.palette}
+                            hueShift={leadAgent.hueShift || 0}
+                            scale={1}
+                            className="mr-0.5"
+                          />
                           <span
                             className="w-2.5 h-2.5 rounded-full shrink-0"
                             style={{
@@ -263,6 +336,12 @@ export function AgentRosterModal({
                           <div className="flex items-center justify-between gap-1.5">
                             <div className="flex items-center gap-1.5 truncate">
                               <span className="text-text-muted text-2xs font-mono">↳</span>
+                              <AgentAvatar
+                                palette={sub.palette}
+                                hueShift={sub.hueShift || 0}
+                                scale={1}
+                                className="mr-0.5"
+                              />
                               <span
                                 className="w-2 h-2 rounded-full shrink-0"
                                 style={{
@@ -315,6 +394,12 @@ export function AgentRosterModal({
                     >
                       <div className="flex items-center justify-between gap-1.5">
                         <div className="flex items-center gap-1.5 truncate">
+                          <AgentAvatar
+                            palette={ch.palette}
+                            hueShift={ch.hueShift || 0}
+                            scale={1}
+                            className="mr-0.5"
+                          />
                           <span
                             className="w-2 h-2 rounded-full shrink-0"
                             style={{
@@ -351,13 +436,37 @@ export function AgentRosterModal({
           {/* Right Two Columns: Tab Content */}
           <div className="md:col-span-2 flex flex-col gap-3 overflow-y-auto max-h-[65vh] pr-1">
             {activeTab === 'roster' ? (
-              activeChar ? (
+              characters.length === 0 ? (
+                <div className="pixel-panel p-6 flex flex-col items-center justify-center gap-3 text-center text-text-muted my-auto">
+                  <span className="text-4xl">🏢</span>
+                  <div className="text-sm font-bold text-text">No Agents Active Yet</div>
+                  <div className="text-xs max-w-md leading-relaxed">
+                    Start a conversation with <strong>GitHub Copilot Chat</strong> or launch an
+                    autonomous task with <strong>Google Antigravity</strong> to spawn your Project
+                    Lead and watch your team collaborate in real time!
+                  </div>
+                </div>
+              ) : activeChar ? (
                 <div className="flex flex-col gap-3">
                   {/* Agent Header & Hierarchy Card */}
                   <div className="pixel-panel p-4 flex flex-col gap-3">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <span className="text-3xl">{getRoleDefinition(activeChar.role).icon}</span>
+                        <div className="flex items-center gap-2">
+                          <div className="p-1 bg-black/30 border border-border/40 rounded flex items-center justify-center">
+                            <AgentAvatar
+                              palette={activeChar.palette}
+                              hueShift={activeChar.hueShift || 0}
+                              scale={2}
+                            />
+                          </div>
+                          <span
+                            className="text-2xl"
+                            title={getRoleDefinition(activeChar.role).name}
+                          >
+                            {getRoleDefinition(activeChar.role).icon}
+                          </span>
+                        </div>
                         <div>
                           <div className="flex items-center gap-2">
                             <input
@@ -502,13 +611,13 @@ export function AgentRosterModal({
                       )}
 
                       {/* Active Tools */}
-                      {agentTools[activeChar.id] && agentTools[activeChar.id].length > 0 && (
+                      {getToolsForAgent(activeChar).length > 0 && (
                         <div className="mt-1 flex flex-col gap-1.5">
                           <span className="text-2xs font-bold uppercase tracking-wider text-text-muted">
                             Active Tools:
                           </span>
                           <div className="flex flex-col gap-1">
-                            {agentTools[activeChar.id].map((t, idx) => (
+                            {getToolsForAgent(activeChar).map((t, idx) => (
                               <div
                                 key={idx}
                                 className={`text-2xs px-2 py-1 rounded border flex items-center justify-between ${
@@ -615,7 +724,7 @@ export function AgentRosterModal({
                             </div>
                             <div className="flex items-center gap-1.5 text-text-muted font-mono">
                               {msg.aiAction && (
-                                <span className="px-1.5 py-0.2 rounded bg-white/10 text-2xs font-sans">
+                                <span className="px-1.5 py-0.5 rounded bg-white/10 text-2xs font-sans">
                                   {msg.aiAction}
                                 </span>
                               )}
