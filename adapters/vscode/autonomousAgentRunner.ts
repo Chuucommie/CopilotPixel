@@ -1,3 +1,4 @@
+import * as path from 'path';
 import * as vscode from 'vscode';
 
 import type {
@@ -316,11 +317,16 @@ Rules:
           try {
             if (workspaceRoot) {
               const fileUri = vscode.Uri.joinPath(workspaceRoot, filePath);
-              const fileBytes = await vscode.workspace.fs.readFile(fileUri);
-              fileContent = Buffer.from(fileBytes).toString('utf-8');
-              // Truncate if excessively long to keep prompt efficient
-              if (fileContent.length > 12000) {
-                fileContent = fileContent.slice(0, 12000) + '\n\n[... truncated for brevity ...]';
+              // Security: Validate target path remains within workspace boundaries to prevent path traversal
+              if (!isPathWithinWorkspace(workspaceRoot, fileUri)) {
+                fileContent = 'Error: Path traversal detected. Access to file outside workspace is denied.';
+              } else {
+                const fileBytes = await vscode.workspace.fs.readFile(fileUri);
+                fileContent = Buffer.from(fileBytes).toString('utf-8');
+                // Truncate if excessively long to keep prompt efficient
+                if (fileContent.length > 12000) {
+                  fileContent = fileContent.slice(0, 12000) + '\n\n[... truncated for brevity ...]';
+                }
               }
             } else {
               fileContent = 'Error: No workspace root folder open.';
@@ -389,9 +395,14 @@ Rules:
           try {
             if (workspaceRoot) {
               const fileUri = vscode.Uri.joinPath(workspaceRoot, filePath);
-              const bytes = Buffer.from(action.content, 'utf-8');
-              await vscode.workspace.fs.writeFile(fileUri, bytes);
-              writeResult = `File ${filePath} written successfully.`;
+              // Security: Validate target path remains within workspace boundaries to prevent path traversal
+              if (!isPathWithinWorkspace(workspaceRoot, fileUri)) {
+                writeResult = 'Error: Path traversal detected. Access to file outside workspace is denied.';
+              } else {
+                const bytes = Buffer.from(action.content, 'utf-8');
+                await vscode.workspace.fs.writeFile(fileUri, bytes);
+                writeResult = `File ${filePath} written successfully.`;
+              }
             } else {
               writeResult = 'Error: No workspace root folder open.';
             }
@@ -594,4 +605,14 @@ Rules:
     this.activeTasks.clear();
     this.outputChannel.dispose();
   }
+}
+
+/**
+ * Security helper to verify that a target file URI is strictly inside the workspace directory.
+ * Prevents path traversal vulnerabilities where an AI action attempts to escape workspace scope via `../`.
+ */
+function isPathWithinWorkspace(workspaceUri: vscode.Uri, targetUri: vscode.Uri): boolean {
+  if (!workspaceUri.fsPath || !targetUri.fsPath) return false;
+  const rel = path.relative(workspaceUri.fsPath, targetUri.fsPath);
+  return !rel.startsWith('..') && !path.isAbsolute(rel);
 }
