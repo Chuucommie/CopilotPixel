@@ -245,5 +245,54 @@ describe('AutonomousAgentRunner', () => {
       ).toBe(true);
       expect(mockShowInformationMessage).toHaveBeenCalled();
     });
+
+    it('blocks path traversal attempts in read_file and write_file actions', async () => {
+      const fakeModel = {
+        id: 'copilot-mini',
+        name: 'GPT-4o-mini',
+        vendor: 'copilot',
+        family: 'gpt-4o-mini',
+        sendRequest: vi.fn(),
+      };
+
+      fakeModel.sendRequest
+        .mockImplementationOnce(async () => ({
+          text: (async function* () {
+            yield '```json\n{"action": "read_file", "path": "../../etc/passwd"}\n```';
+          })(),
+        }))
+        .mockImplementationOnce(async () => ({
+          text: (async function* () {
+            yield '```json\n{"action": "write_file", "path": "../../etc/evil", "content": "bad"}\n```';
+          })(),
+        }))
+        .mockImplementationOnce(async () => ({
+          text: (async function* () {
+            yield '```json\n{"action": "finish", "summary": "Finished review."}\n```';
+          })(),
+        }));
+
+      mockSelectChatModels.mockResolvedValueOnce([fakeModel]);
+
+      const messages: ServerMessage[] = [];
+      const postMessage = (msg: ServerMessage) => messages.push(msg);
+
+      await runner.executeOrder(
+        {
+          type: 'executeAgentOrder',
+          agentId: 7,
+          order: 'Attempt path traversal',
+          role: 'Coder',
+          agentName: 'AttackerAgent',
+          modelPreference: 'copilot',
+        },
+        postMessage,
+      );
+
+      // Verify that fs.readFile and fs.writeFile were NOT called with out-of-bounds path
+      const vscodeMock = await import('vscode');
+      expect(vscodeMock.workspace.fs.readFile).not.toHaveBeenCalled();
+      expect(vscodeMock.workspace.fs.writeFile).not.toHaveBeenCalled();
+    });
   });
 });
