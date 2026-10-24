@@ -132,6 +132,77 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
     });
   });
 
+  // ── addExternalAssetDirectory validation ──────────────────────
+
+  describe('addExternalAssetDirectory', () => {
+    it('accepts a valid existing directory and adds it to config', () => {
+      const validDir = path.join(tempHome, 'custom-assets');
+      fs.mkdirSync(validDir);
+
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: validDir },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).toContain(validDir);
+      const updateMsg = sent.find((m) => m.type === 'externalAssetDirectoriesUpdated');
+      expect(updateMsg).toBeDefined();
+    });
+
+    it('rejects a non-existent path', () => {
+      const nonExistent = path.join(tempHome, 'does-not-exist');
+
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: nonExistent },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).not.toContain(nonExistent);
+      expect(sent.find((m) => m.type === 'externalAssetDirectoriesUpdated')).toBeUndefined();
+    });
+
+    it('rejects a path pointing to a file instead of a directory', () => {
+      const filePath = path.join(tempHome, 'somefile.txt');
+      fs.writeFileSync(filePath, 'hello');
+
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: filePath },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).not.toContain(filePath);
+      expect(sent.find((m) => m.type === 'externalAssetDirectoriesUpdated')).toBeUndefined();
+    });
+
+    it('rejects invalid type or empty path or overly long path', () => {
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: 12345 },
+        (m) => sent.push(m),
+        ctx,
+      );
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: '   ' },
+        (m) => sent.push(m),
+        ctx,
+      );
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: 'a'.repeat(1025) },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).toEqual([]);
+      expect(sent.find((m) => m.type === 'externalAssetDirectoriesUpdated')).toBeUndefined();
+    });
+  });
+
   // ── setShowAreas ─────────────────────────────────────────────
 
   describe('setShowAreas', () => {
