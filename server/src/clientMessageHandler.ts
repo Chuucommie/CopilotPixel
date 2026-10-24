@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+
 import type { HookProvider } from '../../core/src/provider.js';
 import { resendAgentActivity } from './agentActivityResend.js';
 import { buildAgentDiagnostics } from './agentDiagnostics.js';
@@ -230,8 +232,16 @@ export function handleClientMessage(
       break;
 
     case 'addExternalAssetDirectory': {
-      const newPath = msg.path as string | undefined;
-      if (!newPath) break;
+      const newPath = msg.path;
+      if (typeof newPath !== 'string' || !newPath.trim() || newPath.length > 1024) break;
+      try {
+        if (!fs.existsSync(newPath) || !fs.statSync(newPath).isDirectory()) {
+          console.warn(`[CopilotAgents] Invalid asset directory rejected: "${newPath}"`);
+          break;
+        }
+      } catch {
+        break;
+      }
       const cfg = readConfig();
       if (!cfg.externalAssetDirectories.includes(newPath)) {
         cfg.externalAssetDirectories.push(newPath);
