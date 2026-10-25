@@ -87,6 +87,87 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
     fs.rmSync(tempHome, { recursive: true, force: true });
   });
 
+  // ── addExternalAssetDirectory validation ────────────────────
+
+  describe('addExternalAssetDirectory validation', () => {
+    it('accepts valid existing absolute directory and updates config', () => {
+      const validDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pxl-valid-asset-dir-'));
+      let reloaded = false;
+      ctx.onReloadAssets = () => {
+        reloaded = true;
+      };
+
+      try {
+        handleClientMessage(
+          { type: 'addExternalAssetDirectory', path: validDir },
+          (m) => sent.push(m),
+          ctx,
+        );
+
+        const cfg = readConfig();
+        expect(cfg.externalAssetDirectories).toContain(validDir);
+        expect(sent).toContainEqual({
+          type: 'externalAssetDirectoriesUpdated',
+          dirs: cfg.externalAssetDirectories,
+        });
+        expect(reloaded).toBe(true);
+      } finally {
+        fs.rmSync(validDir, { recursive: true, force: true });
+      }
+    });
+
+    it('rejects relative path', () => {
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: './relative/path' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).not.toContain('./relative/path');
+      expect(sent).toHaveLength(0);
+    });
+
+    it('rejects non-existent path', () => {
+      const nonExistent = path.join(tempHome, 'does-not-exist-dir');
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: nonExistent },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).not.toContain(nonExistent);
+      expect(sent).toHaveLength(0);
+    });
+
+    it('rejects path to a file (not a directory)', () => {
+      const filePath = path.join(tempHome, 'test-file.txt');
+      fs.writeFileSync(filePath, 'hello');
+
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: filePath },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).not.toContain(filePath);
+      expect(sent).toHaveLength(0);
+    });
+
+    it('rejects non-string path', () => {
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: 12345 },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(sent).toHaveLength(0);
+    });
+  });
+
   // ── saveAreaMappings ─────────────────────────────────────────
 
   describe('saveAreaMappings', () => {
