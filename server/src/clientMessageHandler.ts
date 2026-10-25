@@ -1,3 +1,6 @@
+import * as fs from 'fs';
+import * as path from 'path';
+
 import type { HookProvider } from '../../core/src/provider.js';
 import { resendAgentActivity } from './agentActivityResend.js';
 import { buildAgentDiagnostics } from './agentDiagnostics.js';
@@ -231,7 +234,13 @@ export function handleClientMessage(
 
     case 'addExternalAssetDirectory': {
       const newPath = msg.path as string | undefined;
-      if (!newPath) break;
+      // Security validation: path must be a non-empty string, absolute, exist on disk, and be a directory.
+      if (!newPath || typeof newPath !== 'string' || !path.isAbsolute(newPath)) break;
+      try {
+        if (!fs.existsSync(newPath) || !fs.statSync(newPath).isDirectory()) break;
+      } catch {
+        break;
+      }
       const cfg = readConfig();
       if (!cfg.externalAssetDirectories.includes(newPath)) {
         cfg.externalAssetDirectories.push(newPath);
