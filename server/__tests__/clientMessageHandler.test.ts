@@ -132,6 +132,105 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
     });
   });
 
+  // ── externalAssetDirectories privilege enforcement ───────────
+
+  describe('externalAssetDirectories privilege enforcement', () => {
+    it('ignores addExternalAssetDirectory when client is unprivileged', () => {
+      let reloadCalled = false;
+      ctx.privileged = false;
+      ctx.onReloadAssets = () => {
+        reloadCalled = true;
+      };
+
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: '/tmp/custom-assets' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).not.toContain('/tmp/custom-assets');
+      expect(reloadCalled).toBe(false);
+      expect(sent).toHaveLength(0);
+    });
+
+    it('allows addExternalAssetDirectory when client is privileged', () => {
+      let reloadCalled = false;
+      ctx.privileged = true;
+      ctx.onReloadAssets = () => {
+        reloadCalled = true;
+      };
+
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: '/tmp/custom-assets' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).toContain('/tmp/custom-assets');
+      expect(reloadCalled).toBe(true);
+      expect(sent.find((m) => m.type === 'externalAssetDirectoriesUpdated')).toEqual({
+        type: 'externalAssetDirectoriesUpdated',
+        dirs: cfg.externalAssetDirectories,
+      });
+    });
+
+    it('ignores removeExternalAssetDirectory when client is unprivileged', () => {
+      let reloadCalled = false;
+      ctx.privileged = true;
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: '/tmp/to-remove' },
+        () => {},
+        ctx,
+      );
+
+      ctx.privileged = false;
+      ctx.onReloadAssets = () => {
+        reloadCalled = true;
+      };
+
+      handleClientMessage(
+        { type: 'removeExternalAssetDirectory', path: '/tmp/to-remove' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).toContain('/tmp/to-remove');
+      expect(reloadCalled).toBe(false);
+      expect(sent).toHaveLength(0);
+    });
+
+    it('allows removeExternalAssetDirectory when client is privileged', () => {
+      let reloadCalled = false;
+      ctx.privileged = true;
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: '/tmp/to-remove' },
+        () => {},
+        ctx,
+      );
+
+      ctx.onReloadAssets = () => {
+        reloadCalled = true;
+      };
+
+      handleClientMessage(
+        { type: 'removeExternalAssetDirectory', path: '/tmp/to-remove' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).not.toContain('/tmp/to-remove');
+      expect(reloadCalled).toBe(true);
+      expect(sent.find((m) => m.type === 'externalAssetDirectoriesUpdated')).toEqual({
+        type: 'externalAssetDirectoriesUpdated',
+        dirs: cfg.externalAssetDirectories,
+      });
+    });
+  });
+
   // ── setShowAreas ─────────────────────────────────────────────
 
   describe('setShowAreas', () => {

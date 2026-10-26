@@ -1,0 +1,4 @@
+## 2026-10-16 - WebSocket Client Message Privilege Verification Gap
+**Vulnerability:** Unprivileged / untokened WebSocket clients could issue `addExternalAssetDirectory` and `removeExternalAssetDirectory` messages to alter persistent server configuration (`config.json`) and trigger directory scanning.
+**Learning:** `handleClientMessage` delegates server actions based on WebSocket message types. Handlers modifying disk configuration or system state must explicitly check `ctx.privileged`, which is set by transport authentication gates (`standaloneTokenValid` or Bearer token).
+**Prevention:** Whenever adding new WebSocket message types to `handleClientMessage` in `server/src/clientMessageHandler.ts` that write config or touch filesystem resources, always check `if (!ctx.privileged)` before executing the handler logic.
