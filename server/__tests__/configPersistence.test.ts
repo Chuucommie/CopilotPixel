@@ -39,12 +39,24 @@ describe('configPersistence: areas', () => {
   // ── parseAreaMappings ────────────────────────────────────────
 
   describe('parseAreaMappings', () => {
-    it('returns empty object for non-object input (null, undefined, primitives)', () => {
+    it('returns empty object for non-object input (null, undefined, primitives, arrays)', () => {
       expect(parseAreaMappings(null)).toEqual({});
       expect(parseAreaMappings(undefined)).toEqual({});
       expect(parseAreaMappings(42)).toEqual({});
       expect(parseAreaMappings('foo')).toEqual({});
       expect(parseAreaMappings(true)).toEqual({});
+      expect(parseAreaMappings(['foo', 'bar'])).toEqual({});
+    });
+
+    it('filters out prototype property keys to prevent pollution', () => {
+      const input = JSON.parse(
+        '{"__proto__": ["bad"], "constructor": ["bad"], "prototype": ["bad"], "frontend": ["Engineering"]}',
+      );
+      const result = parseAreaMappings(input);
+      expect(result).toEqual({ frontend: ['Engineering'] });
+      expect(Object.prototype.hasOwnProperty.call(result, '__proto__')).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(result, 'constructor')).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(result, 'prototype')).toBe(false);
     });
 
     it('accepts a valid Record<string, string[]>', () => {

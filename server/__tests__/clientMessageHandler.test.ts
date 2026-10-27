@@ -119,6 +119,25 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
       expect(cfg.standalone.areaMappings).toEqual({});
     });
 
+    it('sanitizes malformed and prototype-polluting mappings payloads before persisting', () => {
+      const maliciousPayload = JSON.parse(
+        '{"__proto__": ["bad"], "frontend": ["Engineering", 123, null], "invalidFolder": "not-an-array"}',
+      );
+      handleClientMessage(
+        { type: 'saveAreaMappings', mappings: maliciousPayload },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.standalone.areaMappings).toEqual({
+        frontend: ['Engineering'],
+      });
+      expect(Object.prototype.hasOwnProperty.call(cfg.standalone.areaMappings, '__proto__')).toBe(
+        false,
+      );
+    });
+
     it('does not leak into the vscode namespace', () => {
       handleClientMessage(
         { type: 'saveAreaMappings', mappings: { frontend: ['Engineering'] } },
