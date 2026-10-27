@@ -107,12 +107,17 @@ function parseHooksEnabled(raw: unknown): Record<string, boolean> {
  * may have been hand-edited or written by an older build.
  */
 export function parseAreaMappings(raw: unknown): Record<string, string[]> {
-  if (!raw || typeof raw !== 'object') {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return {};
   }
   const out: Record<string, string[]> = {};
   for (const [folder, labels] of Object.entries(raw as Record<string, unknown>)) {
-    if (typeof folder !== 'string') {
+    if (
+      typeof folder !== 'string' ||
+      folder === '__proto__' ||
+      folder === 'constructor' ||
+      folder === 'prototype'
+    ) {
       continue;
     }
     if (!Array.isArray(labels)) {

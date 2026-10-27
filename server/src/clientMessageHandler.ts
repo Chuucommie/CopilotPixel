@@ -7,6 +7,7 @@ import type { LoadedAssets, LoadedCharacterSprites, LoadedPetSprites } from './a
 import {
   getHooksConsent,
   getHooksEnabled,
+  parseAreaMappings,
   readConfig,
   setHooksEnabled,
   writeConfig,
@@ -254,12 +255,8 @@ export function handleClientMessage(
     }
 
     case 'saveAreaMappings': {
-      const rawMappings = msg.mappings;
-      if (!rawMappings || typeof rawMappings !== 'object') {
-        break;
-      }
       const cfg = readConfig();
-      cfg.standalone.areaMappings = rawMappings as Record<string, string[]>;
+      cfg.standalone.areaMappings = parseAreaMappings(msg.mappings);
       writeConfig(cfg);
       break;
     }
