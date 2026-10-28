@@ -230,6 +230,12 @@ export function handleClientMessage(
       break;
 
     case 'addExternalAssetDirectory': {
+      if (!ctx.privileged) {
+        console.warn(
+          '[CopilotAgents] Ignoring addExternalAssetDirectory from an untokened client — modifying configuration needs approval from this machine.',
+        );
+        break;
+      }
       const newPath = msg.path as string | undefined;
       if (!newPath) break;
       const cfg = readConfig();
@@ -243,6 +249,12 @@ export function handleClientMessage(
     }
 
     case 'removeExternalAssetDirectory': {
+      if (!ctx.privileged) {
+        console.warn(
+          '[CopilotAgents] Ignoring removeExternalAssetDirectory from an untokened client — modifying configuration needs approval from this machine.',
+        );
+        break;
+      }
       const removePath = msg.path as string | undefined;
       if (!removePath) break;
       const cfg = readConfig();

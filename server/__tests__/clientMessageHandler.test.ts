@@ -179,6 +179,114 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
     });
   });
 
+  // ── externalAssetDirectories privilege checks ─────────────
+
+  describe('externalAssetDirectories privilege checks', () => {
+    it('ignores addExternalAssetDirectory when client is unprivileged', () => {
+      let reloaded = false;
+      ctx.privileged = false;
+      ctx.onReloadAssets = () => {
+        reloaded = true;
+      };
+
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: '/untrusted/path' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).not.toContain('/untrusted/path');
+      expect(reloaded).toBe(false);
+      expect(sent).toHaveLength(0);
+    });
+
+    it('allows addExternalAssetDirectory when client is privileged', () => {
+      let reloaded = false;
+      ctx.privileged = true;
+      ctx.onReloadAssets = () => {
+        reloaded = true;
+      };
+
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: '/trusted/path' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).toContain('/trusted/path');
+      expect(reloaded).toBe(true);
+      expect(sent).toContainEqual({
+        type: 'externalAssetDirectoriesUpdated',
+        dirs: cfg.externalAssetDirectories,
+      });
+    });
+
+    it('ignores removeExternalAssetDirectory when client is unprivileged', () => {
+      // Pre-seed an external asset directory in config
+      let cfg = readConfig();
+      cfg.externalAssetDirectories = ['/existing/path'];
+      fs.mkdirSync(path.dirname(path.join(tempHome, '.pixel-office', 'config.json')), {
+        recursive: true,
+      });
+      fs.writeFileSync(
+        path.join(tempHome, '.pixel-office', 'config.json'),
+        JSON.stringify(cfg),
+      );
+
+      let reloaded = false;
+      ctx.privileged = false;
+      ctx.onReloadAssets = () => {
+        reloaded = true;
+      };
+
+      handleClientMessage(
+        { type: 'removeExternalAssetDirectory', path: '/existing/path' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      cfg = readConfig();
+      expect(cfg.externalAssetDirectories).toContain('/existing/path');
+      expect(reloaded).toBe(false);
+      expect(sent).toHaveLength(0);
+    });
+
+    it('allows removeExternalAssetDirectory when client is privileged', () => {
+      // Pre-seed an external asset directory in config
+      let cfg = readConfig();
+      cfg.externalAssetDirectories = ['/existing/path'];
+      fs.mkdirSync(path.dirname(path.join(tempHome, '.pixel-office', 'config.json')), {
+        recursive: true,
+      });
+      fs.writeFileSync(
+        path.join(tempHome, '.pixel-office', 'config.json'),
+        JSON.stringify(cfg),
+      );
+
+      let reloaded = false;
+      ctx.privileged = true;
+      ctx.onReloadAssets = () => {
+        reloaded = true;
+      };
+
+      handleClientMessage(
+        { type: 'removeExternalAssetDirectory', path: '/existing/path' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      cfg = readConfig();
+      expect(cfg.externalAssetDirectories).not.toContain('/existing/path');
+      expect(reloaded).toBe(true);
+      expect(sent).toContainEqual({
+        type: 'externalAssetDirectoriesUpdated',
+        dirs: cfg.externalAssetDirectories,
+      });
+    });
+  });
+
   // ── setHooksEnabled: preference vs reality ───────────────────
 
   describe('setHooksEnabled persistence', () => {
