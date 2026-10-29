@@ -28,5 +28,6 @@ jobs:
             ci
             build
           requireScope: false
+          headerPattern: '^(?:.*:\s*)?(\w+)(?:\(([\w\$.\-* ]+)\))?!?: (.*)$'
           subjectPattern: ^[a-z].+$
           subjectPatternError: "PR title subject must start with a lowercase letter: '{subject}'"

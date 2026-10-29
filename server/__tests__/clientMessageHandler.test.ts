@@ -179,6 +179,81 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
     });
   });
 
+  // ── externalAssetDirectories privilege checks ────────────────
+
+  describe('externalAssetDirectories privilege checks', () => {
+    it('ignores addExternalAssetDirectory when client is not privileged', () => {
+      ctx.privileged = false;
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: '/test/assets' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).not.toContain('/test/assets');
+      expect(sent).toHaveLength(0);
+    });
+
+    it('allows addExternalAssetDirectory when client is privileged', () => {
+      ctx.privileged = true;
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: '/test/assets' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).toContain('/test/assets');
+      expect(sent).toEqual([
+        { type: 'externalAssetDirectoriesUpdated', dirs: cfg.externalAssetDirectories },
+      ]);
+    });
+
+    it('ignores removeExternalAssetDirectory when client is not privileged', () => {
+      ctx.privileged = true;
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: '/test/assets' },
+        (m) => sent.push(m),
+        ctx,
+      );
+      sent = [];
+
+      ctx.privileged = false;
+      handleClientMessage(
+        { type: 'removeExternalAssetDirectory', path: '/test/assets' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).toContain('/test/assets');
+      expect(sent).toHaveLength(0);
+    });
+
+    it('allows removeExternalAssetDirectory when client is privileged', () => {
+      ctx.privileged = true;
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: '/test/assets' },
+        (m) => sent.push(m),
+        ctx,
+      );
+      sent = [];
+
+      handleClientMessage(
+        { type: 'removeExternalAssetDirectory', path: '/test/assets' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).not.toContain('/test/assets');
+      expect(sent).toEqual([
+        { type: 'externalAssetDirectoriesUpdated', dirs: cfg.externalAssetDirectories },
+      ]);
+    });
+  });
+
   // ── setHooksEnabled: preference vs reality ───────────────────
 
   describe('setHooksEnabled persistence', () => {
