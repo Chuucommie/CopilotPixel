@@ -53,9 +53,9 @@ export interface ClientMessageContext {
   /** Reload assets after an external-asset-directory change. Needs the dist root, known only to cli.ts. */
   onReloadAssets?: ReloadAssetsSideEffect;
   /**
-   * Whether this client may send messages that reach OUTSIDE `~/.copilot-agents/`
-   * — today only `setHooksEnabled`, which grants machine-wide consent to modify
-   * user hook configurations. Decided per-connection by the transport
+   * Whether this client may send messages that mutate persistent server configuration
+   * or trigger server-side side-effects (`setHooksEnabled`, `addExternalAssetDirectory`,
+   * `removeExternalAssetDirectory`). Decided per-connection by the transport
    * (httpServer's standaloneTokenValid, or the embedded Bearer token); defaults
    * to false so a caller that forgets to pass it gets the safe answer.
    */
@@ -230,8 +230,14 @@ export function handleClientMessage(
       break;
 
     case 'addExternalAssetDirectory': {
-      const newPath = msg.path as string | undefined;
-      if (!newPath) break;
+      if (!ctx.privileged) {
+        console.warn(
+          '[CopilotAgents] Ignoring addExternalAssetDirectory from an untokened client — modifying asset directories needs approval from this machine.',
+        );
+        break;
+      }
+      const newPath = msg.path;
+      if (typeof newPath !== 'string' || !newPath) break;
       const cfg = readConfig();
       if (!cfg.externalAssetDirectories.includes(newPath)) {
         cfg.externalAssetDirectories.push(newPath);
@@ -243,8 +249,14 @@ export function handleClientMessage(
     }
 
     case 'removeExternalAssetDirectory': {
-      const removePath = msg.path as string | undefined;
-      if (!removePath) break;
+      if (!ctx.privileged) {
+        console.warn(
+          '[CopilotAgents] Ignoring removeExternalAssetDirectory from an untokened client — modifying asset directories needs approval from this machine.',
+        );
+        break;
+      }
+      const removePath = msg.path;
+      if (typeof removePath !== 'string' || !removePath) break;
       const cfg = readConfig();
       cfg.externalAssetDirectories = cfg.externalAssetDirectories.filter((d) => d !== removePath);
       writeConfig(cfg);
