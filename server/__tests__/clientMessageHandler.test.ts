@@ -293,6 +293,136 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
     });
   });
 
+  // ── externalAssetDirectories privilege checks ─────────────
+
+  describe('externalAssetDirectories privilege checks', () => {
+    it('ignores addExternalAssetDirectory when client is not privileged', () => {
+      let reloadRan = false;
+      ctx.privileged = false;
+      ctx.onReloadAssets = () => {
+        reloadRan = true;
+      };
+
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: '/tmp/custom-assets' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).not.toContain('/tmp/custom-assets');
+      expect(reloadRan).toBe(false);
+      expect(sent.find((m) => m.type === 'externalAssetDirectoriesUpdated')).toBeUndefined();
+    });
+
+    it('allows addExternalAssetDirectory when client is privileged', () => {
+      let reloadRan = false;
+      ctx.privileged = true;
+      ctx.onReloadAssets = () => {
+        reloadRan = true;
+      };
+
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: '/tmp/custom-assets' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).toContain('/tmp/custom-assets');
+      expect(reloadRan).toBe(true);
+      expect(sent.find((m) => m.type === 'externalAssetDirectoriesUpdated')).toEqual({
+        type: 'externalAssetDirectoriesUpdated',
+        dirs: cfg.externalAssetDirectories,
+      });
+    });
+
+    it('ignores removeExternalAssetDirectory when client is not privileged', () => {
+      // Pre-seed an external asset directory
+      const initialCfg = readConfig();
+      initialCfg.externalAssetDirectories = ['/tmp/existing-assets'];
+      fs.mkdirSync(path.dirname(path.join(tempHome, '.pixel-office', 'config.json')), {
+        recursive: true,
+      });
+      fs.writeFileSync(
+        path.join(tempHome, '.pixel-office', 'config.json'),
+        JSON.stringify(initialCfg),
+      );
+
+      let reloadRan = false;
+      ctx.privileged = false;
+      ctx.onReloadAssets = () => {
+        reloadRan = true;
+      };
+
+      handleClientMessage(
+        { type: 'removeExternalAssetDirectory', path: '/tmp/existing-assets' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).toContain('/tmp/existing-assets');
+      expect(reloadRan).toBe(false);
+      expect(sent.find((m) => m.type === 'externalAssetDirectoriesUpdated')).toBeUndefined();
+    });
+
+    it('allows removeExternalAssetDirectory when client is privileged', () => {
+      // Pre-seed an external asset directory
+      const initialCfg = readConfig();
+      initialCfg.externalAssetDirectories = ['/tmp/existing-assets'];
+      fs.mkdirSync(path.dirname(path.join(tempHome, '.pixel-office', 'config.json')), {
+        recursive: true,
+      });
+      fs.writeFileSync(
+        path.join(tempHome, '.pixel-office', 'config.json'),
+        JSON.stringify(initialCfg),
+      );
+
+      let reloadRan = false;
+      ctx.privileged = true;
+      ctx.onReloadAssets = () => {
+        reloadRan = true;
+      };
+
+      handleClientMessage(
+        { type: 'removeExternalAssetDirectory', path: '/tmp/existing-assets' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).not.toContain('/tmp/existing-assets');
+      expect(reloadRan).toBe(true);
+      expect(sent.find((m) => m.type === 'externalAssetDirectoriesUpdated')).toEqual({
+        type: 'externalAssetDirectoriesUpdated',
+        dirs: [],
+      });
+    });
+
+    it('ignores addExternalAssetDirectory and removeExternalAssetDirectory if path is not a string', () => {
+      let reloadRan = false;
+      ctx.privileged = true;
+      ctx.onReloadAssets = () => {
+        reloadRan = true;
+      };
+
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: 123 },
+        (m) => sent.push(m),
+        ctx,
+      );
+      handleClientMessage(
+        { type: 'removeExternalAssetDirectory', path: { invalid: true } },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      expect(reloadRan).toBe(false);
+      expect(sent.find((m) => m.type === 'externalAssetDirectoriesUpdated')).toBeUndefined();
+    });
+  });
+
   // ── handleWebviewReady ordering ──────────────────────────────
 
   describe('handleWebviewReady ordering', () => {
