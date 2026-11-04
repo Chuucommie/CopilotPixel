@@ -53,11 +53,12 @@ export interface ClientMessageContext {
   /** Reload assets after an external-asset-directory change. Needs the dist root, known only to cli.ts. */
   onReloadAssets?: ReloadAssetsSideEffect;
   /**
-   * Whether this client may send messages that reach OUTSIDE `~/.copilot-agents/`
-   * — today only `setHooksEnabled`, which grants machine-wide consent to modify
-   * user hook configurations. Decided per-connection by the transport
-   * (httpServer's standaloneTokenValid, or the embedded Bearer token); defaults
-   * to false so a caller that forgets to pass it gets the safe answer.
+   * Whether this client may send messages that perform privileged actions
+   * (e.g., setHooksEnabled to modify user hook configurations, or modifying
+   * externalAssetDirectories which points file loading to arbitrary filesystem paths).
+   * Decided per-connection by the transport (httpServer's standaloneTokenValid,
+   * or the embedded Bearer token); defaults to false so a caller that forgets to pass
+   * it gets the safe answer.
    */
   privileged?: boolean;
 }
@@ -230,6 +231,12 @@ export function handleClientMessage(
       break;
 
     case 'addExternalAssetDirectory': {
+      if (!ctx.privileged) {
+        console.warn(
+          '[CopilotAgents] Ignoring addExternalAssetDirectory from an untokened client — external asset paths require approval from this machine.',
+        );
+        break;
+      }
       const newPath = msg.path as string | undefined;
       if (!newPath) break;
       const cfg = readConfig();
@@ -243,6 +250,12 @@ export function handleClientMessage(
     }
 
     case 'removeExternalAssetDirectory': {
+      if (!ctx.privileged) {
+        console.warn(
+          '[CopilotAgents] Ignoring removeExternalAssetDirectory from an untokened client — external asset paths require approval from this machine.',
+        );
+        break;
+      }
       const removePath = msg.path as string | undefined;
       if (!removePath) break;
       const cfg = readConfig();

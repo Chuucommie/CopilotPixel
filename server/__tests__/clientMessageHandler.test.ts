@@ -9,7 +9,12 @@ import {
   type ClientMessageContext,
   handleClientMessage,
 } from '../src/clientMessageHandler.js';
-import { getHooksEnabled, readConfig, setHooksEnabled } from '../src/configPersistence.js';
+import {
+  getHooksEnabled,
+  readConfig,
+  setHooksEnabled,
+  writeConfig,
+} from '../src/configPersistence.js';
 import { FileStateAdapter } from '../src/fileStateAdapter.js';
 import { COPILOT_HOOK_EVENTS } from '../src/providers/hook/copilot/constants.js';
 import type { AgentState } from '../src/types.js';
@@ -603,5 +608,79 @@ describe('clientMessageHandler: saveAgentSeats palette sync', () => {
       ctx,
     );
     expect(store.get(1)?.palette).toBe(7);
+  });
+
+  // ── externalAssetDirectories privilege check ─────────────────
+
+  describe('externalAssetDirectories privilege checks', () => {
+    it('ignores addExternalAssetDirectory when client is unprivileged', () => {
+      let reloadCalled = false;
+      ctx.privileged = false;
+      ctx.onReloadAssets = () => {
+        reloadCalled = true;
+      };
+
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: '/etc/malicious' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      const cfg = readConfig();
+      expect(cfg.externalAssetDirectories).toEqual([]);
+      expect(reloadCalled).toBe(false);
+      expect(sent.filter((m) => m.type === 'externalAssetDirectoriesUpdated')).toHaveLength(0);
+    });
+
+    it('allows addExternalAssetDirectory and removeExternalAssetDirectory when client is privileged', () => {
+      let reloadCalls = 0;
+      ctx.privileged = true;
+      ctx.onReloadAssets = () => {
+        reloadCalls++;
+      };
+
+      handleClientMessage(
+        { type: 'addExternalAssetDirectory', path: '/custom/assets' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      let cfg = readConfig();
+      expect(cfg.externalAssetDirectories).toEqual(['/custom/assets']);
+      expect(reloadCalls).toBe(1);
+
+      handleClientMessage(
+        { type: 'removeExternalAssetDirectory', path: '/custom/assets' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      cfg = readConfig();
+      expect(cfg.externalAssetDirectories).toEqual([]);
+      expect(reloadCalls).toBe(2);
+    });
+
+    it('ignores removeExternalAssetDirectory when client is unprivileged', () => {
+      // Pre-seed config with a directory
+      const cfg = readConfig();
+      cfg.externalAssetDirectories = ['/safe/assets'];
+      writeConfig(cfg);
+
+      let reloadCalled = false;
+      ctx.privileged = false;
+      ctx.onReloadAssets = () => {
+        reloadCalled = true;
+      };
+
+      handleClientMessage(
+        { type: 'removeExternalAssetDirectory', path: '/safe/assets' },
+        (m) => sent.push(m),
+        ctx,
+      );
+
+      expect(readConfig().externalAssetDirectories).toEqual(['/safe/assets']);
+      expect(reloadCalled).toBe(false);
+      expect(sent.filter((m) => m.type === 'externalAssetDirectoriesUpdated')).toHaveLength(0);
+    });
   });
 });
